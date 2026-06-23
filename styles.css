@@ -378,8 +378,7 @@ body { background-color: var(--bg-base); color: var(--text-primary); -webkit-fon
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(5, 10, 25, 0.92);
-    backdrop-filter: blur(12px);
+    background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.15), var(--bg-base) 60%), var(--bg-base);
     z-index: 10000;
     align-items: center;
     justify-content: center;
