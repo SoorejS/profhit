@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROPHIT - Precision Forecasting Platform</title>
+    <meta name="description" content="PROPHIT is India's premier prediction market platform. Trade on politics, finance, technology, and global events with real-time odds.">
+    <meta property="og:title" content="PROPHIT - Precision Forecasting">
+    <meta property="og:description" content="India's premier prediction market. Forecast events, earn points, climb the leaderboard.">
+    <!-- Razorpay Checkout for Payments -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-layout">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-chart-line logo-icon"></i>
+                    <span>PROPHIT</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-target="view-markets"><i class="fa-solid fa-house"></i> Markets</a>
+                <a href="#" class="nav-link" data-target="view-portfolio"><i class="fa-solid fa-chart-pie"></i> Portfolio</a>
+                <a href="#" class="nav-link" data-target="view-leaderboard"><i class="fa-solid fa-ranking-star"></i> Leaderboard</a>
+                <a href="#" class="nav-link" data-target="view-activity"><i class="fa-solid fa-bolt"></i> Activity</a>
+                <a href="#" class="nav-link admin-link hidden" data-target="view-admin" id="navAdminBtn"><i class="fa-solid fa-lock"></i> Admin Panel</a>
+                
+                <div class="nav-section-title">Categories</div>
+                <a href="#" class="nav-link category-link" data-target="view-category-politics"><i class="fa-solid fa-landmark"></i> Politics</a>
+                <a href="#" class="nav-link category-link" data-target="view-category-finance"><i class="fa-solid fa-money-bill-trend-up"></i> Finance</a>
+                <a href="#" class="nav-link category-link" data-target="view-category-technology"><i class="fa-solid fa-microchip"></i> Technology</a>
+                <a href="#" class="nav-link category-link" data-target="view-category-global"><i class="fa-solid fa-globe"></i> Global News</a>
+
+                <div class="dropdown-divider" style="margin: 1rem 0;"></div>
+
+                <button class="auth-submit" style="width: 100%; margin-top: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--gold-light);" onclick="openProposeModal()">
+                    <i class="fa-solid fa-plus-circle"></i> Propose Market
+                </button>
+            </nav>
+
+            <!-- Legal & Ethics Widget in Sidebar -->
+            <div class="ethics-widget">
+                <div class="widget-title"><i class="fa-solid fa-shield-halved"></i> Ethics & Compliance</div>
+                <div class="widget-item">
+                    <i class="fa-solid fa-fingerprint text-green"></i> <span>Aadhaar KYC Active</span>
+                </div>
+                <div class="widget-item">
+                    <i class="fa-solid fa-scale-balanced text-gold"></i> <span>Game of Skill Verified</span>
+                </div>
+                <div class="widget-item">
+                    <i class="fa-solid fa-ban text-red"></i> <span>100 pts/day Cap Enforced</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Top Navigation Bar -->
+            <header class="topbar">
+                <div class="search-container">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" placeholder="Search markets, categories, or events...">
+                </div>
+                
+                <div class="topbar-actions">
+                    <div class="points-balance" style="display:flex; gap:0.5rem;">
+                        <button class="auth-submit" style="padding:0.4rem 0.8rem; font-size:0.85rem;" onclick="openDepositModal()"><i class="fa-solid fa-plus"></i> Deposit</button>
+                        <button class="auth-submit" style="padding:0.4rem 0.8rem; font-size:0.85rem; background:var(--bg-secondary); color:white; border:1px solid var(--border-color);" onclick="withdrawFunds()"><i class="fa-solid fa-building-columns"></i> Withdraw</button>
+                    </div>
+                    
+                    <div class="points-balance" style="background:var(--bg-card); padding:0.4rem 1rem; border-radius:20px; font-weight:bold; border:1px solid var(--border-color);">
+                        <i class="fa-solid fa-coins gold-text"></i> <span class="points-value">85</span> PTS
+                    </div>
+                    
+                    <button class="tier-btn gold-tier" id="kycBtn" onclick="upgradeKyc()">
+                        <i class="fa-solid fa-crown"></i> <span id="kycBtnText">Gold</span>
+                    </button>
+                    
+                    <div class="profile-menu">
+                        <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128&bold=true" alt="Profile" id="profileImage">
+                        <div class="profile-dropdown" id="profileDropdown">
+                            <div class="dropdown-header">
+                                <strong>@You</strong>
+                                <span class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--gold-light); width: fit-content; margin-top: 4px;">Gold Tier</span>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item"><i class="fa-solid fa-user"></i> My Profile</a>
+                            <a href="#" class="dropdown-item"><i class="fa-solid fa-wallet"></i> Wallet & Funds</a>
+                            <a href="#" class="dropdown-item"><i class="fa-solid fa-gear"></i> Settings</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item text-red"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="mobile-categories-scroll">
+                <a href="#" class="mobile-cat-link nav-link category-link" data-target="view-category-politics">Politics</a>
+                <a href="#" class="mobile-cat-link nav-link category-link" data-target="view-category-finance">Finance</a>
+                <a href="#" class="mobile-cat-link nav-link category-link" data-target="view-category-technology">Technology</a>
+                <a href="#" class="mobile-cat-link nav-link category-link" data-target="view-category-global">Global</a>
+            </div>
+
+            <div class="content-wrapper">
+                
+                <!-- VIEW: MARKETS (Home) -->
+                <div id="view-markets" class="view-section active">
+                    <!-- Polymarket Style Banner -->
+                    <div class="featured-banner">
+                        <div class="banner-info">
+                            <span class="trending-badge"><i class="fa-solid fa-fire"></i> Trending Market</span>
+                            <h2>Will TVK win more than 15 seats in the upcoming assembly elections?</h2>
+                            <p class="banner-desc">Resolution Source: Official Election Commission of India results.</p>
+                            <div class="banner-stats">
+                                <span><i class="fa-solid fa-users"></i> ₹142.5K Vol.</span>
+                                <span><i class="fa-regular fa-clock"></i> Closes May 2</span>
+                            </div>
+                        </div>
+                        <div class="banner-action">
+                            <div class="large-probability">65%</div>
+                            <span class="prob-label">Chance</span>
+                            <div class="banner-buttons">
+                                <button class="btn btn-yes" onclick="trade('yes', 'TVK Election Market', 65, 35, 1)">Yes 65</button>
+                                <button class="btn btn-no" onclick="trade('no', 'TVK Election Market', 65, 35, 1)">No 35</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="markets-header">
+                        <h3>Trending Markets</h3>
+                        <div class="sort-dropdown">
+                            Sort by: <strong>Volume</strong> <i class="fa-solid fa-chevron-down"></i>
+                        </div>
+                    </div>
+
+                    <!-- Polymarket Style Grid -->
+                    <div class="markets-grid">
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-landmark"></i></div>
+                                <div class="market-vol">₹142.5K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will TVK win more than 15 seats?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">65%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 C20,20 40,30 60,10 C80,-10 100,15 100,15" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'TVK Market', 65, 35, 1)"><span class="side">Yes</span><span class="price">65 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'TVK Market', 65, 35, 1)"><span class="side">No</span><span class="price">35 pts</span></button>
+                            </div>
+                            <div class="card-footer"><a href="#"><i class="fa-solid fa-book-open"></i> Read Research</a></div>
+                        </div>
+
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-building-columns"></i></div>
+                                <div class="market-vol">₹89.2K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will RBI hike repo rate by 25bps in MPC?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">20%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,5 C20,15 40,5 60,20 C80,35 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'RBI Market', 20, 80, 2)"><span class="side">Yes</span><span class="price">20 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'RBI Market', 20, 80, 2)"><span class="side">No</span><span class="price">80 pts</span></button>
+                            </div>
+                            <div class="card-footer"><a href="#"><i class="fa-solid fa-book-open"></i> Read Research</a></div>
+                        </div>
+
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-rocket"></i></div>
+                                <div class="market-vol">₹45.1K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will ISRO launch Gaganyaan in 2026?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">88%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 C20,25 40,20 60,15 C80,5 100,5 100,5" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'ISRO Market', 88, 12, 3)"><span class="side">Yes</span><span class="price">88 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'ISRO Market', 88, 12, 3)"><span class="side">No</span><span class="price">12 pts</span></button>
+                            </div>
+                            <div class="card-footer"><a href="#"><i class="fa-solid fa-book-open"></i> Read Research</a></div>
+                        </div>
+                        
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-chart-line"></i></div>
+                                <div class="market-vol">₹210K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will India's GDP growth exceed 7% in Q3?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">45%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,15 C20,10 40,20 60,15 C80,10 100,20 100,20" fill="none" stroke="#3B82F6" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'GDP Market', 45, 55)"><span class="side">Yes</span><span class="price">45 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'GDP Market', 45, 55)"><span class="side">No</span><span class="price">55 pts</span></button>
+                            </div>
+                            <div class="card-footer"><a href="#"><i class="fa-solid fa-book-open"></i> Read Research</a></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CATEGORY POLITICS -->
+                <div id="view-category-politics" class="view-section">
+                    <div class="category-banner bg-politics">
+                        <i class="fa-solid fa-landmark category-banner-icon"></i>
+                        <div class="category-banner-content">
+                            <h2>Politics Markets</h2>
+                            <p>Forecast on global and domestic political events, elections, and policy changes.</p>
+                        </div>
+                    </div>
+                    <div class="markets-grid">
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-landmark"></i></div>
+                                <div class="market-vol">₹500K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will NDA win more than 350 seats in 2029?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">40%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,10 C20,25 40,15 60,25 C80,20 100,10 100,10" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'NDA 2029', 40, 60)"><span class="side">Yes</span><span class="price">40 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'NDA 2029', 40, 60)"><span class="side">No</span><span class="price">60 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-flag-usa"></i></div>
+                                <div class="market-vol">₹1.2M Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Donald Trump win the 2028 election?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">15%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,5 C20,10 40,5 60,15 C80,20 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'US Election 2028', 15, 85)"><span class="side">Yes</span><span class="price">15 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'US Election 2028', 15, 85)"><span class="side">No</span><span class="price">85 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-person-booth"></i></div>
+                                <div class="market-vol">₹320K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Arvind Kejriwal become CM again?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">55%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 C20,15 40,25 60,10 C80,15 100,10 100,10" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Kejriwal CM', 55, 45)"><span class="side">Yes</span><span class="price">55 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Kejriwal CM', 55, 45)"><span class="side">No</span><span class="price">45 pts</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CATEGORY FINANCE -->
+                <div id="view-category-finance" class="view-section">
+                    <div class="category-banner bg-finance">
+                        <i class="fa-solid fa-money-bill-trend-up category-banner-icon"></i>
+                        <div class="category-banner-content">
+                            <h2>Finance & Crypto Markets</h2>
+                            <p>Predict stock movements, crypto milestones, and macroeconomic indicators.</p>
+                        </div>
+                    </div>
+                    <div class="markets-grid">
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-brands fa-bitcoin"></i></div>
+                                <div class="market-vol">₹2.1M Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Bitcoin cross $100k by December?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">75%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 C20,30 40,10 60,15 C80,0 100,5 100,5" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'BTC 100k', 75, 25)"><span class="side">Yes</span><span class="price">75 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'BTC 100k', 75, 25)"><span class="side">No</span><span class="price">25 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-chart-pie"></i></div>
+                                <div class="market-vol">₹450K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Reliance Industries stock hit ₹3500?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">30%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,5 C20,10 40,5 60,20 C80,15 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Reliance Stock', 30, 70)"><span class="side">Yes</span><span class="price">30 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Reliance Stock', 30, 70)"><span class="side">No</span><span class="price">70 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-building-columns"></i></div>
+                                <div class="market-vol">₹890K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will US Fed cut rates by 50bps in next meeting?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">45%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 C20,15 40,20 60,10 C80,25 100,15 100,15" fill="none" stroke="#3B82F6" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Fed Rate Cut', 45, 55)"><span class="side">Yes</span><span class="price">45 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Fed Rate Cut', 45, 55)"><span class="side">No</span><span class="price">55 pts</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CATEGORY TECHNOLOGY -->
+                <div id="view-category-technology" class="view-section">
+                    <div class="category-banner bg-technology">
+                        <i class="fa-solid fa-microchip category-banner-icon"></i>
+                        <div class="category-banner-content">
+                            <h2>Technology Markets</h2>
+                            <p>Forecast the cutting edge of AI, space exploration, and consumer hardware.</p>
+                        </div>
+                    </div>
+                    <div class="markets-grid">
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-brain"></i></div>
+                                <div class="market-vol">₹1.5M Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will OpenAI release GPT-5 before Q4 2026?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">80%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 C20,20 40,15 60,10 C80,15 100,5 100,5" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'GPT-5 Release', 80, 20)"><span class="side">Yes</span><span class="price">80 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'GPT-5 Release', 80, 20)"><span class="side">No</span><span class="price">20 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-car"></i></div>
+                                <div class="market-vol">₹780K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Tesla achieve full self-driving approval in US?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">25%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,10 C20,5 40,15 60,20 C80,15 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Tesla FSD', 25, 75)"><span class="side">Yes</span><span class="price">25 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Tesla FSD', 25, 75)"><span class="side">No</span><span class="price">75 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-brands fa-apple"></i></div>
+                                <div class="market-vol">₹520K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will Apple announce a foldable iPhone this year?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">10%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,5 C20,15 40,5 60,20 C80,25 100,30 100,30" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Apple Foldable', 10, 90)"><span class="side">Yes</span><span class="price">10 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Apple Foldable', 10, 90)"><span class="side">No</span><span class="price">90 pts</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CATEGORY GLOBAL NEWS -->
+                <div id="view-category-global" class="view-section">
+                    <div class="category-banner bg-global">
+                        <i class="fa-solid fa-globe category-banner-icon"></i>
+                        <div class="category-banner-content">
+                            <h2>Global News Markets</h2>
+                            <p>Predict outcomes on international relations, health, and global events.</p>
+                        </div>
+                    </div>
+                    <div class="markets-grid">
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-handshake"></i></div>
+                                <div class="market-vol">₹950K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will the UN broker a ceasefire in Eastern Europe by July?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">20%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,10 C20,20 40,15 60,25 C80,15 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'UN Ceasefire', 20, 80)"><span class="side">Yes</span><span class="price">20 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'UN Ceasefire', 20, 80)"><span class="side">No</span><span class="price">80 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-virus"></i></div>
+                                <div class="market-vol">₹410K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will WHO declare a new global health emergency in 2026?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">15%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,15 C20,10 40,20 60,25 C80,20 100,25 100,25" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'WHO Emergency', 15, 85)"><span class="side">Yes</span><span class="price">15 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'WHO Emergency', 15, 85)"><span class="side">No</span><span class="price">85 pts</span></button>
+                            </div>
+                        </div>
+                        <div class="market-card">
+                            <div class="card-top">
+                                <div class="market-icon"><i class="fa-solid fa-leaf"></i></div>
+                                <div class="market-vol">₹630K Vol.</div>
+                            </div>
+                            <h4 class="card-title">Will the Paris Agreement targets be officially delayed?</h4>
+                            <div class="card-probability">
+                                <div class="prob-number">65%</div>
+                                <div class="sparkline">
+                                    <svg viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 C20,30 40,20 60,15 C80,5 100,10 100,10" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="trade-btn btn-yes" onclick="trade('yes', 'Paris Agreement', 65, 35)"><span class="side">Yes</span><span class="price">65 pts</span></button>
+                                <button class="trade-btn btn-no" onclick="trade('no', 'Paris Agreement', 65, 35)"><span class="side">No</span><span class="price">35 pts</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: PORTFOLIO -->
+                <div id="view-portfolio" class="view-section">
+                    <div class="page-header">
+                        <h2>Your Portfolio</h2>
+                    </div>
+                    
+                    <div class="portfolio-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Portfolio Value</div>
+                            <div class="stat-value">2,450 pts</div>
+                            <div class="stat-change positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.5%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Points in Active Markets</div>
+                            <div class="stat-value">850 pts</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Win Rate (Last 30 Days)</div>
+                            <div class="stat-value">68%</div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3>Active Positions</h3>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Market</th>
+                                    <th>Outcome</th>
+                                    <th>Shares</th>
+                                    <th>Avg Price</th>
+                                    <th>Return</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="portfolioTrades">
+                                <!-- Trades injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-container" style="margin-top: 2rem;">
+                        <div class="table-header">
+                            <h3>Pending Limit Orders</h3>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Outcome</th>
+                                    <th>Target Price</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="portfolioLimitOrders">
+                                <!-- Limit orders injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW: LEADERBOARD -->
+                <div id="view-leaderboard" class="view-section">
+                    <div class="page-header">
+                        <h2>Top Forecasters</h2>
+                        <div class="header-filters">
+                            <button class="filter-btn active">This Week</button>
+                            <button class="filter-btn">All Time</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Forecaster</th>
+                                    <th>Win Rate</th>
+                                    <th>Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="rank gold">1</span></td>
+                                    <td class="user-cell"><img src="https://ui-avatars.com/api/?name=AlphaTrader&background=random" alt="User"> @AlphaTrader</td>
+                                    <td>82%</td>
+                                    <td class="text-green">+4,500 pts</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="rank silver">2</span></td>
+                                    <td class="user-cell"><img src="https://ui-avatars.com/api/?name=NewsJunkie&background=random" alt="User"> @NewsJunkie</td>
+                                    <td>75%</td>
+                                    <td class="text-green">+3,210 pts</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="rank bronze">3</span></td>
+                                    <td class="user-cell"><img src="https://ui-avatars.com/api/?name=DataNerd&background=random" alt="User"> @DataNerd</td>
+                                    <td>71%</td>
+                                    <td class="text-green">+2,890 pts</td>
+                                </tr>
+                                <!-- Current user -->
+                                <tr class="current-user-row">
+                                    <td><span class="rank">42</span></td>
+                                    <td class="user-cell"><img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128" alt="User"> @You (Gold Tier)</td>
+                                    <td>68%</td>
+                                    <td class="text-green">+850 pts</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW: ACTIVITY -->
+                <div id="view-activity" class="view-section">
+                    <div class="page-header">
+                        <h2>Live Activity</h2>
+                    </div>
+                    
+                    <div class="activity-feed">
+                        <div class="activity-item">
+                            <div class="activity-icon bg-blue"><i class="fa-solid fa-cart-shopping"></i></div>
+                            <div class="activity-content">
+                                <p><strong>@QuantGuru</strong> bought <span class="text-green">YES</span> on <em>Will TVK win more than 15 seats?</em></p>
+                                <span class="activity-time">2 mins ago</span>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon bg-red"><i class="fa-solid fa-flag-checkered"></i></div>
+                            <div class="activity-content">
+                                <p>Market Resolved: <em>Will Nifty 50 cross 23k this week?</em> resolved to <span class="text-red">NO</span>.</p>
+                                <span class="activity-time">15 mins ago</span>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon bg-gold"><i class="fa-solid fa-crown"></i></div>
+                            <div class="activity-content">
+                                <p><strong>@NewsJunkie</strong> reached <strong>Platinum Tier</strong>!</p>
+                                <span class="activity-time">1 hour ago</span>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon bg-blue"><i class="fa-solid fa-cart-shopping"></i></div>
+                            <div class="activity-content">
+                                <p><strong>@You</strong> bought <span class="text-red">NO</span> on <em>Will RBI hike repo rate?</em></p>
+                                <span class="activity-time">3 hours ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: ADMIN DASHBOARD -->
+                <div id="view-admin" class="view-section">
+                    <div class="page-header">
+                        <h2>Admin Dashboard</h2>
+                        <p style="color:var(--text-secondary);">Manage markets and platform resolution</p>
+                    </div>
+
+                    <div style="background:var(--bg-card); padding:2rem; border-radius:15px; border:1px solid var(--border-color); margin-bottom:2rem;">
+                        <h3>Create New Market</h3>
+                        <form id="adminCreateForm" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+                            <input type="text" id="adminTitle" placeholder="Market Title" required style="padding:0.75rem; background:var(--bg-secondary); border:1px solid var(--border-color); color:white; border-radius:8px;">
+                            <textarea id="adminDesc" placeholder="Description" rows="3" style="padding:0.75rem; background:var(--bg-secondary); border:1px solid var(--border-color); color:white; border-radius:8px;"></textarea>
+                            <div style="display:flex; gap:1rem;">
+                                <select id="adminCategory" style="padding:0.75rem; background:var(--bg-secondary); border:1px solid var(--border-color); color:white; border-radius:8px; flex:1;">
+                                    <option value="Politics">Politics</option>
+                                    <option value="Finance">Finance</option>
+                                    <option value="Technology">Technology</option>
+                                    <option value="Global News">Global News</option>
+                                </select>
+                                <input type="date" id="adminDate" required style="padding:0.75rem; background:var(--bg-secondary); border:1px solid var(--border-color); color:white; border-radius:8px; flex:1;">
+                            </div>
+                            <button type="submit" class="auth-submit" style="width:200px;">Create Market</button>
+                        </form>
+                    </div>
+
+                    <div style="background:var(--bg-card); padding:2rem; border-radius:15px; border:1px solid var(--border-color);">
+                        <div class="auth-tabs" style="margin-bottom: 1.5rem; justify-content: flex-start;">
+                            <button class="auth-tab active" onclick="switchAdminTab('markets')">Active Markets</button>
+                            <button class="auth-tab" onclick="switchAdminTab('proposals')" id="proposalTabBtn">Review Proposals</button>
+                        </div>
+
+                        <div id="admin-markets-tab" class="admin-tab-content active">
+                            <div class="table-container">
+                                <table class="data-table" id="adminResolveTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Market Title</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="admin-proposals-tab" class="admin-tab-content" style="display:none;">
+                            <div class="table-container">
+                                <table class="data-table" id="adminProposalsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Description</th>
+                                            <th>Category</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Polymarket-style Trade Sidebar/Modal -->
+        <div class="trade-sidebar" id="tradeSidebar">
+            <div class="trade-header">
+                <h3>Buy Shares</h3>
+                <button class="close-btn" onclick="closeSidebar()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="trade-body">
+                <p id="modalMarketName" class="trade-market-title">Market Name</p>
+                
+                <div class="outcome-tabs">
+                    <button class="outcome-tab yes-tab active" id="tabYes" onclick="selectOutcome('yes')">Yes</button>
+                    <button class="outcome-tab no-tab" id="tabNo" onclick="selectOutcome('no')">No</button>
+                </div>
+
+                <div class="trade-tabs" id="tradeTypeTabs" style="margin-bottom: 1.5rem;">
+                    <button class="auth-tab active" onclick="switchTradeType('market')">Market</button>
+                    <button class="auth-tab" onclick="switchTradeType('limit')">Limit</button>
+                </div>
+
+                <div class="trade-input-section" id="limitPriceSection" style="display:none; margin-bottom: 1.5rem;">
+                    <div class="input-label">
+                        <span>Target Price (pts)</span>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="number" id="limitPriceInput" value="50" min="2" max="98">
+                    </div>
+                </div>
+
+                <div class="trade-input-section">
+                    <div class="input-label">
+                        <span>Amount (Points)</span>
+                        <span class="max-balance">Limit: 100 pts/day</span>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="number" id="investmentAmount" value="10" min="1" max="100">
+                        <span class="currency-label">PTS</span>
+                    </div>
+                    <div class="quick-amounts">
+                        <button onclick="setAmount(10)">10</button>
+                        <button onclick="setAmount(25)">25</button>
+                        <button onclick="setAmount(50)">50</button>
+                        <button onclick="setAmount(100)">Max</button>
+                    </div>
+                </div>
+
+                <div class="trade-details">
+                    <div class="detail-row">
+                        <span id="priceLabel">Avg Price</span>
+                        <strong id="avgPriceDisplay">65.00 pts</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Shares</span>
+                        <strong id="sharesDisplay">15.38</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Potential Return</span>
+                        <strong class="text-green" id="expectedReturn">15.38 pts</strong>
+                    </div>
+                </div>
+
+                <button class="btn-submit" id="submitTradeBtn" onclick="confirmTrade()">Buy Yes</button>
+
+                <div class="dropdown-divider" style="margin: 2rem 0;"></div>
+
+                <div class="comments-section">
+                    <h4>Discussion</h4>
+                    <div class="comments-list" id="commentsList" style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.8rem;">
+                        <!-- Comments will be injected here -->
+                    </div>
+                    <div class="comment-input-area" style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="newCommentInput" placeholder="Add a comment..." style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: white;">
+                        <button class="btn btn-yes" style="padding: 0.6rem 1rem;" onclick="postComment()"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </div>
+
+                <div class="legal-disclaimer">
+                    <i class="fa-solid fa-shield-check"></i>
+                    <p>Governed by Supreme Court's Game-of-Skill doctrine. Monitored by the Independent Resolution Committee to prevent manipulation.</p>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-modal">
+            <div class="auth-logo">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>PROPHIT</span>
+            </div>
+            <p class="auth-tagline">India's Premier Prediction Market</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="loginTab" onclick="switchAuthTab('login')">Sign In</button>
+                <button class="auth-tab" id="registerTab" onclick="switchAuthTab('register')">Create Account</button>
+            </div>
+
+            <!-- Login Form -->
+            <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+                <div class="auth-field">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="auth-field">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button type="submit" class="auth-submit" id="loginBtn">
+                    <span>Sign In</span>
+                </button>
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                    <a href="#" style="color:var(--gold-light); font-size:0.8rem;" onclick="forgotPassword()">Forgot Password?</a>
+                    <p class="auth-hint">Demo: test@example.com / password</p>
+                </div>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
+                <div class="auth-field">
+                    <label>Username</label>
+                    <input type="text" id="regUsername" placeholder="@yourhandle" required>
+                </div>
+                <div class="auth-field">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="auth-field">
+                    <label>Password</label>
+                    <input type="password" id="regPassword" placeholder="Min 8 characters" required minlength="8">
+                </div>
+                <div class="auth-error" id="registerError"></div>
+                <button type="submit" class="auth-submit" id="registerBtn">
+                    <span>Create Account</span>
+                </button>
+              <!-- KYC Modal -->
+    <div class="trade-modal-overlay" id="kycOverlay" onclick="if(event.target===this) this.style.display='none'">
+        <div class="trade-modal" style="max-width:500px; padding:2rem;">
+            <h3>Verify Your Identity</h3>
+            <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem;">Upload your Aadhaar/PAN card to upgrade to Gold Tier.</p>
+            <form id="kycForm" onsubmit="handleKycSubmit(event)" style="display:flex; flex-direction:column; gap:1.5rem;">
+                <div class="auth-field">
+                    <label>Document Number</label>
+                    <input type="text" id="kycDocId" placeholder="Enter Aadhaar/PAN Number" required style="padding:1rem;">
+                </div>
+                <div class="auth-field">
+                    <label>Document Image</label>
+                    <div style="border: 2px dashed var(--border-color); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer;" onclick="document.getElementById('kycFile').click()">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: var(--gold-light); margin-bottom: 0.5rem;"></i>
+                        <p id="fileNameLabel">Click to upload image</p>
+                        <input type="file" id="kycFile" accept="image/*" hidden onchange="document.getElementById('fileNameLabel').textContent = this.files[0].name" required>
+                    </div>
+                </div>
+                <button type="submit" class="auth-submit" style="padding:1rem; font-size:1.1rem;"><i class="fa-solid fa-shield-halved"></i> Submit Verification</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Propose Market Modal -->
+    <div class="trade-modal-overlay" id="proposeOverlay" onclick="if(event.target===this) this.style.display='none'">
+        <div class="trade-modal" style="max-width:500px; padding:2rem;">
+            <h3>Propose New Market</h3>
+            <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem;">Suggested markets will be reviewed by our content curators before going live.</p>
+            <form id="proposeForm" onsubmit="handleProposeSubmit(event)" style="display:flex; flex-direction:column; gap:1.2rem;">
+                <div class="auth-field">
+                    <label>Market Title</label>
+                    <input type="text" id="proposeTitle" placeholder="e.g. Will ISRO launch Gaganyaan in 2026?" required>
+                </div>
+                <div class="auth-field">
+                    <label>Description (Context)</label>
+                    <textarea id="proposeDesc" placeholder="Provide some background details..." style="padding:0.8rem; border-radius:8px; background:var(--bg-secondary); color:white; border:1px solid var(--border-color); height:100px;"></textarea>
+                </div>
+                <div class="auth-field">
+                    <label>Category</label>
+                    <select id="proposeCategory" style="padding:0.8rem; border-radius:8px; background:var(--bg-secondary); color:white; border:1px solid var(--border-color);">
+                        <option value="Politics">Politics</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Global News">Global News</option>
+                    </select>
+                </div>
+                <div class="auth-field">
+                    <label>End Date</label>
+                    <input type="date" id="proposeDate" required>
+                </div>
+                <button type="submit" class="auth-submit" style="padding:1rem;"><i class="fa-solid fa-paper-plane"></i> Submit Proposal</button>
+            </form>
+        </div>
+    </div>
+    <div class="trade-modal-overlay" id="depositOverlay" onclick="if(event.target===this) this.style.display='none'">
+        <div class="trade-modal" style="max-width:400px; padding:2rem;">
+            <h3>Deposit Funds (INR)</h3>
+            <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem;">1 INR = 1 Point. Secure payments via Razorpay.</p>
+            <div style="display:flex; flex-direction:column; gap:1rem;">
+                <input type="number" id="depositAmount" placeholder="Amount in ₹" min="100" value="500" style="padding:1rem; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-secondary); color:white; font-size:1.2rem;">
+                <div class="quick-amounts" style="justify-content:space-between;">
+                    <button type="button" onclick="document.getElementById('depositAmount').value=100">₹100</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=500">₹500</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=1000">₹1000</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=5000">₹5000</button>
+                </div>
+                <button class="auth-submit" onclick="initiateDeposit()" style="margin-top:1rem; padding:1rem; font-size:1.1rem;"><i class="fa-solid fa-lock"></i> Pay Securely</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

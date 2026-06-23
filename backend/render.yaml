@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: prophit-api
+    env: go
+    region: singapore
+    plan: starter
+    buildCommand: go build -o prophit-backend .
+    startCommand: ./prophit-backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prophit-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 8080
+      - key: GIN_MODE
+        value: release
+
+databases:
+  - name: prophit-db
+    databaseName: profhit
+    user: prophit_user
+    region: singapore
+    plan: starter
