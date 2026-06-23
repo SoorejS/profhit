@@ -7,5 +7,5 @@ const CONFIG = {
   // Production (update this after deploying backend to Render)
   API_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8080/api'
-    : 'https://prophit-api.onrender.com/api'
+    : 'https://profhit.onrender.com/api'
 };

@@ -2,7 +2,7 @@
 // PROPHIT Admin Panel — admin.js
 // ============================================================
 
-const API = window.API_URL || 'http://localhost:8080/api';
+const API = (typeof CONFIG !== 'undefined' ? CONFIG.API_URL : null) || window.API_URL || 'http://localhost:8080/api';
 
 let adminToken = localStorage.getItem('admin_token');
 let adminUser  = JSON.parse(localStorage.getItem('admin_user') || 'null');
