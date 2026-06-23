@@ -14,7 +14,7 @@ func main() {
 
 	// Auto-Migrate the database models
 	log.Println("Running Auto-Migration...")
-	err := config.DB.AutoMigrate(&models.User{}, &models.Market{}, &models.Trade{}, &models.LimitOrder{}, &models.Comment{})
+	err := config.DB.AutoMigrate(&models.User{}, &models.Market{}, &models.Trade{}, &models.LimitOrder{}, &models.Comment{}, &models.WithdrawalRequest{}, &models.KycRequest{})
 	if err != nil {
 		log.Fatal("Failed to migrate database: \n", err)
 	}

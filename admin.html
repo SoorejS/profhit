@@ -58,6 +58,9 @@
             <button class="nav-item super-only" data-tab="roles" onclick="switchTab('roles', this)">
                 <i class="fa-solid fa-shield-halved"></i> Role Assignment
             </button>
+            <button class="nav-item admin-only" data-tab="queues" onclick="switchTab('queues', this)">
+                <i class="fa-solid fa-inbox"></i> Processing Queues
+            </button>
             <button class="nav-item admin-only" data-tab="logs" onclick="switchTab('logs', this)">
                 <i class="fa-solid fa-scroll"></i> Activity Logs
             </button>
@@ -238,6 +241,56 @@
                     </thead>
                     <tbody id="logsBody"></tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- ===== TAB: QUEUES ===== -->
+        <div id="tab-queues" class="tab-content">
+            <div class="page-header">
+                <h1>Processing Queues</h1>
+                <p>Approve or reject pending KYC and Withdrawal requests</p>
+            </div>
+
+            <!-- KYC Section -->
+            <div class="admin-panel-section">
+                <h2>Pending KYC Verifications</h2>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User ID</th>
+                                <th>Document / Aadhaar</th>
+                                <th>Submitted At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kycQueueBody">
+                            <tr><td colspan="5" class="empty-state">Loading KYC requests...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Withdrawals Section -->
+            <div class="admin-panel-section" style="margin-top: 2rem;">
+                <h2>Pending Withdrawals</h2>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User ID</th>
+                                <th>Amount (PTS)</th>
+                                <th>Requested At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="withdrawalQueueBody">
+                            <tr><td colspan="5" class="empty-state">Loading withdrawals...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 

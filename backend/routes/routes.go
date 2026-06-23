@@ -128,6 +128,15 @@ func SetupRouter() *gin.Engine {
 			adminPanel.PUT("/users/:id/role", middleware.RoleRequired(
 				models.RoleSuperAdmin,
 			), controllers.UpdateUserRole)
+
+			// Queues (admin, super_admin)
+			adminPanel.GET("/kyc-requests", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetKycRequests)
+			adminPanel.POST("/kyc-requests/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveKycRequest)
+			adminPanel.POST("/kyc-requests/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectKycRequest)
+
+			adminPanel.GET("/withdrawals", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetWithdrawals)
+			adminPanel.POST("/withdrawals/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveWithdrawal)
+			adminPanel.POST("/withdrawals/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectWithdrawal)
 		}
 	}
 

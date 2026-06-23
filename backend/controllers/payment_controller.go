@@ -142,17 +142,31 @@ func WithdrawFunds(c *gin.Context) {
 		return
 	}
 
-	// In a real app, this would hit RazorpayX or Stripe Connect to send funds.
-	// For now, we mock the success and deduct the points.
-	
+	// Deduct points immediately so they can't double-spend while pending
+	tx := config.DB.Begin()
 	user.Points -= int(req.Amount)
-	if err := config.DB.Save(&user).Error; err != nil {
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process withdrawal"})
 		return
 	}
 
+	withdrawalReq := models.WithdrawalRequest{
+		UserID: user.ID,
+		Amount: int(req.Amount),
+		Status: "Pending",
+	}
+
+	if err := tx.Create(&withdrawalReq).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create withdrawal request"})
+		return
+	}
+	
+	tx.Commit()
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Withdrawal successful! Funds sent to your bank.",
+		"message": "Withdrawal requested! Pending Admin approval.",
 		"balance": user.Points,
 	})
 }

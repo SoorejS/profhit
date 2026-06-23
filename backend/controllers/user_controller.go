@@ -225,23 +225,21 @@ func UpdateKycStatus(c *gin.Context) {
 		docId = "MOCK_DOC"
 	}
 
-	verified, err := services.VerifyKYC(docId)
-	if err != nil || !verified {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "KYC Verification failed with provider."})
+	// Create a Pending KYC Request
+	kycReq := models.KycRequest{
+		UserID:     user.ID,
+		DocumentID: docId,
+		Status:     "Pending",
+	}
+
+	if err := config.DB.Create(&kycReq).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create KYC request"})
 		return
 	}
 
-	user.KycStatus = true
-	user.Tier = "Gold"
-	// Optional: store the filename in DB if needed
-	config.DB.Save(&user)
-
-	// Re-issue token with updated tier
-	token, _ := generateToken(user)
-
+	// Return a message stating it's under review.
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Aadhaar/Document KYC verified successfully with image. Tier upgraded to Gold!",
-		"token":   token,
+		"message": "KYC Document submitted successfully! It is now pending Admin approval.",
 		"user": gin.H{
 			"id":     user.ID,
 			"tier":   user.Tier,

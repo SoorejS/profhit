@@ -147,6 +147,7 @@ function switchTab(tabName, btn) {
     else if (tabName === 'markets') loadMarkets();
     else if (tabName === 'users') loadUsers();
     else if (tabName === 'roles') loadRolesTab();
+    else if (tabName === 'queues') loadQueues();
     else if (tabName === 'logs') loadLogs();
 }
 
@@ -481,4 +482,105 @@ function formatRole(role) {
         it_support:      'IT Support',
         user:            'User'
     }[role] || role;
+}
+
+// ============================================================
+// QUEUES (KYC & WITHDRAWALS)
+// ============================================================
+async function loadQueues() {
+    await Promise.all([loadKycQueue(), loadWithdrawalQueue()]);
+}
+
+async function loadKycQueue() {
+    const tbody = document.getElementById('kycQueueBody');
+    try {
+        const res = await fetch(`${API}/admin/kyc-requests`, { headers: getHeaders() });
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error);
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No pending KYC requests</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(req => `
+            <tr>
+                <td>#${req.id}</td>
+                <td>User ${req.user_id}</td>
+                <td><strong>${req.document_id}</strong></td>
+                <td>${new Date(req.created_at).toLocaleString()}</td>
+                <td class="action-cell">
+                    <button class="btn-primary" onclick="approveKyc(${req.id})">Approve</button>
+                    <button class="btn-danger" style="margin-left: 8px;" onclick="rejectKyc(${req.id})">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="error-msg">Error loading KYC requests</td></tr>`;
+    }
+}
+
+async function approveKyc(id) {
+    if (!confirm(`Are you sure you want to approve KYC Request #${id}? This will upgrade the user's tier.`)) return;
+    try {
+        const res = await fetch(`${API}/admin/kyc-requests/${id}/approve`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) loadKycQueue();
+        else alert('Failed to approve KYC');
+    } catch (err) { alert(err.message); }
+}
+
+async function rejectKyc(id) {
+    if (!confirm(`Reject KYC Request #${id}?`)) return;
+    try {
+        const res = await fetch(`${API}/admin/kyc-requests/${id}/reject`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) loadKycQueue();
+        else alert('Failed to reject KYC');
+    } catch (err) { alert(err.message); }
+}
+
+async function loadWithdrawalQueue() {
+    const tbody = document.getElementById('withdrawalQueueBody');
+    try {
+        const res = await fetch(`${API}/admin/withdrawals`, { headers: getHeaders() });
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error);
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No pending withdrawals</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(req => `
+            <tr>
+                <td>#${req.id}</td>
+                <td>User ${req.user_id}</td>
+                <td style="color:var(--loss-color); font-weight:bold;">${req.amount} PTS</td>
+                <td>${new Date(req.created_at).toLocaleString()}</td>
+                <td class="action-cell">
+                    <button class="btn-primary" onclick="approveWithdrawal(${req.id})">Approve & Send</button>
+                    <button class="btn-danger" style="margin-left: 8px;" onclick="rejectWithdrawal(${req.id})">Reject & Refund</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="error-msg">Error loading withdrawals</td></tr>`;
+    }
+}
+
+async function approveWithdrawal(id) {
+    if (!confirm(`Mark Withdrawal #${id} as paid? Ensure you have actually sent the funds to the user.`)) return;
+    try {
+        const res = await fetch(`${API}/admin/withdrawals/${id}/approve`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) loadWithdrawalQueue();
+        else alert('Failed to approve withdrawal');
+    } catch (err) { alert(err.message); }
+}
+
+async function rejectWithdrawal(id) {
+    if (!confirm(`Reject Withdrawal #${id}? The points will be refunded to the user's wallet.`)) return;
+    try {
+        const res = await fetch(`${API}/admin/withdrawals/${id}/reject`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) loadWithdrawalQueue();
+        else alert('Failed to reject withdrawal');
+    } catch (err) { alert(err.message); }
 }
