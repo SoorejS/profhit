@@ -139,15 +139,19 @@ function updateTopbarFromUser(user) {
     const profileName   = document.querySelector('#profileDropdown .dropdown-header strong');
     const profileImg    = document.getElementById('profileImage');
 
-    if (balanceEl)    balanceEl.innerHTML = `<i class="fa-solid fa-coins gold-text"></i> ${user.points} / 100`;
+    if (balanceEl)    balanceEl.textContent = user.points;
     if (progressFill) progressFill.style.width = `${Math.min(user.points, 100)}%`;
     if (profileName)  profileName.innerHTML = `@${user.username} <span class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--gold-light); width: fit-content; margin-top: 4px;">${user.tier} Tier</span>`;
     if (profileImg)   profileImg.src = `https://ui-avatars.com/api/?name=${user.username}&background=D4AF37&color=0A1128&bold=true`;
 
     const kycBtnText = document.getElementById('kycBtnText');
-    if (kycBtnText) {
-        kycBtnText.textContent = user.tier;
-    }
+    if (kycBtnText) kycBtnText.textContent = user.tier;
+    
+    const sidebarBalance = document.querySelector('.sidebar-points-value');
+    if (sidebarBalance) sidebarBalance.textContent = user.points;
+    
+    const sidebarKycBtnText = document.getElementById('sidebarKycBtnText');
+    if (sidebarKycBtnText) sidebarKycBtnText.textContent = user.tier;
 
     const navAdminBtn = document.getElementById('navAdminBtn');
     if (navAdminBtn && user.username === 'You') {

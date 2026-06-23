@@ -45,6 +45,26 @@
                 </button>
             </nav>
 
+            <!-- Wallet & Identity Widget -->
+            <div class="wallet-widget">
+                <div class="wallet-header">
+                    <i class="fa-solid fa-wallet gold-text"></i> Wallet & Identity
+                </div>
+                <div class="wallet-balance">
+                    <span class="balance-label">Available Balance</span>
+                    <div class="balance-amount"><i class="fa-solid fa-coins gold-text" style="font-size:0.9rem;"></i> <span class="sidebar-points-value">--</span> PTS</div>
+                </div>
+                <div class="wallet-actions">
+                    <button class="wallet-btn deposit-btn" onclick="openDepositModal()"><i class="fa-solid fa-plus"></i> Deposit</button>
+                    <button class="wallet-btn withdraw-btn" onclick="withdrawFunds()"><i class="fa-solid fa-arrow-right-arrow-left"></i> Redeem</button>
+                </div>
+                <div class="wallet-kyc">
+                    <button class="kyc-upgrade-btn" id="sidebarKycBtn" onclick="upgradeKyc()">
+                        <i class="fa-solid fa-shield-halved"></i> KYC Tier: <span id="sidebarKycBtnText">Unverified</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Legal & Ethics Widget in Sidebar -->
             <div class="ethics-widget">
                 <div class="widget-title"><i class="fa-solid fa-shield-halved"></i> Ethics & Compliance</div>
@@ -71,18 +91,9 @@
                 </div>
                 
                 <div class="topbar-actions">
-                    <div class="points-balance" style="display:flex; gap:0.5rem;">
-                        <button class="auth-submit" style="padding:0.4rem 0.8rem; font-size:0.85rem;" onclick="openDepositModal()"><i class="fa-solid fa-plus"></i> Deposit</button>
-                        <button class="auth-submit" style="padding:0.4rem 0.8rem; font-size:0.85rem; background:var(--bg-secondary); color:white; border:1px solid var(--border-color);" onclick="withdrawFunds()"><i class="fa-solid fa-building-columns"></i> Withdraw</button>
+                    <div class="points-balance" style="background:var(--bg-surface); padding:0.4rem 1rem; border-radius:20px; font-weight:bold; border:1px solid var(--border-color);">
+                        <i class="fa-solid fa-coins gold-text"></i> <span class="points-value">--</span> PTS
                     </div>
-                    
-                    <div class="points-balance" style="background:var(--bg-card); padding:0.4rem 1rem; border-radius:20px; font-weight:bold; border:1px solid var(--border-color);">
-                        <i class="fa-solid fa-coins gold-text"></i> <span class="points-value">85</span> PTS
-                    </div>
-                    
-                    <button class="tier-btn gold-tier" id="kycBtn" onclick="upgradeKyc()">
-                        <i class="fa-solid fa-crown"></i> <span id="kycBtnText">Gold</span>
-                    </button>
                     
                     <div class="profile-menu">
                         <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128&bold=true" alt="Profile" id="profileImage">
