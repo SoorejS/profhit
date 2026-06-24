@@ -562,11 +562,15 @@ function trade(side, marketTitle, yesPrice, noPrice, marketId) {
     }
 
     currentTradeMarketId = marketId;
-    selectedOutcome = side;
+    currentSide = side;
     
     // Update UI
-    document.getElementById('tradeMarketTitle').textContent = marketTitle;
+    document.getElementById('modalMarketName').textContent = marketTitle;
     selectOutcome(side);
+    
+    if (typeof switchTradeSide === 'function') {
+        switchTradeSide('buy');
+    }
     
     // Open sidebar
     tradeSidebar.classList.add('active');
@@ -635,11 +639,105 @@ function selectOutcome(side) {
         submitTradeBtn.innerText = 'Buy No';
     }
     calculateTrade();
+    if (currentTradeMode === 'sell') {
+        fetchMarketPositions();
+    }
 }
 
 function setAmount(val) {
     inputAmount.value = val;
     calculateTrade();
+}
+
+let currentTradeMode = 'buy';
+function switchTradeSide(mode) {
+    currentTradeMode = mode;
+    document.getElementById('tabBuySide').classList.toggle('active', mode === 'buy');
+    document.getElementById('tabSellSide').classList.toggle('active', mode === 'sell');
+    
+    const tradeTypeTabs = document.getElementById('tradeTypeTabs');
+    const limitPriceSec = document.getElementById('limitPriceSection');
+    const buySec = document.getElementById('buySection');
+    const sellSec = document.getElementById('sellSection');
+    
+    if (mode === 'buy') {
+        if(tradeTypeTabs) tradeTypeTabs.style.display = 'flex';
+        buySec.style.display = 'block';
+        sellSec.style.display = 'none';
+        submitTradeBtn.innerText = currentSide === 'yes' ? 'Buy Yes' : 'Buy No';
+    } else {
+        if(tradeTypeTabs) tradeTypeTabs.style.display = 'none';
+        if(limitPriceSec) limitPriceSec.style.display = 'none';
+        buySec.style.display = 'none';
+        sellSec.style.display = 'block';
+        fetchMarketPositions();
+    }
+}
+
+async function fetchMarketPositions() {
+    const list = document.getElementById('activePositionsList');
+    list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.9rem;">Loading positions...</p>';
+    if (!authToken || !currentTradeMarketId) return;
+
+    try {
+        const res = await fetch(`${API_URL}/portfolio`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const trades = Array.isArray(data) ? data : [];
+        const marketTrades = trades.filter(t => t.market_id === currentTradeMarketId && t.shares > 0);
+        
+        if (marketTrades.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.9rem;">You have no active shares for this market.</p>';
+            return;
+        }
+
+        list.innerHTML = '';
+        marketTrades.forEach(t => {
+            const isYes = t.outcome.toLowerCase() === 'yes';
+            const colorClass = isYes ? 'text-green' : 'text-red';
+            list.innerHTML += `
+            <div style="background:var(--bg-card); padding:1rem; border-radius:8px; border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <strong class="${colorClass}">${t.outcome} Shares</strong>
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">
+                        ${parseFloat(t.shares).toFixed(2)} shares @ ${t.price}¢
+                    </div>
+                </div>
+                <button class="auth-submit" style="width:auto; padding:0.4rem 1rem; font-size:0.8rem;" onclick="sellSharesSidebar(${t.id})">
+                    Sell All
+                </button>
+            </div>
+            `;
+        });
+    } catch (err) {
+        list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.9rem;">Failed to load positions.</p>';
+    }
+}
+
+async function sellSharesSidebar(tradeId) {
+    if (!confirm("Are you sure you want to sell these shares at the current market price?")) return;
+    
+    try {
+        const res = await fetch(`${API_URL}/trades/${tradeId}/sell`, {
+            method: 'POST',
+            headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(`✅ ${data.message} (Payout: ${data.payout} pts)`);
+            fetchUserStats();
+            fetchPortfolio();
+            fetchMarketPositions();
+            
+            // Also refresh market volume/prices
+            fetchMarkets();
+        } else {
+            alert(`❌ Failed: ${data.error}`);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Network error while selling.');
+    }
 }
 
 function calculateTrade() {

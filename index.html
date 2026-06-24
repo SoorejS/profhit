@@ -719,6 +719,11 @@
             <div class="trade-body">
                 <p id="modalMarketName" class="trade-market-title">Market Name</p>
                 
+                <div class="trade-tabs" id="tradeSideTabs" style="margin-bottom: 1rem; display: flex; border-radius: 8px; overflow: hidden; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    <button class="auth-tab active" id="tabBuySide" onclick="switchTradeSide('buy')" style="flex: 1; border: none;">Buy</button>
+                    <button class="auth-tab" id="tabSellSide" onclick="switchTradeSide('sell')" style="flex: 1; border: none;">Sell</button>
+                </div>
+
                 <div class="outcome-tabs">
                     <button class="outcome-tab yes-tab active" id="tabYes" onclick="selectOutcome('yes')">Yes</button>
                     <button class="outcome-tab no-tab" id="tabNo" onclick="selectOutcome('no')">No</button>
@@ -738,39 +743,52 @@
                     </div>
                 </div>
 
-                <div class="trade-input-section">
-                    <div class="input-label">
-                        <span>Amount (Points)</span>
-                        <span class="max-balance">Limit: 100 pts/day</span>
+                <div id="buySection">
+                    <div class="trade-input-section">
+                        <div class="input-label">
+                            <span>Amount (Points)</span>
+                            <span class="max-balance">Limit: 100 pts/day</span>
+                        </div>
+                        <div class="input-wrapper">
+                            <input type="number" id="investmentAmount" value="10" min="1" max="100">
+                            <span class="currency-label">PTS</span>
+                        </div>
+                        <div class="quick-amounts">
+                            <button onclick="setAmount(10)">10</button>
+                            <button onclick="setAmount(25)">25</button>
+                            <button onclick="setAmount(50)">50</button>
+                            <button onclick="setAmount(100)">Max</button>
+                        </div>
                     </div>
-                    <div class="input-wrapper">
-                        <input type="number" id="investmentAmount" value="10" min="1" max="100">
-                        <span class="currency-label">PTS</span>
+
+                    <div class="trade-details">
+                        <div class="detail-row">
+                            <span id="priceLabel">Avg Price</span>
+                            <strong id="avgPriceDisplay">65.00 pts</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Shares</span>
+                            <strong id="sharesDisplay">15.38</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Potential Return</span>
+                            <strong class="text-green" id="expectedReturn">15.38 pts</strong>
+                        </div>
                     </div>
-                    <div class="quick-amounts">
-                        <button onclick="setAmount(10)">10</button>
-                        <button onclick="setAmount(25)">25</button>
-                        <button onclick="setAmount(50)">50</button>
-                        <button onclick="setAmount(100)">Max</button>
+
+                    <button class="btn-submit" id="submitTradeBtn" onclick="confirmTrade()">Buy Yes</button>
+                </div>
+
+                <div id="sellSection" style="display: none; margin-bottom: 1.5rem;">
+                    <div class="input-label" style="margin-bottom: 10px;">
+                        <span>Your Active Positions</span>
+                    </div>
+                    <div id="activePositionsList" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Injected via JS -->
                     </div>
                 </div>
 
-                <div class="trade-details">
-                    <div class="detail-row">
-                        <span id="priceLabel">Avg Price</span>
-                        <strong id="avgPriceDisplay">65.00 pts</strong>
-                    </div>
-                    <div class="detail-row">
-                        <span>Shares</span>
-                        <strong id="sharesDisplay">15.38</strong>
-                    </div>
-                    <div class="detail-row">
-                        <span>Potential Return</span>
-                        <strong class="text-green" id="expectedReturn">15.38 pts</strong>
-                    </div>
-                </div>
 
-                <button class="btn-submit" id="submitTradeBtn" onclick="confirmTrade()">Buy Yes</button>
 
                 <div class="dropdown-divider" style="margin: 2rem 0;"></div>
 

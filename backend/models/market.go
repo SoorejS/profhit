@@ -12,6 +12,8 @@ type Market struct {
 	Category         string         `gorm:"index;not null" json:"category"` // e.g., "Politics", "Finance"
 	YesPrice         int            `gorm:"default:50" json:"yes_price"` // Between 1 and 99
 	NoPrice          int            `gorm:"default:50" json:"no_price"`
+	LiquidityYes     float64        `gorm:"default:5000" json:"liquidity_yes"` // CPMM Yes pool size
+	LiquidityNo      float64        `gorm:"default:5000" json:"liquidity_no"`  // CPMM No pool size
 	Volume           float64        `gorm:"default:0" json:"volume"`
 	ResolutionStatus string         `gorm:"default:'Open'" json:"resolution_status"` // 'Proposed', 'Open', 'Resolved_Yes', 'Resolved_No'
 	ResolutionSource string         `json:"resolution_source"`

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"math"
 	"net/http"
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -48,12 +49,42 @@ func PlaceTrade(c *gin.Context) {
 		return
 	}
 
-	price := market.YesPrice
-	if req.Outcome == "No" {
-		price = market.NoPrice
+	// --- CPMM AMM Math ---
+	// Formula: k = LiquidityYes * LiquidityNo
+	// When buying YES, the pool gains P points. It mints P YES and P NO shares.
+	// The pool keeps the P NO shares, increasing LiquidityNo.
+	// We calculate new LiquidityYes to maintain k, and give the excess YES shares to the user.
+	k := market.LiquidityYes * market.LiquidityNo
+	var shares float64
+
+	if req.Outcome == "Yes" {
+		newLiquidityNo := market.LiquidityNo + req.Points
+		newLiquidityYes := k / newLiquidityNo
+		shares = (market.LiquidityYes + req.Points) - newLiquidityYes
+
+		market.LiquidityYes = newLiquidityYes
+		market.LiquidityNo = newLiquidityNo
+	} else {
+		newLiquidityYes := market.LiquidityYes + req.Points
+		newLiquidityNo := k / newLiquidityYes
+		shares = (market.LiquidityNo + req.Points) - newLiquidityNo
+
+		market.LiquidityYes = newLiquidityYes
+		market.LiquidityNo = newLiquidityNo
 	}
-	priceInPts := float64(price) / 100.0
-	shares := req.Points / priceInPts
+
+	// Calculate exact average price paid per share
+	pricePaidPerShare := (req.Points / shares) * 100.0
+
+	// Update the marginal display prices (PriceYes = PoolNo / TotalPool)
+	totalLiquidity := market.LiquidityYes + market.LiquidityNo
+	market.YesPrice = int((market.LiquidityNo / totalLiquidity) * 100)
+	market.NoPrice = int((market.LiquidityYes / totalLiquidity) * 100)
+	market.Volume += req.Points
+
+	// Clamp visually for UI cleanliness
+	market.YesPrice = clamp(market.YesPrice, 1, 99)
+	market.NoPrice = clamp(market.NoPrice, 1, 99)
 
 	trade := models.Trade{
 		UserID:   user.ID,
@@ -61,27 +92,7 @@ func PlaceTrade(c *gin.Context) {
 		Outcome:  req.Outcome,
 		Points:   req.Points,
 		Shares:   shares,
-		Price:    price,
-	}
-
-	// Advanced AMM Math (Dynamic Liquidity-based Price Shift)
-	// Base liquidity prevents massive swings early on, behaving like a Constant Product Market Maker
-	baseLiquidity := 5000.0
-	totalLiquidity := float64(market.Volume) + baseLiquidity
-	
-	// Shift is proportional to trade size vs total liquidity depth
-	shiftFloat := (req.Points / totalLiquidity) * 100.0
-	shift := int(shiftFloat)
-	if shift < 1 && req.Points >= 10 { // Ensure some minimum movement for decent trades
-		shift = 1
-	}
-
-	if req.Outcome == "Yes" {
-		market.YesPrice = clamp(market.YesPrice+shift, 2, 98)
-		market.NoPrice = 100 - market.YesPrice
-	} else {
-		market.NoPrice = clamp(market.NoPrice+shift, 2, 98)
-		market.YesPrice = 100 - market.NoPrice
+		Price:    int(pricePaidPerShare),
 	}
 
 	tx := config.DB.Begin()
@@ -257,13 +268,39 @@ func SellTrade(c *gin.Context) {
 		return
 	}
 
-	// Calculate payout based on CURRENT market price
-	currentPrice := market.YesPrice
-	if trade.Outcome == "No" {
-		currentPrice = market.NoPrice
+	// --- CPMM Sell Math (Quadratic Equation for exact slippage) ---
+	// Equation: P = ((Y+N+S) - sqrt((Y+N+S)^2 - 4*S*Other)) / 2
+	S := trade.Shares
+	Y := market.LiquidityYes
+	N := market.LiquidityNo
+	var payoutFloat float64
+	
+	if trade.Outcome == "Yes" {
+		Other := N
+		sum := Y + N + S
+		payoutFloat = (sum - math.Sqrt(sum*sum - 4*S*Other)) / 2.0
+		
+		market.LiquidityYes += (S - payoutFloat)
+		market.LiquidityNo -= payoutFloat
+	} else {
+		Other := Y
+		sum := Y + N + S
+		payoutFloat = (sum - math.Sqrt(sum*sum - 4*S*Other)) / 2.0
+		
+		market.LiquidityNo += (S - payoutFloat)
+		market.LiquidityYes -= payoutFloat
 	}
 
-	payout := trade.Shares * (float64(currentPrice) / 100.0)
+	payout := int(payoutFloat)
+
+	// Update marginal display prices
+	totalLiquidity := market.LiquidityYes + market.LiquidityNo
+	market.YesPrice = int((market.LiquidityNo / totalLiquidity) * 100)
+	market.NoPrice = int((market.LiquidityYes / totalLiquidity) * 100)
+	market.Volume += float64(payout) // Treat selling as active volume
+
+	market.YesPrice = clamp(market.YesPrice, 1, 99)
+	market.NoPrice = clamp(market.NoPrice, 1, 99)
 
 	tx := config.DB.Begin()
 
@@ -284,7 +321,22 @@ func SellTrade(c *gin.Context) {
 		return
 	}
 
+	// Update the market AMM state
+	if err := tx.Save(&market).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update market AMM pool"})
+		return
+	}
+
 	tx.Commit()
+
+	// Broadcast the update to all connected clients so charts update in real-time
+	BroadcastUpdate("trade_placed", gin.H{
+		"market_id": market.ID,
+		"yes_price": market.YesPrice,
+		"no_price":  market.NoPrice,
+		"volume":    market.Volume,
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Shares sold successfully",
