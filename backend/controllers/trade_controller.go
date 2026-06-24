@@ -330,6 +330,9 @@ func SellTrade(c *gin.Context) {
 
 	tx.Commit()
 
+	// Trigger limit orders that match the new price after selling
+	go checkAndExecuteLimitOrders(market.ID, market.YesPrice, market.NoPrice)
+
 	// Broadcast the update to all connected clients so charts update in real-time
 	BroadcastUpdate("trade_placed", gin.H{
 		"market_id": market.ID,

@@ -487,6 +487,65 @@ function renderPortfolio(trades) {
     });
 }
 
+async function fetchLimitOrders() {
+    if (!authToken) return;
+    try {
+        const res = await fetch(`${API_URL}/trades/limit`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        renderLimitOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+        console.error('Failed to fetch limit orders:', err);
+    }
+}
+
+function renderLimitOrders(orders) {
+    const tbody = document.getElementById('portfolioLimitOrders');
+    if (!tbody) return;
+
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-secondary);">
+            No pending limit orders.
+        </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = '';
+    orders.forEach(o => {
+        const sideClass = o.outcome === 'Yes' ? 'badge-yes' : 'badge-no';
+        tbody.innerHTML += `
+        <tr>
+            <td><span class="badge ${sideClass}">${o.outcome}</span></td>
+            <td>${o.target_price} pts</td>
+            <td>${o.points} pts</td>
+            <td><span style="color:var(--text-secondary)">${o.status}</span></td>
+            <td>
+                <button class="auth-submit" style="padding:0.3rem 0.6rem; font-size:0.8rem; background:var(--color-no);" onclick="cancelLimitOrder(${o.id})">Cancel</button>
+            </td>
+        </tr>`;
+    });
+}
+
+async function cancelLimitOrder(id) {
+    if (!confirm("Cancel this limit order? Your locked points will be refunded.")) return;
+    try {
+        const res = await fetch(`${API_URL}/trades/limit/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`✅ ${data.message}`);
+            fetchUserStats();
+            fetchPortfolio();
+            fetchLimitOrders();
+        } else {
+            alert(`❌ Failed: ${data.error}`);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 function renderLeaderboard(users) {
     const tbody = document.querySelector('#view-leaderboard .data-table tbody');
     if (!tbody) return;
@@ -674,6 +733,16 @@ function switchTradeSide(mode) {
     }
 }
 
+let currentTradeType = 'market';
+function switchTradeType(type) {
+    currentTradeType = type;
+    const tabs = document.querySelectorAll('#tradeTypeTabs button');
+    tabs[0].classList.toggle('active', type === 'market');
+    tabs[1].classList.toggle('active', type === 'limit');
+    
+    document.getElementById('limitPriceSection').style.display = type === 'limit' ? 'block' : 'none';
+}
+
 async function fetchMarketPositions() {
     const list = document.getElementById('activePositionsList');
     list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.9rem;">Loading positions...</p>';
@@ -768,23 +837,53 @@ async function confirmTrade() {
     submitTradeBtn.disabled  = true;
 
     try {
-        currentPriceNo  = data.new_no_price  || currentPriceNo;
+        let endpoint = `${API_URL}/trades`;
+        let payload = {
+            market_id: currentTradeMarketId,
+            outcome: currentSide,
+            points: amount
+        };
 
-        // Refresh wallet
-        currentUser.points = data.balance;
-        localStorage.setItem('prophit_user', JSON.stringify(currentUser));
-        updateTopbarFromUser(currentUser);
+        const tradeTypeTabs = document.getElementById('tradeTypeTabs');
+        const isLimitOrder = tradeTypeTabs && tradeTypeTabs.style.display !== 'none' && currentTradeType === 'limit';
+        
+        if (isLimitOrder) {
+            endpoint = `${API_URL}/trades/limit`;
+            payload.target_price = parseInt(document.getElementById('limitPriceInput').value);
+        }
 
-        closeSidebar();
-        submitTradeBtn.disabled  = false;
-        submitTradeBtn.innerText = currentSide === 'yes' ? 'Buy Yes' : 'Buy No';
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
 
-        // Toast notification
-        showToast(`✅ Trade confirmed! You bought ${sharesDisplay.innerText} ${currentSide.toUpperCase()} shares.`);
+        if (res.ok) {
+            if (isLimitOrder) {
+                showToast(`✅ Limit Order placed! Waiting for price to reach ${payload.target_price}pts.`);
+                fetchLimitOrders();
+            } else {
+                showToast(`✅ Trade confirmed! You bought ${sharesDisplay.innerText} ${currentSide.toUpperCase()} shares.`);
+            }
 
+            // Refresh wallet
+            if (data.balance !== undefined) {
+                currentUser.points = data.balance;
+                localStorage.setItem('prophit_user', JSON.stringify(currentUser));
+                updateTopbarFromUser(currentUser);
+            }
+
+            closeSidebar();
+            fetchUserStats();
+            fetchPortfolio();
+        } else {
+            alert(`❌ Failed: ${data.error}`);
+        }
     } catch (err) {
         console.error(err);
-        alert('Network error. Is the Go backend running?');
+        alert('Network error while placing trade.');
+    } finally {
         submitTradeBtn.disabled  = false;
         submitTradeBtn.innerText = currentSide === 'yes' ? 'Buy Yes' : 'Buy No';
     }
