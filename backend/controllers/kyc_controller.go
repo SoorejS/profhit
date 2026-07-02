@@ -14,6 +14,7 @@ import (
 
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -210,6 +211,9 @@ func HypervergeWebhook(c *gin.Context) {
 			user.Tier = "Gold" // Auto upgrade tier upon KYC
 		}
 		tx.Save(&user)
+
+		// Trigger referral bonus for KYC completion
+		_ = services.TriggerReferralEvent(user.ID, models.ReferralStatusKYCCompleted, 200)
 	} else if payload.Status == "rejected" {
 		kyc.Status = "Rejected"
 	} else {

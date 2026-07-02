@@ -33,6 +33,7 @@ func main() {
 		&models.WalletLedger{},       // Double-entry wallet ledger
 		&models.UserStreak{},         // Daily login streak tracker
 		&models.PasswordResetToken{}, // Password reset tokens
+		&models.ReferralEvent{},      // Referral events
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: \n", err)

@@ -75,6 +75,9 @@ func SetupRouter() *gin.Engine {
 			protected.GET("/me/streak", controllers.GetStreakInfo)
 			protected.GET("/wallet/history", controllers.GetWalletHistory)
 			protected.GET("/wallet/transaction/:id", controllers.GetWalletTransaction)
+			
+			// Referrals
+			protected.GET("/referrals/analytics", controllers.GetReferralAnalytics)
 
 			// Payments & Redemption
 			protected.POST("/payments/order", controllers.CreateRazorpayOrder)

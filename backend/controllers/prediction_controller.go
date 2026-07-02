@@ -5,6 +5,7 @@ import (
 
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -78,6 +79,9 @@ func SubmitPrediction(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
 		return
 	}
+
+	// Trigger Referral Event for First Prediction
+	go services.TriggerReferralEvent(userID, models.ReferralStatusFirstBet, 50)
 
 	// Broadcast to live clients
 	BroadcastUpdate("trade_placed", gin.H{"market_id": market.ID})

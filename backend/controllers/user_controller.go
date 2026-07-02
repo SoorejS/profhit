@@ -68,45 +68,57 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// Generate a simple random referral code for the new user
-	prefixLen := len(input.Username)
-	if prefixLen > 3 {
-		prefixLen = 3
-	}
-	newReferralCode := fmt.Sprintf("%s%d", input.Username[:prefixLen], time.Now().UnixNano()%10000)
-
-	var referredBy uint = 0
-	bonusPoints := 100 // default
-
-	if input.ReferralCode != "" {
-		var referrer models.User
-		if err := config.DB.Where("referral_code = ?", input.ReferralCode).First(&referrer).Error; err == nil {
-			referredBy = referrer.ID
-			bonusPoints = 150 // 50 bonus points for using a referral code
-			
-			// Reward referrer
-			referrer.Points += 50
-			config.DB.Save(&referrer)
-		}
-	}
+	newReferralCode := services.GenerateReferralCode()
 
 	user := models.User{
 		Username:     input.Username,
 		Email:        input.Email,
 		Password:     string(hashedPwd),
-		Points:       bonusPoints,
+		Points:       0, // Points are now added via WalletLedger below
 		Tier:         "Standard",
 		Role:         models.RoleUser,
 		IsActive:     true,
 		KycStatus:    false,
 		ReferralCode: newReferralCode,
-		ReferredBy:   referredBy,
+		ReferredBy:   0, // Filled in by ProcessReferral if valid
 	}
 
-	if err := config.DB.Create(&user).Error; err != nil {
+	tx := config.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
 		return
 	}
+
+	// Base sign-up bonus via ledger
+	if err := services.CreditWalletTx(tx, user.ID, 100, models.TxTypeAdminAdjustment, 0, "Welcome Bonus", nil); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not issue welcome bonus"})
+		return
+	}
+
+	// Process referral if provided
+	if input.ReferralCode != "" {
+		if err := services.ProcessReferral(tx, user.ID, input.ReferralCode); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+
+	// Refresh user to get latest points from DB after ledger txns
+	config.DB.First(&user, user.ID)
 
 	token, err := generateToken(user)
 	if err != nil {

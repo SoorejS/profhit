@@ -115,6 +115,9 @@ func addFunds(userID uint, points float64, c *gin.Context) {
 		return
 	}
 
+	// Trigger Referral Event for First Deposit
+	go services.TriggerReferralEvent(userID, models.ReferralStatusFirstDeposit, 100)
+
 	// Fetch fresh balance to return accurate data
 	var user models.User
 	if err := config.DB.First(&user, userID).Error; err != nil {
