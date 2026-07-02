@@ -159,6 +159,10 @@ func GetPlatformStats(c *gin.Context) {
 	// Total volume traded (n/a for fixed-odds predictions)
 	var totalVolume struct{ Sum float64 }
 
+	// Total wallets balance
+	var totalWalletBalance int64
+	config.DB.Model(&models.User{}).Select("COALESCE(SUM(points), 0)").Row().Scan(&totalWalletBalance)
+
 	// Role breakdown
 	type RoleCount struct {
 		Role  string
@@ -184,6 +188,9 @@ func GetPlatformStats(c *gin.Context) {
 		"trades": gin.H{
 			"total":        totalTrades,
 			"total_volume": totalVolume.Sum,
+		},
+		"wallets": gin.H{
+			"total_balance": totalWalletBalance,
 		},
 	})
 }
