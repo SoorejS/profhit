@@ -28,7 +28,9 @@ type User struct {
 	ReferredBy       uint           `gorm:"default:0" json:"referred_by"`
 	TwoFactorSecret  string         `json:"-"`
 	TwoFactorEnabled bool           `gorm:"default:false" json:"two_factor_enabled"`
+	IsMuted          bool           `gorm:"default:false" json:"is_muted"` // Cannot comment if true
+	SuspendedUntil   *time.Time     `json:"suspended_until"`               // Temporary ban
 	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

@@ -4,6 +4,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"profhit-backend/config"
+	"profhit-backend/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -62,6 +66,27 @@ func AuthRequired() gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("tier", claims.Tier)
 		c.Set("role", claims.Role)
+
+		// DB Check for active/suspended status to ensure real-time bans apply
+		var user models.User
+		if err := config.DB.First(&user, claims.UserID).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User no longer exists"})
+			c.Abort()
+			return
+		}
+
+		if !user.IsActive {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Account is banned"})
+			c.Abort()
+			return
+		}
+
+		if user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now()) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Account is temporarily suspended until " + user.SuspendedUntil.Format(time.RFC3339)})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

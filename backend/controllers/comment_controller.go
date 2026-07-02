@@ -26,6 +26,11 @@ func AddComment(c *gin.Context) {
 		return
 	}
 
+	if user.IsMuted {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are currently muted and cannot comment."})
+		return
+	}
+
 	var market models.Market
 	if err := config.DB.First(&market, marketID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})

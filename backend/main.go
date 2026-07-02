@@ -35,6 +35,7 @@ func main() {
 		&models.PasswordResetToken{}, // Password reset tokens
 		&models.ReferralEvent{},      // Referral events
 		&models.AuditLog{},           // Audit logs
+		&models.Report{},             // Reports
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: \n", err)

@@ -94,6 +94,10 @@ func SetupRouter() *gin.Engine {
 
 			// Comments (any logged-in user can comment)
 			protected.POST("/markets/:id/comments", predLimit, controllers.AddComment)
+
+			// Reports (user reporting)
+			protected.POST("/reports", predLimit, controllers.SubmitReport)
+			protected.GET("/me/reports", controllers.GetUserReports)
 		}
 
 		// ── CONTENT CREATOR ROUTES ────────────────────────────────────────────
@@ -158,6 +162,10 @@ func SetupRouter() *gin.Engine {
 			adminPanel.GET("/withdrawals", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetWithdrawals)
 			adminPanel.POST("/withdrawals/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveWithdrawal)
 			adminPanel.POST("/withdrawals/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectWithdrawal)
+
+			// Reports & Moderation (admin, super_admin)
+			adminPanel.GET("/reports", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetReports)
+			adminPanel.POST("/reports/:id/resolve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ResolveReport)
 		}
 	}
 
