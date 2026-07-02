@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"profhit-backend/config"
 	"profhit-backend/middleware"
 	"profhit-backend/models"
@@ -13,13 +15,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func generateToken(user models.User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "prophit-super-secret-key-2026"
+		return "", errors.New("JWT_SECRET not configured")
 	}
 
 	claims := middleware.Claims{
@@ -40,9 +43,10 @@ func generateToken(user models.User) (string, error) {
 // RegisterUser creates a new user with hashed password
 func RegisterUser(c *gin.Context) {
 	var input struct {
-		Username string `json:"username" binding:"required"`
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Username     string `json:"username" binding:"required"`
+		Email        string `json:"email" binding:"required"`
+		Password     string `json:"password" binding:"required"`
+		ReferralCode string `json:"referral_code"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -64,15 +68,39 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
+	// Generate a simple random referral code for the new user
+	prefixLen := len(input.Username)
+	if prefixLen > 3 {
+		prefixLen = 3
+	}
+	newReferralCode := fmt.Sprintf("%s%d", input.Username[:prefixLen], time.Now().UnixNano()%10000)
+
+	var referredBy uint = 0
+	bonusPoints := 100 // default
+
+	if input.ReferralCode != "" {
+		var referrer models.User
+		if err := config.DB.Where("referral_code = ?", input.ReferralCode).First(&referrer).Error; err == nil {
+			referredBy = referrer.ID
+			bonusPoints = 150 // 50 bonus points for using a referral code
+			
+			// Reward referrer
+			referrer.Points += 50
+			config.DB.Save(&referrer)
+		}
+	}
+
 	user := models.User{
-		Username:  input.Username,
-		Email:     input.Email,
-		Password:  string(hashedPwd),
-		Points:    100,
-		Tier:      "Standard",
-		Role:      models.RoleUser,
-		IsActive:  true,
-		KycStatus: false,
+		Username:     input.Username,
+		Email:        input.Email,
+		Password:     string(hashedPwd),
+		Points:       bonusPoints,
+		Tier:         "Standard",
+		Role:         models.RoleUser,
+		IsActive:     true,
+		KycStatus:    false,
+		ReferralCode: newReferralCode,
+		ReferredBy:   referredBy,
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
@@ -104,8 +132,9 @@ func RegisterUser(c *gin.Context) {
 // LoginUser authenticates a user and returns a JWT
 func LoginUser(c *gin.Context) {
 	var input struct {
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Email         string `json:"email" binding:"required"`
+		Password      string `json:"password" binding:"required"`
+		TwoFactorCode string `json:"two_factor_code"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -124,15 +153,28 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(user)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+	if user.TwoFactorEnabled {
+		if input.TwoFactorCode == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "2fa_required"})
+			return
+		}
+		
+		valid := totp.Validate(input.TwoFactorCode, user.TwoFactorSecret)
+		if !valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid 2FA code"})
+			return
+		}
+	}
+
+	// Block banned users BEFORE generating the token
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended. Contact support."})
 		return
 	}
 
-	// Block banned users
-	if !user.IsActive {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended. Contact support."})
+	token, err := generateToken(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
@@ -140,16 +182,18 @@ func LoginUser(c *gin.Context) {
 		"message": "Login successful!",
 		"token":   token,
 		"user": gin.H{
-			"id":        user.ID,
-			"username":  user.Username,
-			"email":     user.Email,
-			"tier":      user.Tier,
-			"role":      user.Role,
-			"is_active": user.IsActive,
-			"points":    user.Points,
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"tier":       user.Tier,
+			"role":       user.Role,
+			"is_active":  user.IsActive,
+			"points":     user.Points,
+			"kyc_status": user.KycStatus,
 		},
 	})
 }
+
 
 // GetMe returns the logged-in user's profile from JWT context
 func GetMe(c *gin.Context) {
@@ -192,84 +236,113 @@ func GetUser(c *gin.Context) {
 	})
 }
 
-// UpdateKycStatus handles 3rd party KYC document verification with image upload
-func UpdateKycStatus(c *gin.Context) {
-	userID := c.MustGet("userID").(uint)
-	var user models.User
 
-	if err := config.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-
-	// Handle Image Upload
-	file, err := c.FormFile("document_image")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Document image is required"})
-		return
-	}
-
-	// Create uploads directory if not exists
-	os.Mkdir("uploads", 0755)
-	
-	// Save file
-	filename := fmt.Sprintf("%d_%d_%s", userID, time.Now().Unix(), file.Filename)
-	savePath := filepath.Join("uploads", filename)
-	if err := c.SaveUploadedFile(file, savePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save document image"})
-		return
-	}
-
-	docId := c.PostForm("document_id")
-	if docId == "" {
-		docId = "MOCK_DOC"
-	}
-
-	// Create a Pending KYC Request
-	kycReq := models.KycRequest{
-		UserID:     user.ID,
-		DocumentID: docId,
-		Status:     "Pending",
-	}
-
-	if err := config.DB.Create(&kycReq).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create KYC request"})
-		return
-	}
-
-	// Return a message stating it's under review.
-	c.JSON(http.StatusOK, gin.H{
-		"message": "KYC Document submitted successfully! It is now pending Admin approval.",
-		"user": gin.H{
-			"id":     user.ID,
-			"tier":   user.Tier,
-			"points": user.Points,
-		},
-	})
-}
-
-// ForgotPassword handles sending a password reset email via SMTP
+// ForgotPassword generates a secure reset token, persists it, and emails the user.
 func ForgotPassword(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || req["email"] == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
 		return
 	}
 
 	var user models.User
 	if err := config.DB.Where("email = ?", req["email"]).First(&user).Error; err != nil {
-		// Don't leak user existence
+		// Don't leak user existence — always return the same message
 		c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent."})
 		return
 	}
 
-	// In a real app, generate a secure token and save to DB
-	resetToken := "mock-reset-token-123"
-	resetLink := "http://localhost:3000/reset?token=" + resetToken
+	// Generate a cryptographically random 32-byte hex token
+	rawBytes := make([]byte, 32)
+	if _, err := rand.Read(rawBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+		return
+	}
+	token := hex.EncodeToString(rawBytes)
 
-	body := "Hello " + user.Username + ",\n\nClick the link below to reset your password:\n" + resetLink + "\n\nThanks,\nThe PROPHIT Team"
-	
+	// Invalidate any existing tokens for this user
+	config.DB.Where("user_id = ?", user.ID).Delete(&models.PasswordResetToken{})
+
+	resetRecord := models.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+	}
+	if err := config.DB.Create(&resetRecord).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist reset token"})
+		return
+	}
+
+	// Build reset link — APP_URL can be set in env, fallback to localhost for dev
+	appURL := os.Getenv("APP_URL")
+	if appURL == "" {
+		appURL = "http://localhost:8080"
+	}
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", appURL, token)
+
+	body := fmt.Sprintf(
+		"Hello %s,\n\nClick the link below to reset your PROPHIT password:\n\n%s\n\n"+
+			"This link expires in 1 hour.\n\nIf you did not request this, ignore this email.\n\n"+
+			"The PROPHIT Team",
+		user.Username, resetLink,
+	)
 	go services.SendEmail(user.Email, "Reset Your PROPHIT Password", body)
 
 	c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent."})
 }
+
+// ResetPassword validates the token and updates the user's password.
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var record models.PasswordResetToken
+	if err := config.DB.Where("token = ?", req.Token).First(&record).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired reset token"})
+		return
+	}
+
+	if time.Now().After(record.ExpiresAt) {
+		config.DB.Delete(&record) // Clean up expired token
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token has expired. Please request a new one."})
+		return
+	}
+
+	// Hash new password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password and consume the token atomically
+	tx := config.DB.Begin()
+
+	if err := tx.Model(&models.User{}).Where("id = ?", record.UserID).
+		Update("password", string(hashed)).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	// Delete the token so it cannot be reused
+	if err := tx.Delete(&record).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to invalidate reset token"})
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully. Please log in with your new password."})
+}
+

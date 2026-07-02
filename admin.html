@@ -3,313 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PROPHIT Admin Panel</title>
+    <title>Admin Dashboard - PROPHIT</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="admin.css">
+    
+        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/dashboard.css">
+    <style>
+        .admin-nav {
+            display: flex;
+            gap: var(--spacing-2);
+            border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: var(--spacing-6);
+            overflow-x: auto;
+        }
+        .admin-tab {
+            padding: var(--spacing-3) var(--spacing-6);
+            cursor: pointer;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .admin-tab.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+        .admin-tab:hover:not(.active) {
+            color: var(--text-primary);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th, .data-table td {
+            padding: var(--spacing-4);
+            text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .data-table th {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .data-table tr:hover {
+            background-color: var(--bg-surface-elevated);
+        }
+    </style>
 </head>
 <body>
+    <div class="app-layout">
+        <app-sidebar mode="admin"></app-sidebar>
 
-<!-- Login Gate -->
-<div id="adminLoginGate" class="login-gate">
-    <div class="login-box">
-        <div class="login-logo">
-            <i class="fa-solid fa-bolt-lightning"></i>
-            <span>PROPHIT <span class="role-badge badge-super_admin">Admin</span></span>
-        </div>
-        <p class="login-sub">Staff access only. Unauthorized access is monitored.</p>
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="adminEmail" placeholder="admin@prophit.com">
-        </div>
-        <div class="form-group">
-            <label>Password</label>
-            <input type="password" id="adminPassword" placeholder="Password">
-        </div>
-        <div id="loginError" class="error-msg" style="display:none;"></div>
-        <button class="btn-primary full-width" onclick="adminLogin()">
-            <i class="fa-solid fa-lock"></i> Sign In
-        </button>
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="single-column-grid">
+                    
+                    <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
+                        <h1 style="margin: 0;"><i class="fa-solid fa-lock text-primary"></i> Admin Dashboard</h1>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="admin-nav">
+                        <div class="admin-tab active" onclick="switchTab('markets', this)">Markets</div>
+                        <div class="admin-tab" onclick="switchTab('kyc', this)">KYC Queue</div>
+                        <div class="admin-tab" onclick="switchTab('withdrawals', this)">Withdrawals</div>
+                        <div class="admin-tab" onclick="switchTab('analytics', this)">Analytics</div>
+                        <div class="admin-tab" onclick="switchTab('moderation', this)">Moderation</div>
+                    </div>
+
+                    <!-- Tab: Markets -->
+                    <div id="tab-markets" class="admin-tab-content">
+                        <div class="card" style="margin-bottom: var(--spacing-6);">
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <h3 style="margin: 0;">Proposed Markets</h3>
+                                <button class="btn btn-outline" onclick="fetchProposedMarkets()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" id="proposalsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Category</th>
+                                            <th>Proposed By</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: KYC -->
+                    <div id="tab-kyc" class="admin-tab-content hidden">
+                        <div class="card">
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <h3 style="margin: 0;">HyperVerge KYC Logs</h3>
+                                <button class="btn btn-outline" onclick="fetchAdminKyc()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" id="kycTable">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Status</th>
+                                            <th>Provider Ref</th>
+                                            <th>Date</th>
+                                            <th>Reason (If Failed)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Withdrawals -->
+                    <div id="tab-withdrawals" class="admin-tab-content hidden">
+                        <div class="card">
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <h3 style="margin: 0;">Pending Withdrawals</h3>
+                                <button class="btn btn-outline" onclick="fetchWithdrawals()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" id="withdrawalsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Analytics -->
+                    <div id="tab-analytics" class="admin-tab-content hidden">
+                        <div class="dashboard-grid">
+                            <div class="card text-center">
+                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase;">Total Users</div>
+                                <div class="text-gold font-bold" style="font-size: 2.5rem;">1,250</div>
+                            </div>
+                            <div class="card text-center">
+                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase;">Volume (24h)</div>
+                                <div class="text-primary font-bold" style="font-size: 2.5rem;">452K PTS</div>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top: var(--spacing-6);">
+                            <h3 style="margin-bottom: var(--spacing-4);">System Health</h3>
+                            <div class="text-muted text-center" style="padding: var(--spacing-6);">Analytics dashboard powered by Grafana (Placeholder).</div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Moderation -->
+                    <div id="tab-moderation" class="admin-tab-content hidden">
+                        <div class="card">
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <h3 style="margin: 0;">User Management & Audit</h3>
+                            </div>
+                            <div class="input-group" style="max-width: 400px; margin-bottom: var(--spacing-6);">
+                                <input type="text" class="input-control" placeholder="Search users by ID or username...">
+                            </div>
+                            <div class="text-muted text-center" style="padding: var(--spacing-6);">No moderation flags pending.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
     </div>
-</div>
 
-<!-- Main Admin Shell -->
-<div id="adminApp" class="admin-layout" style="display:none;">
-
-    <!-- Sidebar -->
-    <aside class="admin-sidebar">
-        <div class="admin-logo">
-            <i class="fa-solid fa-bolt-lightning"></i>
-            <span>PROPHIT</span>
-        </div>
-        <div class="admin-user-info" id="adminUserInfo">
-            <!-- Filled by JS -->
-        </div>
-        <nav class="admin-nav">
-            <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard', this)">
-                <i class="fa-solid fa-gauge-high"></i> Dashboard
-            </button>
-            <button class="nav-item" data-tab="markets" onclick="switchTab('markets', this)">
-                <i class="fa-solid fa-chart-line"></i> Markets
-            </button>
-            <button class="nav-item admin-only" data-tab="users" onclick="switchTab('users', this)">
-                <i class="fa-solid fa-users"></i> User Management
-            </button>
-            <button class="nav-item super-only" data-tab="roles" onclick="switchTab('roles', this)">
-                <i class="fa-solid fa-shield-halved"></i> Role Assignment
-            </button>
-            <button class="nav-item admin-only" data-tab="queues" onclick="switchTab('queues', this)">
-                <i class="fa-solid fa-inbox"></i> Processing Queues
-            </button>
-            <button class="nav-item admin-only" data-tab="logs" onclick="switchTab('logs', this)">
-                <i class="fa-solid fa-scroll"></i> Activity Logs
-            </button>
-        </nav>
-        <button class="logout-btn" onclick="adminLogout()">
-            <i class="fa-solid fa-right-from-bracket"></i> Logout
-        </button>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="admin-main">
-
-        <!-- ===== TAB: DASHBOARD ===== -->
-        <div id="tab-dashboard" class="tab-content active">
-            <div class="page-header">
-                <h1>Platform Dashboard</h1>
-                <p>Real-time overview of PROPHIT's beta performance</p>
-            </div>
-            <div class="stats-grid" id="statsGrid">
-                <div class="stat-card">
-                    <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statTotalUsers">—</div>
-                        <div class="stat-label">Total Users</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon green"><i class="fa-solid fa-user-check"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statActiveUsers">—</div>
-                        <div class="stat-label">Active Users</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon red"><i class="fa-solid fa-user-slash"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statBannedUsers">—</div>
-                        <div class="stat-label">Banned Users</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon gold"><i class="fa-solid fa-chart-bar"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statOpenMarkets">—</div>
-                        <div class="stat-label">Open Markets</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon purple"><i class="fa-solid fa-arrows-turn-to-dots"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statTotalTrades">—</div>
-                        <div class="stat-label">Total Trades</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon cyan"><i class="fa-solid fa-coins"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="statVolume">—</div>
-                        <div class="stat-label">Total Volume (pts)</div>
-                    </div>
-                </div>
-            </div>
-            <div class="section-card" id="roleBreakdown">
-                <h3>Users by Role</h3>
-                <div id="roleBreakdownContent" class="role-breakdown-grid">
-                    <!-- Filled by JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== TAB: MARKETS ===== -->
-        <div id="tab-markets" class="tab-content">
-            <div class="page-header">
-                <h1>Market Management</h1>
-                <p>Create, approve proposals, and resolve markets</p>
-            </div>
-
-            <!-- Create Market -->
-            <div class="section-card content-creator-only">
-                <h3><i class="fa-solid fa-plus-circle"></i> Create New Market</h3>
-                <form id="adminCreateForm" class="inline-form">
-                    <input type="text" id="adminTitle" placeholder="Market Title" required>
-                    <textarea id="adminDesc" placeholder="Description" rows="2"></textarea>
-                    <div class="form-row">
-                        <select id="adminCategory">
-                            <option value="Politics">Politics</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Technology">Technology</option>
-                            <option value="Global News">Global News</option>
-                        </select>
-                        <input type="date" id="adminDate" required>
-                        <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Create</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Open Markets / Resolve -->
-            <div class="section-card admin-only-section">
-                <h3><i class="fa-solid fa-gavel"></i> Resolve Open Markets</h3>
-                <table class="admin-table" id="marketsTable">
-                    <thead>
-                        <tr><th>ID</th><th>Title</th><th>Vol</th><th>Status</th><th>Action</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-
-            <!-- Pending Proposals -->
-            <div class="section-card content-creator-only">
-                <h3><i class="fa-solid fa-inbox"></i> Pending Proposals <span id="proposalCount" class="badge-count">0</span></h3>
-                <table class="admin-table" id="proposalsTable">
-                    <thead>
-                        <tr><th>Title</th><th>Category</th><th>Submitted By</th><th>Action</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ===== TAB: USER MANAGEMENT ===== -->
-        <div id="tab-users" class="tab-content">
-            <div class="page-header">
-                <h1>User Management</h1>
-                <p>Search, ban, unban users. Role changes are in the Role Assignment tab.</p>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="userSearch" placeholder="Search by username or email…" oninput="filterUsers()">
-                <select id="roleFilter" onchange="filterUsers()">
-                    <option value="">All Roles</option>
-                    <option value="super_admin">Super Admin</option>
-                    <option value="admin">Admin</option>
-                    <option value="content_creator">Content Creator</option>
-                    <option value="it_support">IT Support</option>
-                    <option value="user">User</option>
-                </select>
-                <select id="statusFilter" onchange="filterUsers()">
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="banned">Banned</option>
-                </select>
-            </div>
-            <div class="section-card">
-                <table class="admin-table" id="usersTable">
-                    <thead>
-                        <tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Tier</th><th>Points</th><th>KYC</th><th>Status</th><th>Action</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ===== TAB: ROLE ASSIGNMENT (super_admin only) ===== -->
-        <div id="tab-roles" class="tab-content">
-            <div class="page-header">
-                <h1>Role Assignment</h1>
-                <p>Promote or demote staff members. Super Admin access only.</p>
-            </div>
-            <div class="section-card">
-                <table class="admin-table" id="rolesTable">
-                    <thead>
-                        <tr><th>ID</th><th>Username</th><th>Email</th><th>Current Role</th><th>Assign Role</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ===== TAB: ACTIVITY LOGS ===== -->
-        <div id="tab-logs" class="tab-content">
-            <div class="page-header">
-                <h1>Activity Log</h1>
-                <p>Recent platform activity across all users</p>
-            </div>
-            <div class="section-card">
-                <table class="admin-table" id="logsTable">
-                    <thead>
-                        <tr><th>Time</th><th>User</th><th>Action</th><th>Market</th></tr>
-                    </thead>
-                    <tbody id="logsBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ===== TAB: QUEUES ===== -->
-        <div id="tab-queues" class="tab-content">
-            <div class="page-header">
-                <h1>Processing Queues</h1>
-                <p>Approve or reject pending KYC and Withdrawal requests</p>
-            </div>
-
-            <!-- KYC Section -->
-            <div class="admin-panel-section">
-                <h2>Pending KYC Verifications</h2>
-                <div class="table-responsive">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>User ID</th>
-                                <th>Document / Aadhaar</th>
-                                <th>Submitted At</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="kycQueueBody">
-                            <tr><td colspan="5" class="empty-state">Loading KYC requests...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Withdrawals Section -->
-            <div class="admin-panel-section" style="margin-top: 2rem;">
-                <h2>Pending Withdrawals</h2>
-                <div class="table-responsive">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>User ID</th>
-                                <th>Amount (PTS)</th>
-                                <th>Requested At</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="withdrawalQueueBody">
-                            <tr><td colspan="5" class="empty-state">Loading withdrawals...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-    </main>
-</div>
-
-<!-- Confirm Dialog -->
-<div class="modal-overlay" id="confirmModal" style="display:none;">
-    <div class="modal-box">
-        <h3 id="confirmTitle">Confirm Action</h3>
-        <p id="confirmMsg">Are you sure?</p>
-        <div class="modal-actions">
-            <button class="btn-ghost" onclick="closeConfirm()">Cancel</button>
-            <button class="btn-danger" id="confirmBtn">Confirm</button>
-        </div>
-    </div>
-</div>
-
-<script src="config.js"></script>
-<script src="admin.js"></script>
+    <!-- Scripts -->
+    <script type="module" src="js/pages/admin.js"></script>
 </body>
 </html>

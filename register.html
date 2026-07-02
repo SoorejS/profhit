@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - PROPHIT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/auth.css">
+</head>
+<body>
+    <div class="animated-bg"></div>
+
+    <div class="auth-layout">
+        <div class="auth-card glass-panel">
+            <div class="auth-header">
+                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2rem;"><i class="fa-solid fa-chart-line"></i></a>
+                <h2>Create Account</h2>
+                <p>Start predicting the future with PROPHIT.</p>
+            </div>
+
+            <form id="registerForm">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" class="input-control" placeholder="Choose a unique username" required minlength="3">
+                </div>
+
+                <div class="input-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" class="input-control" placeholder="you@example.com" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="regPassword">Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="regPassword" class="input-control" placeholder="••••••••" required minlength="8">
+                        <i class="fa-solid fa-eye password-toggle"></i>
+                    </div>
+                    <div class="password-strength">
+                        <div class="strength-bar"></div>
+                        <div class="strength-bar"></div>
+                        <div class="strength-bar"></div>
+                        <div class="strength-bar"></div>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-top: var(--spacing-4);">
+                    <label for="referralCode">Referral Code (Optional) <span class="badge badge-gold" style="font-size:0.7rem; padding: 2px 6px;">+150 PTS Bonus</span></label>
+                    <input type="text" id="referralCode" class="input-control" placeholder="e.g. USER1234">
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full" style="padding:0.75rem; font-size:1rem; margin-top:1rem;">Create Account</button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="login.html">Log in</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/pages/auth.js"></script>
+</body>
+</html>

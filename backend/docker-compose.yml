@@ -29,7 +29,19 @@ services:
       - DB_NAME=profhit
       - DB_PORT=5432
       - PORT=8080
-      - JWT_SECRET=prophit-super-secret-key-2026-change-in-prod
+      # REQUIRED: Override this with a strong random secret (>=32 chars) before ANY public deployment.
+      # Generate one with: openssl rand -hex 32
+      - JWT_SECRET=prophit-docker-dev-secret-CHANGE-BEFORE-PRODUCTION-2026
+      # Set to false in production to enforce real KYC verification.
+      - BETA_MODE=true
+
+      - HYPERVERGE_API_KEY=dummy_key_for_testing
+      - HYPERVERGE_API_SECRET=dummy_secret_for_testing
+      - HYPERVERGE_WORKFLOW_ID=dummy_workflow_id
+      - HYPERVERGE_WEBHOOK_SECRET=dummy_webhook_secret
+
+      # Optional: set to your deployed frontend URL for password reset links
+      # - APP_URL=https://prophit.app
     depends_on:
       db:
         condition: service_healthy

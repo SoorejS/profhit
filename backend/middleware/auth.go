@@ -36,7 +36,9 @@ func AuthRequired() gin.HandlerFunc {
 
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
-			secret = "prophit-super-secret-key-2026"
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server misconfiguration: JWT_SECRET not set"})
+			c.Abort()
+			return
 		}
 
 		token, err := jwt.ParseWithClaims(parts[1], &Claims{}, func(token *jwt.Token) (interface{}, error) {

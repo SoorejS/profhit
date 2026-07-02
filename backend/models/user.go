@@ -23,8 +23,12 @@ type User struct {
 	Role      string         `gorm:"default:'user'" json:"role"` // RBAC role
 	IsActive  bool           `gorm:"default:true" json:"is_active"` // false = banned
 	Points    int            `gorm:"default:100" json:"points"`
-	KycStatus bool           `gorm:"default:false" json:"kyc_status"`
-	CreatedAt time.Time      `json:"created_at"`
+	KycStatus        bool           `gorm:"default:false" json:"kyc_status"`
+	ReferralCode     string         `gorm:"uniqueIndex" json:"referral_code"`
+	ReferredBy       uint           `gorm:"default:0" json:"referred_by"`
+	TwoFactorSecret  string         `json:"-"`
+	TwoFactorEnabled bool           `gorm:"default:false" json:"two_factor_enabled"`
+	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

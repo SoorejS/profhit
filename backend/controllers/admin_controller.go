@@ -91,6 +91,7 @@ func UpdateUserRole(c *gin.Context) {
 func BanUser(c *gin.Context) {
 	targetID := c.Param("id")
 	callerID := c.MustGet("userID").(uint)
+	callerRole, _ := c.Get("role")
 
 	var target models.User
 	if err := config.DB.First(&target, targetID).Error; err != nil {
@@ -98,17 +99,26 @@ func BanUser(c *gin.Context) {
 		return
 	}
 
-	// Prevent self-ban and super_admin ban
+	// Prevent self-ban
 	if target.ID == callerID {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot ban yourself"})
 		return
 	}
+	// super_admin cannot be banned
 	if target.Role == models.RoleSuperAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot ban a super_admin"})
 		return
 	}
+	// An admin cannot ban another admin — only super_admin can
+	if target.Role == models.RoleAdmin && callerRole != models.RoleSuperAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only super_admin can ban another admin"})
+		return
+	}
 
-	config.DB.Model(&target).Update("is_active", false)
+	if err := config.DB.Model(&target).Update("is_active", false).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "User banned successfully", "user_id": target.ID, "username": target.Username})
 }
 
@@ -122,9 +132,13 @@ func UnbanUser(c *gin.Context) {
 		return
 	}
 
-	config.DB.Model(&target).Update("is_active", true)
+	if err := config.DB.Model(&target).Update("is_active", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned successfully", "user_id": target.ID, "username": target.Username})
 }
+
 
 // GetPlatformStats returns aggregate admin dashboard statistics
 func GetPlatformStats(c *gin.Context) {
@@ -140,11 +154,10 @@ func GetPlatformStats(c *gin.Context) {
 	config.DB.Model(&models.User{}).Where("is_active = false").Count(&bannedUsers)
 	config.DB.Model(&models.Market{}).Count(&totalMarkets)
 	config.DB.Model(&models.Market{}).Where("resolution_status = ?", "Open").Count(&openMarkets)
-	config.DB.Model(&models.Trade{}).Count(&totalTrades)
+	config.DB.Model(&models.PredictionSubmission{}).Count(&totalTrades)
 
-	// Total volume traded
+	// Total volume traded (n/a for fixed-odds predictions)
 	var totalVolume struct{ Sum float64 }
-	config.DB.Model(&models.Trade{}).Select("COALESCE(SUM(amount), 0) as sum").Scan(&totalVolume)
 
 	// Role breakdown
 	type RoleCount struct {

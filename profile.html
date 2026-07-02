@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/dashboard.css">
+    <style>
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-6);
+            padding: var(--spacing-8);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--spacing-6);
+        }
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 4px solid var(--border-subtle);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-4);
+            margin-bottom: var(--spacing-6);
+        }
+        .stat-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-6);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--color-primary);
+            margin-bottom: var(--spacing-2);
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="portfolio"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="single-column-grid">
+                    
+                    <div class="profile-header">
+                        <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128&size=120" alt="Avatar" class="profile-avatar" id="profileAvatar">
+                        <div>
+                            <h1 id="profileUsername">@Username</h1>
+                            <div class="text-muted" style="margin-bottom: var(--spacing-4);">Joined in 2026</div>
+                            <div class="flex gap-2">
+                                <span class="badge badge-gold"><i class="fa-solid fa-crown"></i> Gold Tier</span>
+                                <span class="badge badge-outline" id="profileKycBadge"><i class="fa-solid fa-shield-halved"></i> Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="statWinRate">--%</div>
+                            <div class="stat-label">Win Rate</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statMarketsJoined">--</div>
+                            <div class="stat-label">Markets Joined</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value text-gold" id="statStreak">--</div>
+                            <div class="stat-label">Day Streak</div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <h3 style="margin-bottom: var(--spacing-4);">Your Active Predictions</h3>
+                            <div id="portfolioList">
+                                <div class="text-muted text-center" style="padding: var(--spacing-6);">Loading portfolio...</div>
+                            </div>
+                        </div>
+
+                        <aside class="right-sidebar">
+                            <div class="card" style="border: 1px solid var(--color-primary); background: rgba(139,92,246,0.05);">
+                                <h3 style="margin-bottom: var(--spacing-4); color: var(--color-primary);"><i class="fa-solid fa-users"></i> Refer a Friend</h3>
+                                <p class="text-sm text-muted" style="margin-bottom: var(--spacing-4);">Share your unique code to give your friends 150 PTS when they sign up!</p>
+                                <div class="input-group">
+                                    <input type="text" id="myReferralCode" class="input-control font-mono font-bold text-center text-primary" readonly value="Loading...">
+                                </div>
+                                <button class="btn btn-primary w-full mt-2" onclick="copyReferral()"><i class="fa-regular fa-copy"></i> Copy Code</button>
+                            </div>
+
+                            <div class="card" style="margin-top: var(--spacing-4);">
+                                <h3 style="margin-bottom: var(--spacing-4);"><i class="fa-solid fa-medal text-gold"></i> Achievements</h3>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex items-center gap-4">
+                                        <div style="width:40px; height:40px; border-radius:50%; background:var(--bg-surface-elevated); display:flex; align-items:center; justify-content:center; color:var(--color-gold);"><i class="fa-solid fa-fire"></i></div>
+                                        <div>
+                                            <div class="font-bold">Hot Streak</div>
+                                            <div class="text-xs text-muted">7 day login streak</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div style="width:40px; height:40px; border-radius:50%; background:var(--bg-surface-elevated); display:flex; align-items:center; justify-content:center; color:var(--color-primary);"><i class="fa-solid fa-handshake"></i></div>
+                                        <div>
+                                            <div class="font-bold">Influencer</div>
+                                            <div class="text-xs text-muted">Invited 5 friends</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/pages/profile.js"></script>
+</body>
+</html>

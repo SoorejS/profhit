@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/dashboard.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Reusable Web Component for Sidebar -->
+        <app-sidebar active="home"></app-sidebar>
+
+        <main class="main-content">
+            <!-- Reusable Web Component for Top Navigation -->
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="dashboard-grid">
+                    <!-- Left: Main Markets Feed -->
+                    <div class="markets-feed">
+                        <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
+                            <h2 id="categoryTitle">Live Markets</h2>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary"><i class="fa-solid fa-fire text-gold"></i> Trending</button>
+                                <button class="btn btn-outline">New</button>
+                                <button class="btn btn-outline">Closing Soon</button>
+                            </div>
+                        </div>
+
+                        <div id="marketsContainer" class="markets-grid">
+                            <!-- Skeletons shown during load -->
+                            <div class="card skeleton" style="height: 200px;"></div>
+                            <div class="card skeleton" style="height: 200px;"></div>
+                            
+                            <!-- Sponsored Prediction Placeholder -->
+                            <div class="card market-card" style="border: 2px solid var(--color-gold); background: rgba(212,175,55,0.05);">
+                                <div>
+                                    <div class="market-card-header">
+                                        <span class="market-card-category" style="color: var(--color-gold);"><i class="fa-solid fa-star"></i> Sponsored</span>
+                                        <span class="badge badge-primary">Active</span>
+                                    </div>
+                                    <h3 class="market-card-title">Will Bitcoin reach $150k by end of 2026?</h3>
+                                    <p style="font-size: 0.85rem; color: var(--text-muted);">Trade with zero fees on this sponsored market provided by CryptoExchange Inc.</p>
+                                </div>
+                                <div style="margin-top: var(--spacing-4);">
+                                    <button class="btn btn-outline w-full" style="color: var(--color-gold); border-color: var(--color-gold);">Trade Now</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Right: Trending / Info Sidebar -->
+                    <aside class="right-sidebar">
+                        
+                        <div class="card" style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(139,92,246,0.1) 100%); border-color: var(--color-gold);">
+                            <h3 style="font-size: 1rem; color: var(--color-gold); margin-bottom: var(--spacing-2);"><i class="fa-solid fa-gift"></i> Daily Rewards</h3>
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <span class="text-sm">Current Streak:</span>
+                                <span class="badge badge-gold"><span id="streakCount">--</span> Days</span>
+                            </div>
+                            <button class="btn btn-primary w-full" id="claimDailyBtn" onclick="claimDailyReward()">Claim Today's Bonus</button>
+                        </div>
+
+                        <div class="card">
+                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4);"><i class="fa-solid fa-bolt text-gold"></i> Fast Movers</h3>
+                            <div id="trendingContainer">
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card" style="background: var(--color-primary-light); border-color: var(--color-primary);">
+                            <h3 style="font-size: 1rem; color: #c4b5fd;">Join the Community</h3>
+                            <p style="font-size: 0.85rem; color: #a78bfa; margin-bottom: var(--spacing-4);">Discuss strategies, propose markets, and chat with top forecasters.</p>
+                            <button class="btn btn-primary w-full"><i class="fa-brands fa-discord"></i> Join Discord</button>
+                        </div>
+                    </aside>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/pages/dashboard.js"></script>
+</body>
+</html>

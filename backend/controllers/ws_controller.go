@@ -3,6 +3,7 @@ package controllers
 import (
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -11,9 +12,16 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
+		// In dev (APP_URL empty), allow all. In prod, check origin.
+		appURL := os.Getenv("APP_URL")
+		if appURL == "" {
+			return true
+		}
+		origin := r.Header.Get("Origin")
+		return origin == appURL || origin == appURL+"/"
 	},
 }
+
 
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan interface{})
@@ -22,7 +30,7 @@ var mutex = &sync.Mutex{}
 func WsHandler(c *gin.Context) {
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("[ws] upgrade error: %v", err)
 		return
 	}
 	defer ws.Close()

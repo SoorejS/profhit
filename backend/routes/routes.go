@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"profhit-backend/controllers"
 	"profhit-backend/middleware"
 	"profhit-backend/models"
@@ -13,7 +15,7 @@ func SetupRouter() *gin.Engine {
 
 	go controllers.HandleMessages()
 
-	// CORS
+	// ── CORS ──────────────────────────────────────────────────────────────────
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -27,13 +29,20 @@ func SetupRouter() *gin.Engine {
 
 	api := r.Group("/api")
 	{
-		// --- PUBLIC ROUTES (no auth needed) ---
+		// ── PUBLIC AUTH ROUTES (rate-limited) ─────────────────────────────────
+		// 10 requests per IP per 5 minutes protects against brute-force and enumeration
+		authLimit := middleware.RateLimit(10, 5*time.Minute)
 		auth := api.Group("/auth")
+		auth.Use(authLimit)
 		{
+			// Public Auth & Webhooks
 			auth.POST("/register", controllers.RegisterUser)
 			auth.POST("/login", controllers.LoginUser)
 			auth.POST("/forgot-password", controllers.ForgotPassword)
+			auth.POST("/reset-password", controllers.ResetPassword)
 		}
+		api.POST("/webhooks/hyperverge", controllers.HypervergeWebhook)
+		api.POST("/simulator/sign-webhook", controllers.SimulatorSignWebhook)
 
 		// Public market browsing
 		api.GET("/markets", controllers.GetAllMarkets)
@@ -50,37 +59,41 @@ func SetupRouter() *gin.Engine {
 		// WebSockets
 		api.GET("/ws", controllers.WsHandler)
 
-		// --- PROTECTED ROUTES (any authenticated user) ---
+		// ── PROTECTED ROUTES (any authenticated user) ─────────────────────────
+		// General prediction limit: 30 req / 1 min to prevent spam
+		predLimit := middleware.RateLimit(30, 1*time.Minute)
+
 		protected := api.Group("/")
 		protected.Use(middleware.AuthRequired())
 		{
-			// Own profile
+			// Wallet & Identity
 			protected.GET("/me", controllers.GetMe)
-			protected.POST("/me/kyc", controllers.UpdateKycStatus)
+			// Real KYC Flow
+			protected.POST("/kyc/start", controllers.StartKYCSession)
+			protected.GET("/kyc/status", controllers.GetKYCStatus)
+			protected.POST("/me/daily-login", controllers.DailyLogin)
+			protected.GET("/me/streak", controllers.GetStreakInfo)
+			protected.GET("/wallet/history", controllers.GetWalletHistory)
+			protected.GET("/wallet/transaction/:id", controllers.GetWalletTransaction)
 
-			// Payments
-			protected.POST("/payments/create-order", controllers.CreateRazorpayOrder)
+			// Payments & Redemption
+			protected.POST("/payments/order", controllers.CreateRazorpayOrder)
 			protected.POST("/payments/verify", controllers.VerifyPayment)
-			protected.POST("/payments/withdraw", controllers.WithdrawFunds)
+			protected.POST("/payments/redeem", controllers.RedeemVoucher)
 
-			// Trading
-			protected.POST("/trades", controllers.PlaceTrade)
-			protected.POST("/trades/:id/sell", controllers.SellTrade)
-			protected.GET("/portfolio", controllers.GetUserTrades)
-
-			// Limit Orders
-			protected.POST("/trades/limit", controllers.CreateLimitOrder)
-			protected.GET("/trades/limit", controllers.GetUserLimitOrders)
-			protected.DELETE("/trades/limit/:id", controllers.CancelLimitOrder)
+			// Predictions (Fixed-Odds) — rate limited
+			protected.POST("/predictions", predLimit, controllers.SubmitPrediction)
+			protected.GET("/predictions", controllers.GetUserPredictions)
+			protected.GET("/portfolio", controllers.GetPortfolio) // Enriched prediction history
 
 			// Market proposals (any logged-in user can propose)
-			protected.POST("/markets/propose", controllers.ProposeMarket)
+			protected.POST("/markets/propose", predLimit, controllers.ProposeMarket)
 
 			// Comments (any logged-in user can comment)
-			protected.POST("/markets/:id/comments", controllers.AddComment)
+			protected.POST("/markets/:id/comments", predLimit, controllers.AddComment)
 		}
 
-		// --- CONTENT CREATOR ROUTES ---
+		// ── CONTENT CREATOR ROUTES ────────────────────────────────────────────
 		contentRoutes := api.Group("/")
 		contentRoutes.Use(middleware.AuthRequired())
 		contentRoutes.Use(middleware.RoleRequired(
@@ -92,7 +105,7 @@ func SetupRouter() *gin.Engine {
 			contentRoutes.POST("/markets/:id/approve", controllers.ApproveMarket)
 		}
 
-		// --- ADMIN ROUTES ---
+		// ── ADMIN ROUTES ──────────────────────────────────────────────────────
 		adminRoutes := api.Group("/")
 		adminRoutes.Use(middleware.AuthRequired())
 		adminRoutes.Use(middleware.RoleRequired(
@@ -102,7 +115,7 @@ func SetupRouter() *gin.Engine {
 			adminRoutes.POST("/markets/:id/resolve", controllers.ResolveMarket)
 		}
 
-		// --- ADMIN PANEL ROUTES ---
+		// ── ADMIN PANEL ROUTES ────────────────────────────────────────────────
 		adminPanel := api.Group("/admin")
 		adminPanel.Use(middleware.AuthRequired())
 		{
@@ -129,11 +142,11 @@ func SetupRouter() *gin.Engine {
 				models.RoleSuperAdmin,
 			), controllers.UpdateUserRole)
 
-			// Queues (admin, super_admin)
-			adminPanel.GET("/kyc-requests", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetKycRequests)
-			adminPanel.POST("/kyc-requests/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveKycRequest)
-			adminPanel.POST("/kyc-requests/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectKycRequest)
+			// KYC queue (admin, super_admin)
+			adminPanel.GET("/kyc", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetAdminKycRequests)
+			adminPanel.GET("/kyc/:id", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetAdminKycRequestByID)
 
+			// Withdrawal/Redemption queue (admin, super_admin)
 			adminPanel.GET("/withdrawals", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetWithdrawals)
 			adminPanel.POST("/withdrawals/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveWithdrawal)
 			adminPanel.POST("/withdrawals/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectWithdrawal)

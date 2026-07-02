@@ -1,0 +1,71 @@
+/* ==========================================================================
+   Auth Pages Styles
+   ========================================================================== */
+
+.auth-layout {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-4);
+}
+
+.auth-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-8);
+    width: 100%;
+    max-width: 440px;
+    box-shadow: var(--shadow-xl);
+    position: relative;
+    z-index: 10;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: var(--spacing-8);
+}
+.auth-header h2 {
+    font-size: 1.8rem;
+    margin-bottom: var(--spacing-2);
+}
+.auth-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.password-input-wrapper {
+    position: relative;
+}
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.password-strength {
+    display: flex;
+    gap: 4px;
+    margin-top: var(--spacing-2);
+}
+.strength-bar {
+    height: 4px;
+    flex: 1;
+    background: var(--border-strong);
+    border-radius: var(--radius-full);
+    transition: background-color var(--transition-normal);
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: var(--spacing-6);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.auth-footer a {
+    font-weight: 500;
+}

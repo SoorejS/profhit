@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Details - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Lightweight Charts for Probability Graph -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    
+        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/dashboard.css">
+    <style>
+        .market-header {
+            margin-bottom: var(--spacing-6);
+        }
+        .market-title {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: var(--spacing-2);
+        }
+        .chart-container {
+            height: 350px;
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--spacing-6);
+            overflow: hidden;
+        }
+        .trade-card {
+            position: sticky;
+            top: 20px;
+        }
+        .prediction-buttons {
+            display: flex;
+            gap: var(--spacing-4);
+            margin-bottom: var(--spacing-4);
+        }
+        .prediction-buttons .btn {
+            flex: 1;
+            padding: 1rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        .comment-item {
+            padding: var(--spacing-4);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .comment-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="markets"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="dashboard-grid">
+                    <!-- Left: Market Details & Chart -->
+                    <div>
+                        <div class="market-header">
+                            <a href="dashboard.html" style="color: var(--text-secondary); margin-bottom: var(--spacing-2); display: inline-block;">
+                                <i class="fa-solid fa-arrow-left"></i> Back to Markets
+                            </a>
+                            <div class="flex items-center gap-2" style="margin-bottom: var(--spacing-2);">
+                                <span class="badge badge-primary" id="marketCategory">Loading...</span>
+                                <span class="badge badge-outline" id="marketStatus">Loading...</span>
+                            </div>
+                            <h1 class="market-title" id="marketTitle">Loading Market...</h1>
+                            <p class="text-secondary" id="marketDesc"></p>
+                        </div>
+
+                        <div class="chart-container" id="chartContainer"></div>
+
+                        <div class="card" style="margin-bottom: var(--spacing-6);">
+                            <h3 style="margin-bottom: var(--spacing-4);">Resolution Criteria</h3>
+                            <p id="resolutionRules" class="text-muted">The market will resolve to "Yes" if the specified event occurs before the closing date according to the official resolution source. Otherwise, it will resolve to "No".</p>
+                        </div>
+
+                        <div class="card">
+                            <h3 style="margin-bottom: var(--spacing-4);"><i class="fa-regular fa-comments"></i> Discussion</h3>
+                            <div class="input-group" style="flex-direction: row; gap: var(--spacing-2);">
+                                <input type="text" id="commentInput" class="input-control" placeholder="Share your analysis...">
+                                <button class="btn btn-primary" onclick="postComment()">Post</button>
+                            </div>
+                            <div id="commentsList" style="margin-top: var(--spacing-4);">
+                                <div class="text-muted text-center" style="padding: var(--spacing-4);">Loading comments...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Trade Execution -->
+                    <aside class="right-sidebar">
+                        <div class="card trade-card">
+                            <h3 style="margin-bottom: var(--spacing-4);">Place Prediction</h3>
+                            
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-2);">
+                                <span>Current Odds</span>
+                                <div class="flex gap-4 font-bold">
+                                    <span class="text-yes">Yes 55%</span>
+                                    <span class="text-no">No 45%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="prediction-buttons">
+                                <button class="btn btn-yes" onclick="selectPrediction('Yes')">Yes</button>
+                                <button class="btn btn-no" onclick="selectPrediction('No')">No</button>
+                            </div>
+
+                            <div id="tradeForm" class="hidden">
+                                <div class="input-group">
+                                    <label>Amount (PTS)</label>
+                                    <input type="number" id="tradeAmount" class="input-control" placeholder="10" min="10">
+                                </div>
+                                
+                                <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: var(--spacing-4);">
+                                    <span>Potential Return</span>
+                                    <span id="potentialReturn" class="font-bold text-success">--</span>
+                                </div>
+
+                                <button class="btn btn-primary w-full" onclick="executeTrade()">Confirm Prediction</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card" style="margin-top: var(--spacing-4);">
+                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-2);">Market Stats</h3>
+                            <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: 4px;">
+                                <span>Volume</span>
+                                <span class="text-primary font-bold">142,500 PTS</span>
+                            </div>
+                            <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: 4px;">
+                                <span>Participants</span>
+                                <span class="font-bold">1,204</span>
+                            </div>
+                            <div class="flex justify-between text-muted" style="font-size: 0.85rem;">
+                                <span>Closes</span>
+                                <span id="marketCloseDate" class="font-bold">--</span>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="js/pages/market.js"></script>
+</body>
+</html>
