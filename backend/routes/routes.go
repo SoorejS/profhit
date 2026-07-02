@@ -145,6 +145,11 @@ func SetupRouter() *gin.Engine {
 				models.RoleSuperAdmin,
 			), controllers.UpdateUserRole)
 
+			// Audit Logs (super_admin ONLY)
+			adminPanel.GET("/audit-logs", middleware.RoleRequired(
+				models.RoleSuperAdmin,
+			), controllers.GetAuditLogs)
+
 			// KYC queue (admin, super_admin)
 			adminPanel.GET("/kyc", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetAdminKycRequests)
 			adminPanel.GET("/kyc/:id", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetAdminKycRequestByID)

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -173,6 +174,8 @@ func ResolveMarket(c *gin.Context) {
 		return
 	}
 
+	_ = services.LogAction(tx, adminID, "RESOLVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Resolved market with winner: "+correctOption, c.ClientIP())
+
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
@@ -232,6 +235,9 @@ func ApproveMarket(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve market"})
 		return
 	}
+
+	callerID := c.MustGet("userID").(uint)
+	_ = services.LogAction(nil, callerID, "APPROVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Approved proposed market: "+market.Title, c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Market approved and is now live!", "market": market})
 }

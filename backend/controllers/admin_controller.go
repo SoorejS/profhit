@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -79,6 +81,10 @@ func UpdateUserRole(c *gin.Context) {
 		return
 	}
 
+	callerID := c.MustGet("userID").(uint)
+	ip := c.ClientIP()
+	_ = services.LogAction(nil, callerID, "UPDATE_ROLE", fmt.Sprintf("user_%d", target.ID), fmt.Sprintf("Changed role from %s to %s", target.Role, req.Role), ip)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "Role updated successfully",
 		"user_id":     target.ID,
@@ -119,6 +125,10 @@ func BanUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user"})
 		return
 	}
+	
+	ip := c.ClientIP()
+	_ = services.LogAction(nil, callerID, "BAN_USER", fmt.Sprintf("user_%d", target.ID), "Banned user", ip)
+	
 	c.JSON(http.StatusOK, gin.H{"message": "User banned successfully", "user_id": target.ID, "username": target.Username})
 }
 
@@ -136,6 +146,11 @@ func UnbanUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user"})
 		return
 	}
+
+	callerID := c.MustGet("userID").(uint)
+	ip := c.ClientIP()
+	_ = services.LogAction(nil, callerID, "UNBAN_USER", fmt.Sprintf("user_%d", target.ID), "Unbanned user", ip)
+
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned successfully", "user_id": target.ID, "username": target.Username})
 }
 
