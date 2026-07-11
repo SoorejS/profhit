@@ -1,11 +1,10 @@
 services:
   - type: web
     name: prophit-api
-    env: go
+    env: docker
     region: singapore
     plan: starter
-    buildCommand: go build -o prophit-backend .
-    startCommand: ./prophit-backend
+    rootDir: backend
     envVars:
       - key: DATABASE_URL
         fromDatabase:

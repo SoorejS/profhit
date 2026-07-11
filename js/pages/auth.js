@@ -13,10 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = e.target.previousElementSibling;
             if (input.type === 'password') {
                 input.type = 'text';
-                e.target.classList.replace('fa-eye', 'fa-eye-slash');
+                e.target.classList.replace('ph-eye', 'ph-eye-slash');
             } else {
                 input.type = 'password';
-                e.target.classList.replace('fa-eye-slash', 'fa-eye');
+                e.target.classList.replace('ph-eye-slash', 'ph-eye');
             }
         });
     });
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const btn = loginForm.querySelector('button[type="submit"]');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Logging in...';
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Logging in...';
 
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const btn = regForm.querySelector('button[type="submit"]');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Creating account...';
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Creating account...';
 
             const username = document.getElementById('username').value;
             const email = document.getElementById('email').value;
@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const btn = forgotForm.querySelector('button[type="submit"]');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending link...';
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Sending link...';
 
             const email = document.getElementById('email').value;
 

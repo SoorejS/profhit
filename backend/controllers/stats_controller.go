@@ -105,3 +105,63 @@ func GetActivity(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, activity)
 }
+
+// GetTopStreak fetches users ranked by their longest daily login streak
+func GetTopStreak(c *gin.Context) {
+	var streaks []models.UserStreak
+	if err := config.DB.Preload("User").Order("longest_streak desc").Limit(10).Find(&streaks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch streak leaderboard"})
+		return
+	}
+
+	var leaderboard []gin.H
+	for _, s := range streaks {
+		if s.User.ID != 0 {
+			leaderboard = append(leaderboard, gin.H{
+				"id":             s.User.ID,
+				"username":       s.User.Username,
+				"longest_streak": s.LongestStreak,
+			})
+		}
+	}
+	if leaderboard == nil {
+		leaderboard = []gin.H{}
+	}
+	c.JSON(http.StatusOK, leaderboard)
+}
+
+// GetTopWinRate fetches users ranked by prediction win rate (min 10 predictions)
+func GetTopWinRate(c *gin.Context) {
+	type WinRateRow struct {
+		ID       uint    `json:"id"`
+		Username string  `json:"username"`
+		WinRate  float64 `json:"win_rate"`
+		Total    int     `json:"total_predictions"`
+	}
+
+	var rows []WinRateRow
+	err := config.DB.Raw(`
+		SELECT
+			u.id,
+			u.username,
+			COUNT(ps.id) AS total,
+			(SUM(CASE WHEN ps.is_correct = true THEN 1 ELSE 0 END)::float / COUNT(ps.id)::float) * 100 AS win_rate
+		FROM users u
+		JOIN prediction_submissions ps ON ps.user_id = u.id
+		WHERE ps.deleted_at IS NULL AND u.deleted_at IS NULL
+		GROUP BY u.id, u.username
+		HAVING COUNT(ps.id) >= 10
+		ORDER BY win_rate DESC
+		LIMIT 10
+	`).Scan(&rows).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch win rate leaderboard"})
+		return
+	}
+
+	if rows == nil {
+		rows = []WinRateRow{}
+	}
+	c.JSON(http.StatusOK, rows)
+}

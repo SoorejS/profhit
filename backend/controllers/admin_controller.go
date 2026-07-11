@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
@@ -36,6 +37,47 @@ func GetAllUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"users": users, "total": len(users)})
+}
+
+// GetAdminKycQueue returns all KYC requests
+func GetAdminKycQueue(c *gin.Context) {
+	limit, offset := getPagination(c)
+	var queue []models.HyperVergeKYC
+	if err := config.DB.Order("created_at desc").Limit(limit).Offset(offset).Find(&queue).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch KYC queue"})
+		return
+	}
+	c.JSON(http.StatusOK, queue)
+}
+
+// GetAdminWithdrawalQueue returns pending withdrawals
+func GetAdminWithdrawalQueue(c *gin.Context) {
+	limit, offset := getPagination(c)
+	var reqs []models.WithdrawalRequest
+	if err := config.DB.Where("status = ?", "Pending").Order("created_at asc").Limit(limit).Offset(offset).Find(&reqs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch withdrawal queue"})
+		return
+	}
+	c.JSON(http.StatusOK, reqs)
+}
+
+// Helper for pagination
+func getPagination(c *gin.Context) (int, int) {
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	limit := 50
+	offset := 0
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	return limit, offset
 }
 
 // UpdateUserRole changes a user's role. Only super_admin can do this.

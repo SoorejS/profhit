@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"profhit-backend/config"
 	"profhit-backend/middleware"
 	"profhit-backend/models"
@@ -44,8 +45,8 @@ func generateToken(user models.User) (string, error) {
 func RegisterUser(c *gin.Context) {
 	var input struct {
 		Username     string `json:"username" binding:"required"`
-		Email        string `json:"email" binding:"required"`
-		Password     string `json:"password" binding:"required"`
+		Email        string `json:"email" binding:"required,email"`
+		Password     string `json:"password" binding:"required,min=8"`
 		ReferralCode string `json:"referral_code"`
 	}
 
@@ -206,6 +207,61 @@ func LoginUser(c *gin.Context) {
 	})
 }
 
+// LogoutUser invalidates the current JWT token
+func LogoutUser(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No token provided"})
+		return
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) == 2 && parts[0] == "Bearer" {
+		middleware.InvalidateToken(parts[1])
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// GetUserStats returns calculated statistics for a specific user
+func GetUserStats(c *gin.Context) {
+	id := c.Param("id")
+
+	var totalPredictions int64
+	var wonPredictions int64
+	var coinsEarned int64
+	var coinsSpent int64
+
+	config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ?", id).Count(&totalPredictions)
+	config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ? AND is_correct = ?", id, true).Count(&wonPredictions)
+
+	// Coins earned via predictions, referral bonuses, or admin adjustments
+	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionWin), string(models.TxTypeAdminAdjustment), string(models.TxTypeReferralBonus)}).Select("COALESCE(SUM(credit), 0)").Scan(&coinsEarned)
+	
+	// Coins spent via predictions and withdrawals
+	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionStake), string(models.TxTypeRedemption)}).Select("COALESCE(SUM(debit), 0)").Scan(&coinsSpent)
+
+	var longestStreak int
+	var current models.UserStreak
+	if err := config.DB.Where("user_id = ?", id).First(&current).Error; err == nil {
+		longestStreak = current.LongestStreak
+	}
+
+	winRate := float64(0)
+	if totalPredictions > 0 {
+		winRate = float64(wonPredictions) / float64(totalPredictions) * 100
+	}
+
+	var achievementCount int64
+	config.DB.Model(&models.UserAchievement{}).Where("user_id = ?", id).Count(&achievementCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_predictions": totalPredictions,
+		"win_rate":          fmt.Sprintf("%.1f%%", winRate),
+		"coins_earned":      coinsEarned,
+		"coins_spent":       coinsSpent,
+		"longest_streak":    longestStreak,
+		"achievement_count": achievementCount,
+	})
+}
 
 // GetMe returns the logged-in user's profile from JWT context
 func GetMe(c *gin.Context) {
@@ -216,6 +272,9 @@ func GetMe(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
+
+	// Trigger async profile completion check
+	go services.CheckProfileCompletion(userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"id":         user.ID,

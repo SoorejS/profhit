@@ -5,101 +5,295 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PROPHIT - Precision Forecasting</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/utilities.css">
-    <link rel="stylesheet" href="css/pages/landing.css">
+    
+    <style>
+        /* Landing Page Specific Overrides */
+        body {
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.05) 0%, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .landing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-4) var(--spacing-8);
+            background: rgba(9, 9, 11, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .landing-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-2);
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.03em;
+        }
+
+        .landing-logo i {
+            color: var(--color-primary);
+        }
+
+        .landing-nav {
+            display: none;
+        }
+        @media (min-width: 768px) {
+            .landing-nav {
+                display: flex;
+                gap: var(--spacing-6);
+            }
+            .landing-nav a {
+                color: var(--text-secondary);
+                font-weight: 500;
+                font-size: 0.95rem;
+            }
+            .landing-nav a:hover {
+                color: var(--text-primary);
+            }
+        }
+
+        .hero-section {
+            padding: 160px var(--spacing-6) 100px;
+            text-align: center;
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            padding: 6px 16px;
+            border-radius: var(--radius-full);
+            color: #c4b5fd;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-6);
+        }
+
+        .hero-title {
+            font-size: clamp(3rem, 6vw, 5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.04em;
+            margin-bottom: var(--spacing-6);
+            background: linear-gradient(to right, #fff, #a1a1aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-title span.highlight {
+            background: linear-gradient(to right, var(--color-gold), #fef08a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.1rem, 2vw, 1.25rem);
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin-bottom: var(--spacing-8);
+            line-height: 1.6;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: var(--spacing-4);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .features-section {
+            padding: 100px var(--spacing-6);
+            background: rgba(255, 255, 255, 0.02);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-12);
+            letter-spacing: -0.02em;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-6);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-8);
+            text-align: left;
+            transition: transform var(--transition-fast), border-color var(--transition-fast);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--border-strong);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            color: var(--color-primary);
+            margin-bottom: var(--spacing-4);
+            display: inline-block;
+            padding: 12px;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: var(--radius-md);
+        }
+
+        .footer {
+            padding: 80px var(--spacing-6) 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-8);
+        }
+
+        .footer-col h4 {
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: var(--spacing-4);
+        }
+
+        .footer-col a {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-2);
+            font-size: 0.9rem;
+        }
+        
+        .footer-col a:hover {
+            color: var(--text-primary);
+        }
+    </style>
 </head>
 <body>
-    <div class="animated-bg"></div>
-
     <header class="landing-header">
         <div class="landing-logo">
-            <i class="fa-solid fa-chart-line text-primary"></i>
+            <i class="ph-fill ph-trend-up"></i>
             PROPHIT
         </div>
         <nav class="landing-nav">
             <a href="#features">Features</a>
-            <a href="#how-it-works">How it Works</a>
+            <a href="#markets">Markets</a>
             <a href="#security">Security</a>
         </nav>
         <div class="flex gap-4">
-            <a href="login.html" class="btn btn-outline">Log in</a>
-            <a href="register.html" class="btn btn-primary">Sign up</a>
+            <a href="login.html" class="btn btn-secondary">Log in</a>
+            <a href="register.html" class="btn btn-primary">Get Started</a>
         </div>
     </header>
 
     <section class="hero-section">
-        <div class="hero-badge">New: High Frequency Crypto Markets Live</div>
-        <h1 class="hero-title">Predict the Future.<br>Profit from Truth.</h1>
-        <p class="hero-subtitle">India's premier prediction market platform. Forecast global events, politics, and technology outcomes with unparalleled precision and real-time odds.</p>
+        <div class="hero-badge"><i class="ph-fill ph-lightning"></i> V2 Closed Beta is Live</div>
+        <h1 class="hero-title">Predict the Future.<br><span class="highlight">Profit from Truth.</span></h1>
+        <p class="hero-subtitle">The commercial-grade prediction market platform. Forecast global events, politics, and technology outcomes with unparalleled precision and real-time ledger resolution.</p>
         <div class="hero-cta">
-            <a href="register.html" class="btn btn-primary" style="padding: 1rem 2.5rem; font-size: 1.1rem;">Start Trading</a>
-            <a href="login.html" class="btn btn-secondary" style="padding: 1rem 2.5rem; font-size: 1.1rem;">View Markets</a>
+            <a href="register.html" class="btn btn-primary" style="padding: 1rem 2.5rem; font-size: 1.1rem; box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);">Start Trading</a>
+            <a href="login.html" class="btn btn-secondary" style="padding: 1rem 2.5rem; font-size: 1.1rem;"><i class="ph ph-chart-line-up"></i> View Markets</a>
         </div>
     </section>
 
     <section id="features" class="features-section">
-        <h2 class="section-title">Built for Precision</h2>
+        <h2 class="section-title">Institutional Grade Infrastructure</h2>
         <div class="features-grid">
             <div class="feature-card">
-                <i class="fa-solid fa-bolt feature-icon"></i>
-                <h3>Real-time Resolution</h3>
-                <p>Markets resolve instantly via automated oracles and manual verified consensus.</p>
+                <i class="ph-fill ph-scales feature-icon"></i>
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Immutable Ledger</h3>
+                <p>Every trade and payout is recorded on a strict double-entry ledger ensuring 100% financial accuracy.</p>
             </div>
             <div class="feature-card">
-                <i class="fa-solid fa-shield-halved feature-icon"></i>
-                <h3>Bank-grade Security</h3>
-                <p>Enterprise-grade KYC via HyperVerge and encrypted ledgers protect your funds.</p>
+                <i class="ph-fill ph-shield-check feature-icon" style="color: var(--color-success); background: var(--color-success-light);"></i>
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Verified Identity</h3>
+                <p>Enterprise-grade KYC via HyperVerge protects the platform from manipulation and ensures compliance.</p>
             </div>
             <div class="feature-card">
-                <i class="fa-solid fa-chart-pie feature-icon"></i>
-                <h3>Deep Analytics</h3>
-                <p>Advanced charting, order books, and real-time probability graphs for power users.</p>
+                <i class="ph-fill ph-chart-polar feature-icon" style="color: var(--color-gold); background: var(--color-gold-light);"></i>
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Real-time Odds</h3>
+                <p>Advanced matching engine recalculates probabilities instantly as participants place their predictions.</p>
             </div>
             <div class="feature-card">
-                <i class="fa-solid fa-earth-americas feature-icon"></i>
-                <h3>Global Markets</h3>
-                <p>Trade on Indian politics, global macroeconomics, crypto events, and tech milestones.</p>
+                <i class="ph-fill ph-users-three feature-icon" style="color: #3b82f6; background: rgba(59, 130, 246, 0.1);"></i>
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Community Driven</h3>
+                <p>Propose your own markets, build reputation streaks, and earn rewards via the referral engine.</p>
             </div>
         </div>
     </section>
 
     <footer class="footer">
-        <div class="footer-col">
-            <div class="landing-logo" style="font-size:1.2rem; margin-bottom:1rem;">
-                <i class="fa-solid fa-chart-line text-primary"></i> PROPHIT
+        <!-- Footer Links -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-8); margin-bottom: var(--spacing-8);">
+            
+            <!-- Column 1: Brand -->
+            <div>
+                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2rem;"><i class="ph-fill ph-trend-up"></i> PROPHIT</a>
+                <p class="text-muted text-sm">The next generation of prediction markets. Trade on real-world events and earn rewards.</p>
             </div>
-            <p style="font-size:0.9rem;">Predicting tomorrow, today.</p>
-        </div>
-        <div class="footer-col">
-            <h4>Platform</h4>
-            <a href="login.html">Markets</a>
-            <a href="#">Leaderboard</a>
-            <a href="#">Categories</a>
-        </div>
-        <div class="footer-col">
-            <h4>Resources</h4>
-            <a href="#">Help Center</a>
-            <a href="#">API Documentation</a>
-            <a href="#">Trading Rules</a>
-        </div>
-        <div class="footer-col">
-            <h4>Company</h4>
-            <a href="#">About</a>
-            <a href="#">Terms of Service</a>
-            <a href="#">Privacy Policy</a>
+            
+            <!-- Column 2: Platform -->
+            <div style="display: flex; flex-direction: column; gap: var(--spacing-3);">
+                <h4 style="font-weight: 600; margin-bottom: var(--spacing-2);">Platform</h4>
+                <a href="login.html" class="text-muted hover:text-primary">Markets</a>
+                <a href="login.html" class="text-muted hover:text-primary">Leaderboard</a>
+                <a href="login.html" class="text-muted hover:text-primary">Categories</a>
+            </div>
+            
+            <!-- Column 3: Resources -->
+            <div style="display: flex; flex-direction: column; gap: var(--spacing-3);">
+                <h4 style="font-weight: 600; margin-bottom: var(--spacing-2);">Resources</h4>
+                <a href="support.html" class="text-muted hover:text-primary">Help Center</a>
+                <a href="api-docs.html" class="text-muted hover:text-primary">API Documentation</a>
+                <a href="trading-rules.html" class="text-muted hover:text-primary">Trading Rules</a>
+            </div>
+            
+            <!-- Column 4: Legal -->
+            <div style="display: flex; flex-direction: column; gap: var(--spacing-3);">
+                <h4 style="font-weight: 600; margin-bottom: var(--spacing-2);">Legal</h4>
+                <a href="privacy-policy.html" class="text-muted hover:text-primary">Privacy Policy</a>
+                <a href="terms-of-service.html" class="text-muted hover:text-primary">Terms of Service</a>
+            </div>
         </div>
     </footer>
 
     <script>
-        // If already logged in, redirect to dashboard automatically
-        if (window.ApiClient && window.ApiClient.isAuthenticated()) {
+        // Check if already authenticated, if so skip landing page
+        const token = localStorage.getItem('token');
+        if (token) {
             window.location.href = 'dashboard.html';
         }
     </script>

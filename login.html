@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log In - PROPHIT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="css/tokens.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -19,33 +19,37 @@
     <div class="auth-layout">
         <div class="auth-card glass-panel">
             <div class="auth-header">
-                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2rem;"><i class="fa-solid fa-chart-line"></i></a>
-                <h2>Welcome Back</h2>
-                <p>Log in to access your predictions and portfolio.</p>
+                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2.5rem;"><i class="ph-fill ph-trend-up"></i></a>
+                <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Welcome Back</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Log in to access your predictions and portfolio.</p>
             </div>
 
             <form id="loginForm">
                 <div class="input-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" class="input-control" placeholder="you@example.com" required>
+                    <div style="position: relative;">
+                        <i class="ph ph-envelope-simple" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="email" id="email" class="input-control" placeholder="you@example.com" style="padding-left: 2.5rem;" required>
+                    </div>
                 </div>
 
                 <div class="input-group">
-                    <div class="flex justify-between w-full">
+                    <div class="flex justify-between w-full" style="margin-bottom: 0.25rem;">
                         <label for="password">Password</label>
-                        <a href="forgot-password.html" style="font-size:0.85rem;">Forgot password?</a>
+                        <a href="forgot-password.html" style="font-size:0.85rem; color: var(--color-primary);">Forgot password?</a>
                     </div>
-                    <div class="password-input-wrapper">
-                        <input type="password" id="password" class="input-control" placeholder="••••••••" required>
-                        <i class="fa-solid fa-eye password-toggle"></i>
+                    <div class="password-input-wrapper" style="position: relative;">
+                        <i class="ph ph-lock-key" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="password" id="password" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required>
+                        <i class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></i>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-full" style="padding:0.75rem; font-size:1rem; margin-top:1rem;">Log In</button>
+                <button type="submit" class="btn btn-primary w-full" style="padding:0.85rem; font-size:1.05rem; margin-top:1.5rem; justify-content: center;"><i class="ph-bold ph-sign-in"></i> Log In</button>
             </form>
 
-            <div class="auth-footer">
-                Don't have an account? <a href="register.html">Sign up</a>
+            <div class="auth-footer" style="margin-top: 2rem; text-align: center; font-size: 0.95rem; color: var(--text-secondary);">
+                Don't have an account? <a href="register.html" style="font-weight: 500;">Sign up</a>
             </div>
         </div>
     </div>

@@ -6,12 +6,12 @@
     <title>Market Details - PROPHIT</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <!-- Lightweight Charts for Probability Graph -->
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     
-        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -22,9 +22,10 @@
             margin-bottom: var(--spacing-6);
         }
         .market-title {
-            font-size: 2rem;
+            font-size: 2.25rem;
             font-weight: 700;
             line-height: 1.2;
+            letter-spacing: -0.02em;
             margin-bottom: var(--spacing-2);
         }
         .chart-container {
@@ -39,6 +40,8 @@
         .trade-card {
             position: sticky;
             top: 20px;
+            background: var(--bg-surface-elevated);
+            border-color: var(--border-strong);
         }
         .prediction-buttons {
             display: flex;
@@ -48,8 +51,9 @@
         .prediction-buttons .btn {
             flex: 1;
             padding: 1rem;
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             font-weight: 700;
+            border-radius: var(--radius-md);
         }
         .comment-item {
             padding: var(--spacing-4);
@@ -73,32 +77,34 @@
                     <!-- Left: Market Details & Chart -->
                     <div>
                         <div class="market-header">
-                            <a href="dashboard.html" style="color: var(--text-secondary); margin-bottom: var(--spacing-2); display: inline-block;">
-                                <i class="fa-solid fa-arrow-left"></i> Back to Markets
+                            <a href="dashboard.html" style="color: var(--text-secondary); margin-bottom: var(--spacing-4); display: inline-flex; align-items: center; gap: 4px; font-weight: 500; transition: color var(--transition-fast);">
+                                <i class="ph ph-arrow-left"></i> Back to Markets
                             </a>
-                            <div class="flex items-center gap-2" style="margin-bottom: var(--spacing-2);">
-                                <span class="badge badge-primary" id="marketCategory">Loading...</span>
+                            <div class="flex items-center gap-2" style="margin-bottom: var(--spacing-3);">
+                                <span class="badge badge-primary" id="marketCategory"><i class="ph ph-spinner ph-spin"></i> Loading...</span>
                                 <span class="badge badge-outline" id="marketStatus">Loading...</span>
                             </div>
                             <h1 class="market-title" id="marketTitle">Loading Market...</h1>
-                            <p class="text-secondary" id="marketDesc"></p>
+                            <p class="text-secondary" id="marketDesc" style="font-size: 1.05rem; line-height: 1.6;"></p>
                         </div>
 
                         <div class="chart-container" id="chartContainer"></div>
 
-                        <div class="card" style="margin-bottom: var(--spacing-6);">
-                            <h3 style="margin-bottom: var(--spacing-4);">Resolution Criteria</h3>
-                            <p id="resolutionRules" class="text-muted">The market will resolve to "Yes" if the specified event occurs before the closing date according to the official resolution source. Otherwise, it will resolve to "No".</p>
+                        <div class="card" style="margin-bottom: var(--spacing-6); border: 1px solid var(--border-subtle);">
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-scales text-gold"></i> Resolution Criteria</h3>
+                            <p id="resolutionRules" class="text-muted" style="line-height: 1.6;">The market will resolve to "Yes" if the specified event occurs before the closing date according to the official resolution source. Otherwise, it will resolve to "No".</p>
                         </div>
 
-                        <div class="card">
-                            <h3 style="margin-bottom: var(--spacing-4);"><i class="fa-regular fa-comments"></i> Discussion</h3>
-                            <div class="input-group" style="flex-direction: row; gap: var(--spacing-2);">
-                                <input type="text" id="commentInput" class="input-control" placeholder="Share your analysis...">
-                                <button class="btn btn-primary" onclick="postComment()">Post</button>
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-chats-circle text-primary"></i> Discussion</h3>
+                            <div class="input-group" style="flex-direction: row; gap: var(--spacing-3);">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="text" id="commentInput" class="input-control" placeholder="Share your analysis..." style="border-radius: var(--radius-full); padding-left: var(--spacing-4);">
+                                </div>
+                                <button class="btn btn-primary" onclick="postComment()" style="border-radius: var(--radius-full); padding: 0.5rem 1.5rem;">Post</button>
                             </div>
                             <div id="commentsList" style="margin-top: var(--spacing-4);">
-                                <div class="text-muted text-center" style="padding: var(--spacing-4);">Loading comments...</div>
+                                <div class="text-muted text-center" style="padding: var(--spacing-4);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading comments...</div>
                             </div>
                         </div>
                     </div>
@@ -106,13 +112,13 @@
                     <!-- Right: Trade Execution -->
                     <aside class="right-sidebar">
                         <div class="card trade-card">
-                            <h3 style="margin-bottom: var(--spacing-4);">Place Prediction</h3>
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Place Prediction</h3>
                             
-                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-2);">
-                                <span>Current Odds</span>
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-3); padding: var(--spacing-3); background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                                <span style="color: var(--text-secondary); font-weight: 500;">Current Odds</span>
                                 <div class="flex gap-4 font-bold">
-                                    <span class="text-yes">Yes 55%</span>
-                                    <span class="text-no">No 45%</span>
+                                    <span class="text-yes" style="font-size: 1.1rem;">Yes 55%</span>
+                                    <span class="text-no" style="font-size: 1.1rem;">No 45%</span>
                                 </div>
                             </div>
                             
@@ -122,33 +128,36 @@
                             </div>
 
                             <div id="tradeForm" class="hidden">
-                                <div class="input-group">
-                                    <label>Amount (PTS)</label>
-                                    <input type="number" id="tradeAmount" class="input-control" placeholder="10" min="10">
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label style="font-weight: 500;">Amount (PTS)</label>
+                                    <div style="position: relative;">
+                                        <i class="ph ph-coins" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                                        <input type="number" id="tradeAmount" class="input-control" placeholder="10" min="10" style="padding-left: 2.5rem; font-size: 1.1rem; font-weight: 600;">
+                                    </div>
                                 </div>
                                 
-                                <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: var(--spacing-4);">
-                                    <span>Potential Return</span>
-                                    <span id="potentialReturn" class="font-bold text-success">--</span>
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-5); padding-top: var(--spacing-3); border-top: 1px dashed var(--border-subtle);">
+                                    <span style="color: var(--text-secondary); font-weight: 500;">Potential Return</span>
+                                    <span id="potentialReturn" class="font-bold text-success" style="font-size: 1.1rem;">--</span>
                                 </div>
 
-                                <button class="btn btn-primary w-full" onclick="executeTrade()">Confirm Prediction</button>
+                                <button class="btn btn-primary w-full" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Confirm Prediction</button>
                             </div>
                         </div>
                         
-                        <div class="card" style="margin-top: var(--spacing-4);">
-                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-2);">Market Stats</h3>
-                            <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: 4px;">
+                        <div class="card" style="margin-top: var(--spacing-4); border: 1px solid var(--border-subtle);">
+                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4); font-weight: 600;">Market Stats</h3>
+                            <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
                                 <span>Volume</span>
                                 <span class="text-primary font-bold">142,500 PTS</span>
                             </div>
-                            <div class="flex justify-between text-muted" style="font-size: 0.85rem; margin-bottom: 4px;">
+                            <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
                                 <span>Participants</span>
-                                <span class="font-bold">1,204</span>
+                                <span class="font-bold text-primary-light">1,204</span>
                             </div>
-                            <div class="flex justify-between text-muted" style="font-size: 0.85rem;">
+                            <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem;">
                                 <span>Closes</span>
-                                <span id="marketCloseDate" class="font-bold">--</span>
+                                <span id="marketCloseDate" class="font-bold text-primary-light">--</span>
                             </div>
                         </div>
                     </aside>

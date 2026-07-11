@@ -2,6 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
+import { escapeHTML } from '../utils/escape.js';
 
 /**
  * PROPHIT - Dashboard Logic
@@ -18,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const category = urlParams.get('category');
     
     if (category) {
-        document.getElementById('categoryTitle').textContent = category.charAt(0).toUpperCase() + category.slice(1) + ' Markets';
+        document.getElementById('categoryTitle').textContent = escapeHTML(category.charAt(0).toUpperCase() + category.slice(1) + ' Markets');
     }
 
     fetchMarkets(category);
@@ -65,7 +66,7 @@ async function fetchMarkets(category) {
         
         let filtered = markets;
         if (category) {
-            filtered = markets.filter(m => m.category.toLowerCase() === category.toLowerCase());
+            filtered = markets.filter(m => m.category && m.category.toLowerCase() === category.toLowerCase());
         }
 
         if (filtered.length === 0) {
@@ -84,7 +85,7 @@ async function fetchMarkets(category) {
             const trending = [...markets].sort((a, b) => (b.id) - (a.id)).slice(0, 5); // Mock logic for trending
             trendingContainer.innerHTML = trending.map(m => `
                 <div class="trending-item">
-                    <a href="market.html?id=${m.id}" class="trending-item-title">${m.title}</a>
+                    <a href="market.html?id=${m.id}" class="trending-item-title">${escapeHTML(m.title)}</a>
                     <div class="trending-item-vol"><i class="fa-solid fa-coins"></i> ${Math.floor(Math.random() * 50000) + 1000} Vol.</div>
                 </div>
             `).join('');
@@ -92,39 +93,40 @@ async function fetchMarkets(category) {
 
     } catch (err) {
         console.error(err);
-        container.innerHTML = `<div class="card text-danger" style="grid-column: 1 / -1;">Failed to load markets. ${err.message}</div>`;
+        container.innerHTML = `<div class="card text-danger" style="grid-column: 1 / -1;">Failed to load markets. ${escapeHTML(err.message)}</div>`;
         if(trendingContainer) trendingContainer.innerHTML = `<div class="text-danger">Failed to load trending</div>`;
     }
 }
 
 function renderMarketCard(m) {
-    // Generate mock probability for display if none exists
-    const yesProb = Math.floor(Math.random() * 60) + 20; 
+    // Use market ID as seed for deterministic probability display
+    const seed = m.id % 60;
+    const yesProb = 20 + seed;
     const noProb = 100 - yesProb;
 
     // Check if the market is closed
-    const isClosed = new Date(m.close_time) < new Date();
+    const isClosed = m.lock_time ? new Date(m.lock_time) < new Date() : false;
     
     // Status Badge
     let statusBadge = '';
-    if (m.status === 'Resolved') {
-        statusBadge = `<span class="badge badge-success">Resolved: ${m.outcome}</span>`;
-    } else if (isClosed) {
+    if (m.resolution_status === 'Resolved') {
+        statusBadge = `<span class="badge badge-success">Resolved: ${escapeHTML(m.correct_option)}</span>`;
+    } else if (m.resolution_status === 'Locked' || m.resolution_status === 'Awaiting Resolution') {
         statusBadge = `<span class="badge badge-warning">Resolving</span>`;
     } else {
-        statusBadge = `<span class="badge badge-primary">Active</span>`;
+        statusBadge = `<span class="badge badge-primary">${escapeHTML(m.resolution_status || 'Live')}</span>`;
     }
 
     return `
         <div class="card market-card" onclick="window.location.href='market.html?id=${m.id}'" style="cursor: pointer;">
             <div>
                 <div class="market-card-header">
-                    <span class="market-card-category"><i class="fa-solid fa-tag"></i> ${m.category}</span>
+                    <span class="market-card-category"><i class="fa-solid fa-tag"></i> ${escapeHTML(m.category)}</span>
                     ${statusBadge}
                 </div>
-                <h3 class="market-card-title">${m.title}</h3>
+                <h3 class="market-card-title">${escapeHTML(m.title)}</h3>
                 <p style="font-size: 0.85rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                    ${m.description}
+                    ${escapeHTML(m.description)}
                 </p>
             </div>
             

@@ -30,24 +30,25 @@ async function loadWalletData() {
 async function loadLedger() {
     const list = document.getElementById('ledgerList');
     try {
-        const data = await ApiClient.get('/me/coins');
+        const data = await ApiClient.get('/wallet/history');
         if (!data || data.length === 0) {
             list.innerHTML = `<div class="text-muted text-center" style="padding: var(--spacing-6);">No transactions yet.</div>`;
             return;
         }
 
         list.innerHTML = data.map(tx => {
-            const isPositive = tx.change > 0;
+            const change = tx.credit > 0 ? tx.credit : -tx.debit;
+            const isPositive = change > 0;
             const sign = isPositive ? '+' : '';
-            const color = isPositive ? 'var(--color-success)' : 'var(--text-primary)';
+            const color = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
             return `
                 <div class="transaction-item">
                     <div>
-                        <div class="font-semibold">${tx.reason}</div>
+                        <div class="font-semibold">${tx.description || tx.type || 'Transaction'}</div>
                         <div class="text-muted" style="font-size: 0.8rem;">${new Date(tx.created_at).toLocaleString()}</div>
                     </div>
                     <div style="color: ${color}; font-weight: 700;">
-                        ${sign}${tx.change} PTS
+                        ${sign}${Math.abs(change)} PTS
                     </div>
                 </div>
             `;
@@ -125,21 +126,22 @@ async function processDeposit() {
     }
 
     try {
-        const order = await ApiClient.post('/payments/create-order', { amount: parseFloat(amt) });
+        const order = await ApiClient.post('/payments/order', { amount: parseFloat(amt) });
         
         const options = {
-            key: "rzp_test_your_dummy_key", 
+            key: order.key, 
             amount: order.amount,
-            currency: "INR",
+            currency: order.currency,
             name: "PROPHIT",
             description: "Deposit to Wallet",
-            order_id: order.id,
+            order_id: order.order_id,
             handler: async function (response) {
                 try {
                     await ApiClient.post('/payments/verify', {
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_signature: response.razorpay_signature
+                        razorpay_signature: response.razorpay_signature,
+                        points: parseFloat(amt) // Added required points argument for Verification
                     });
                     showToast("Deposit successful!", "success");
                     document.getElementById('depositModal').classList.add('hidden');
@@ -188,5 +190,6 @@ async function openWithdraw(amount, itemName) {
 }
 
 window.openWithdraw = openWithdraw;
-window.deposit = deposit;
-window.startKYC = startKYC;
+window.openDeposit = openDeposit;
+window.processDeposit = processDeposit;
+window.startKyc = startKyc;

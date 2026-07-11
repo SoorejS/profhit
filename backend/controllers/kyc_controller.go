@@ -69,31 +69,66 @@ func StartKYCSession(c *gin.Context) {
 	}
 	bodyBytes, _ := json.Marshal(payload)
 
-	req, _ := http.NewRequest("POST", "https://vrs.hyperverge.co/api/generateToken", bytes.NewBuffer(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("appId", appID)
-	req.Header.Set("appKey", appKey)
+	hypervergeURL := os.Getenv("HYPERVERGE_API_URL")
+	if hypervergeURL == "" {
+		hypervergeURL = "https://vrs.hyperverge.co/api/generateToken"
+	}
 
-	// NOTE: If using the Simulator (appID/appKey is fake), this HTTP request will fail in real life,
-	// so we'll mock the response right here if we catch a network/auth error, allowing testing.
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, reqErr := client.Do(req)
+	var resp *http.Response
+	var reqErr error
+
+	// Exponential backoff retry loop (max 3 attempts)
+	maxRetries := 3
+	backoff := 500 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		req, _ := http.NewRequest("POST", hypervergeURL, bytes.NewBuffer(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("appId", appID)
+		req.Header.Set("appKey", appKey)
+
+		resp, reqErr = client.Do(req)
+
+		// Break out of retry if successful or a non-transient status code is received
+		if reqErr == nil && resp.StatusCode < 500 {
+			break
+		}
+		
+		// If it's the last attempt, don't sleep
+		if i == maxRetries-1 {
+			break
+		}
+
+		// Close body to prevent connection leaks during retries
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+
+		time.Sleep(backoff)
+		backoff *= 2
+	}
 
 	var verificationURL string
 	var sessionID = transactionID
 
-	if reqErr != nil || resp.StatusCode != http.StatusOK {
-		// FALLBACK TO SIMULATOR for testing without real credentials
-		verificationURL = fmt.Sprintf("%s/kyc-simulator.html?transactionId=%s", os.Getenv("APP_URL"), transactionID)
+	if reqErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to HyperVerge API"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "HyperVerge returned non-200 status"})
+		return
+	}
+
+	var hvResp HyperVergeTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hvResp); err == nil && hvResp.Status == "success" {
+		verificationURL = hvResp.Result.RedirectURL
 	} else {
-		defer resp.Body.Close()
-		var hvResp HyperVergeTokenResponse
-		if err := json.NewDecoder(resp.Body).Decode(&hvResp); err == nil && hvResp.Status == "success" {
-			verificationURL = hvResp.Result.RedirectURL
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HyperVerge session"})
-			return
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HyperVerge session"})
+		return
 	}
 
 	// 4. Create the KYC record in DB
@@ -149,7 +184,7 @@ func HypervergeWebhook(c *gin.Context) {
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 
 	// In simulator mode or real mode, signature must match
-	if signatureHeader != expectedSignature {
+	if !hmac.Equal([]byte(signatureHeader), []byte(expectedSignature)) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid webhook signature"})
 		return
 	}
@@ -178,6 +213,12 @@ func HypervergeWebhook(c *gin.Context) {
 	var kyc models.HyperVergeKYC
 	if err := config.DB.Where("provider_reference = ?", payload.TransactionID).First(&kyc).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+
+	// Replay protection: if already verified, acknowledge but do not re-process
+	if kyc.Status == "Verified" {
+		c.JSON(http.StatusOK, gin.H{"message": "Already verified"})
 		return
 	}
 

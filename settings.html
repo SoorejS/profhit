@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="settings"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                <div class="single-column-grid" style="max-width: 800px; margin: 0 auto;">
+                    
+                    <div style="margin-bottom: var(--spacing-6);">
+                        <h1 style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary);"><i class="ph-fill ph-gear"></i> Settings</h1>
+                        <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Manage your account profile, security, and preferences.</p>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        
+                        <!-- Left Col: Profile & Security -->
+                        <div style="display: flex; flex-direction: column; gap: var(--spacing-6);">
+                            
+                            <!-- Profile Section (Read-Only via API) -->
+                            <div class="card" style="border: 1px solid var(--border-subtle);">
+                                <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Profile Details</h3>
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label>Username</label>
+                                    <input type="text" id="sUsername" class="input-control" value="Loading..." readonly style="background: var(--bg-surface);">
+                                </div>
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label>Email Address</label>
+                                    <input type="email" id="sEmail" class="input-control" value="Loading..." readonly style="background: var(--bg-surface);">
+                                </div>
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label>Account Tier</label>
+                                    <input type="text" id="sTier" class="input-control font-bold text-gold" value="Loading..." readonly style="background: var(--bg-surface);">
+                                </div>
+                                <div style="margin-top: var(--spacing-4);">
+                                    <button class="btn btn-primary w-full" disabled title="Profile updates disabled in Beta">Save Profile Updates</button>
+                                    <p class="text-muted text-center mt-2 text-xs">Profile updates are currently disabled in the Beta release.</p>
+                                </div>
+                            </div>
+
+                            <!-- Security Section (Disabled in Beta) -->
+                            <div class="card" style="border: 1px solid var(--border-subtle); opacity: 0.8;">
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Security</h3>
+                                    <span class="badge badge-warning">Coming Soon</span>
+                                </div>
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label>Current Password</label>
+                                    <input type="password" class="input-control" placeholder="••••••••" disabled>
+                                </div>
+                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                    <label>New Password</label>
+                                    <input type="password" class="input-control" placeholder="••••••••" disabled>
+                                </div>
+                                <button class="btn btn-outline w-full" disabled>Update Password</button>
+                            </div>
+
+                        </div>
+
+                        <!-- Right Col: Preferences & Avatar -->
+                        <div style="display: flex; flex-direction: column; gap: var(--spacing-6);">
+                            
+                            <!-- Avatar Section -->
+                            <div class="card" style="border: 1px solid var(--border-subtle); text-align: center; opacity: 0.8;">
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Avatar</h3>
+                                    <span class="badge badge-warning">Coming Soon</span>
+                                </div>
+                                <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--border-strong); margin: 0 auto var(--spacing-4); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--text-muted);">
+                                    <i class="ph-fill ph-user"></i>
+                                </div>
+                                <button class="btn btn-outline w-full" disabled>Upload Image</button>
+                            </div>
+
+                            <!-- Notification Preferences -->
+                            <div class="card" style="border: 1px solid var(--border-subtle); opacity: 0.8;">
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Notification Preferences</h3>
+                                    <span class="badge badge-warning">Coming Soon</span>
+                                </div>
+                                
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-3); padding-bottom: var(--spacing-3); border-bottom: 1px solid var(--border-subtle);">
+                                    <div>
+                                        <div class="font-bold">Email Alerts</div>
+                                        <div class="text-xs text-muted">Receive updates via email.</div>
+                                    </div>
+                                    <input type="checkbox" disabled checked>
+                                </div>
+                                
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <div class="font-bold">Push Notifications</div>
+                                        <div class="text-xs text-muted">Receive updates in browser.</div>
+                                    </div>
+                                    <input type="checkbox" disabled checked>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/pages/settings.js"></script>
+</body>
+</html>

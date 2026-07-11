@@ -20,6 +20,7 @@ func SubmitPrediction(c *gin.Context) {
 	var req struct {
 		MarketID uint   `json:"market_id" binding:"required"`
 		Choice   string `json:"choice" binding:"required"`
+		Amount   int    `json:"amount" binding:"required,gt=0"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -32,24 +33,23 @@ func SubmitPrediction(c *gin.Context) {
 		return
 	}
 
-	if market.ResolutionStatus != "Open" {
+	acceptableStatuses := map[string]bool{"Open": true, "Live": true, "Scheduled": true}
+	if !acceptableStatuses[market.ResolutionStatus] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "This market is no longer accepting predictions"})
 		return
 	}
 
 	// Validate the chosen option is one of the declared market options.
-	// Prevents clients from injecting arbitrary strings into the choice field.
 	if !isValidOption(req.Choice, market.Options) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid choice — not an option for this market"})
 		return
 	}
 
-	// Attempt insert. If the unique index fires (duplicate), GORM returns an error.
-	// This is safe under concurrent requests because the constraint is enforced by PostgreSQL.
 	prediction := models.PredictionSubmission{
 		UserID:    userID,
 		MarketID:  req.MarketID,
 		Choice:    req.Choice,
+		Amount:    req.Amount,
 		Potential: market.Payout,
 	}
 
@@ -60,6 +60,14 @@ func SubmitPrediction(c *gin.Context) {
 		}
 	}()
 
+	// 1. Deduct coins from wallet first (safe from race conditions due to row lock)
+	if err := services.DebitWalletTx(tx, userID, req.Amount, models.TxTypePredictionStake, market.ID, "Staked on market: "+market.Title, nil); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance or wallet error"})
+		return
+	}
+
+	// 2. Create the prediction record
 	if err := tx.Create(&prediction).Error; err != nil {
 		tx.Rollback()
 		// Unique constraint violation → user already predicted
@@ -67,7 +75,7 @@ func SubmitPrediction(c *gin.Context) {
 		return
 	}
 
-	// Increment volume counter atomically inside the same transaction
+	// 3. Increment market volume
 	if err := tx.Model(&models.Market{}).Where("id = ?", market.ID).
 		UpdateColumn("volume", gorm.Expr("volume + 1")).Error; err != nil {
 		tx.Rollback()
@@ -83,12 +91,16 @@ func SubmitPrediction(c *gin.Context) {
 	// Trigger Referral Event for First Prediction
 	go services.TriggerReferralEvent(userID, models.ReferralStatusFirstBet, 50)
 
+	// Trigger Gamification Hooks
+	go services.CheckPredictionAchievements(userID)
+
 	// Broadcast to live clients
-	BroadcastUpdate("trade_placed", gin.H{"market_id": market.ID})
+	services.BroadcastToAll("trade_placed", gin.H{"market_id": market.ID})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":            "Prediction locked! Good luck 🎯",
 		"choice":             prediction.Choice,
+		"staked":             prediction.Amount,
 		"potential_payout":   prediction.Potential,
 		"market_title":       market.Title,
 	})

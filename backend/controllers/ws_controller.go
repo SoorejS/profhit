@@ -4,15 +4,17 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
+
+	"profhit-backend/middleware"
+	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// In dev (APP_URL empty), allow all. In prod, check origin.
 		appURL := os.Getenv("APP_URL")
 		if appURL == "" {
 			return true
@@ -22,54 +24,36 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-
-var clients = make(map[*websocket.Conn]bool)
-var broadcast = make(chan interface{})
-var mutex = &sync.Mutex{}
-
 func WsHandler(c *gin.Context) {
+	// Authentication via query parameter
+	tokenStr := c.Query("token")
+	if tokenStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
+		return
+	}
+
+	secret := os.Getenv("JWT_SECRET")
+	token, err := jwt.ParseWithClaims(tokenStr, &middleware.Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	claims, ok := token.Claims.(*middleware.Claims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
+		return
+	}
+
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("[ws] upgrade error: %v", err)
 		return
 	}
-	defer ws.Close()
 
-	mutex.Lock()
-	clients[ws] = true
-	mutex.Unlock()
-
-	for {
-		var msg interface{}
-		err := ws.ReadJSON(&msg)
-		if err != nil {
-			mutex.Lock()
-			delete(clients, ws)
-			mutex.Unlock()
-			break
-		}
-	}
-}
-
-func HandleMessages() {
-	for {
-		msg := <-broadcast
-		mutex.Lock()
-		for client := range clients {
-			err := client.WriteJSON(msg)
-			if err != nil {
-				client.Close()
-				delete(clients, client)
-			}
-		}
-		mutex.Unlock()
-	}
-}
-
-func BroadcastUpdate(event string, payload interface{}) {
-	msg := gin.H{
-		"event":   event,
-		"payload": payload,
-	}
-	broadcast <- msg
+	// Register with centralized service
+	services.UpgradeAndRegister(ws, claims.UserID)
 }

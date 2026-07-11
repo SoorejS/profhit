@@ -22,7 +22,7 @@ type User struct {
 	Tier      string         `gorm:"default:'Standard'" json:"tier"`
 	Role      string         `gorm:"default:'user'" json:"role"` // RBAC role
 	IsActive  bool           `gorm:"default:true" json:"is_active"` // false = banned
-	Points    int            `gorm:"default:100" json:"points"`
+	Points           int            `gorm:"default:100;check:points >= 0" json:"points"`
 	KycStatus        bool           `gorm:"default:false" json:"kyc_status"`
 	ReferralCode     string         `gorm:"uniqueIndex" json:"referral_code"`
 	ReferredBy       uint           `gorm:"default:0" json:"referred_by"`

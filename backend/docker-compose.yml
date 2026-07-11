@@ -40,6 +40,10 @@ services:
       - HYPERVERGE_WORKFLOW_ID=dummy_workflow_id
       - HYPERVERGE_WEBHOOK_SECRET=dummy_webhook_secret
 
+      - RAZORPAY_KEY_ID=dummy_key
+      - RAZORPAY_KEY_SECRET=dummy_secret
+      - RAZORPAY_WEBHOOK_SECRET=dummy_webhook_secret
+
       # Optional: set to your deployed frontend URL for password reset links
       # - APP_URL=https://prophit.app
     depends_on:

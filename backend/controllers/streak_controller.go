@@ -30,9 +30,16 @@ func DailyLogin(c *gin.Context) {
 
 	today := truncateToDay(time.Now())
 
-	// Upsert the streak row
+	tx := config.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Upsert the streak row with FOR UPDATE lock
 	var streak models.UserStreak
-	result := config.DB.Where("user_id = ?", userID).First(&streak)
+	result := tx.Set("gorm:query_option", "FOR UPDATE").Where("user_id = ?", userID).First(&streak)
 
 	if result.Error != nil {
 		// First-ever login — create a fresh streak record
@@ -47,6 +54,7 @@ func DailyLogin(c *gin.Context) {
 
 	// Already checked in today → return early
 	if sameDay(streak.LastLoginDate, today) {
+		tx.Rollback() // Rollback transaction as no writes are needed
 		var user models.User
 		config.DB.First(&user, userID)
 		c.JSON(http.StatusOK, DailyLoginResponse{
@@ -75,9 +83,17 @@ func DailyLogin(c *gin.Context) {
 
 	// Save streak
 	if result.Error != nil {
-		config.DB.Create(&streak)
+		if err := tx.Create(&streak).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create streak"})
+			return
+		}
 	} else {
-		config.DB.Save(&streak)
+		if err := tx.Save(&streak).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update streak"})
+			return
+		}
 	}
 
 	// --- Award coins ---
@@ -92,16 +108,21 @@ func DailyLogin(c *gin.Context) {
 	}
 
 	// Base daily login coins
-	_ = services.CreditWallet(userID, models.DailyLoginBaseCoins,
+	_ = services.CreditWalletTx(tx, userID, models.DailyLoginBaseCoins,
 		models.TxTypeDailyLogin, 0,
 		"Daily login reward", nil)
 
 	// Streak bonus coins
 	if streakBonus > 0 {
 		totalCoins += streakBonus
-		_ = services.CreditWallet(userID, streakBonus,
+		_ = services.CreditWalletTx(tx, userID, streakBonus,
 			models.TxTypeStreakBonus, 0,
 			"Streak bonus – day "+itoa(streak.CurrentStreak), nil)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
 	}
 
 	// Fetch updated balance

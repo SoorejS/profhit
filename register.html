@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - PROPHIT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="css/tokens.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -19,46 +19,56 @@
     <div class="auth-layout">
         <div class="auth-card glass-panel">
             <div class="auth-header">
-                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2rem;"><i class="fa-solid fa-chart-line"></i></a>
-                <h2>Create Account</h2>
-                <p>Start predicting the future with PROPHIT.</p>
+                <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2.5rem;"><i class="ph-fill ph-trend-up"></i></a>
+                <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Create Account</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Start predicting the future with PROPHIT.</p>
             </div>
 
             <form id="registerForm">
                 <div class="input-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" class="input-control" placeholder="Choose a unique username" required minlength="3">
+                    <div style="position: relative;">
+                        <i class="ph ph-user" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="text" id="username" class="input-control" placeholder="Choose a unique username" style="padding-left: 2.5rem;" required minlength="3">
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" class="input-control" placeholder="you@example.com" required>
+                    <div style="position: relative;">
+                        <i class="ph ph-envelope-simple" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="email" id="email" class="input-control" placeholder="you@example.com" style="padding-left: 2.5rem;" required>
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="regPassword">Password</label>
-                    <div class="password-input-wrapper">
-                        <input type="password" id="regPassword" class="input-control" placeholder="••••••••" required minlength="8">
-                        <i class="fa-solid fa-eye password-toggle"></i>
+                    <div class="password-input-wrapper" style="position: relative;">
+                        <i class="ph ph-lock-key" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="password" id="regPassword" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required minlength="8">
+                        <i class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></i>
                     </div>
-                    <div class="password-strength">
-                        <div class="strength-bar"></div>
-                        <div class="strength-bar"></div>
-                        <div class="strength-bar"></div>
-                        <div class="strength-bar"></div>
+                    <div class="password-strength" style="display: flex; gap: 4px; margin-top: 8px;">
+                        <div class="strength-bar" style="height: 4px; flex: 1; background: var(--bg-surface-elevated); border-radius: 2px;"></div>
+                        <div class="strength-bar" style="height: 4px; flex: 1; background: var(--bg-surface-elevated); border-radius: 2px;"></div>
+                        <div class="strength-bar" style="height: 4px; flex: 1; background: var(--bg-surface-elevated); border-radius: 2px;"></div>
+                        <div class="strength-bar" style="height: 4px; flex: 1; background: var(--bg-surface-elevated); border-radius: 2px;"></div>
                     </div>
                 </div>
 
                 <div class="input-group" style="margin-top: var(--spacing-4);">
-                    <label for="referralCode">Referral Code (Optional) <span class="badge badge-gold" style="font-size:0.7rem; padding: 2px 6px;">+150 PTS Bonus</span></label>
-                    <input type="text" id="referralCode" class="input-control" placeholder="e.g. USER1234">
+                    <label for="referralCode">Referral Code (Optional) <span class="badge badge-gold" style="font-size:0.7rem; padding: 2px 6px;"><i class="ph-fill ph-gift" style="margin-right: 2px;"></i> +150 PTS Bonus</span></label>
+                    <div style="position: relative;">
+                        <i class="ph ph-ticket" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-gold); font-size: 1.2rem;"></i>
+                        <input type="text" id="referralCode" class="input-control" placeholder="e.g. USER1234" style="padding-left: 2.5rem; border-color: rgba(212,175,55,0.3);">
+                    </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-full" style="padding:0.75rem; font-size:1rem; margin-top:1rem;">Create Account</button>
+                <button type="submit" class="btn btn-primary w-full" style="padding:0.85rem; font-size:1.05rem; margin-top:1.5rem; justify-content: center;"><i class="ph-bold ph-user-plus"></i> Create Account</button>
             </form>
 
-            <div class="auth-footer">
-                Already have an account? <a href="login.html">Log in</a>
+            <div class="auth-footer" style="margin-top: 2rem; text-align: center; font-size: 0.95rem; color: var(--text-secondary);">
+                Already have an account? <a href="login.html" style="font-weight: 500;">Log in</a>
             </div>
         </div>
     </div>

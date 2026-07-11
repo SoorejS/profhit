@@ -6,9 +6,9 @@
     <title>Dashboard - PROPHIT</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -30,11 +30,11 @@
                     <!-- Left: Main Markets Feed -->
                     <div class="markets-feed">
                         <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
-                            <h2 id="categoryTitle">Live Markets</h2>
+                            <h2 id="categoryTitle" style="font-weight: 700; font-size: 1.5rem; letter-spacing: -0.02em;">Live Markets</h2>
                             <div class="flex gap-2">
-                                <button class="btn btn-secondary"><i class="fa-solid fa-fire text-gold"></i> Trending</button>
-                                <button class="btn btn-outline">New</button>
-                                <button class="btn btn-outline">Closing Soon</button>
+                                <button class="btn btn-secondary" style="border-radius: var(--radius-full);"><i class="ph-fill ph-fire text-gold"></i> Trending</button>
+                                <button class="btn btn-outline" style="border-radius: var(--radius-full);">New</button>
+                                <button class="btn btn-outline" style="border-radius: var(--radius-full);">Closing Soon</button>
                             </div>
                         </div>
 
@@ -44,17 +44,15 @@
                             <div class="card skeleton" style="height: 200px;"></div>
                             
                             <!-- Sponsored Prediction Placeholder -->
-                            <div class="card market-card" style="border: 2px solid var(--color-gold); background: rgba(212,175,55,0.05);">
-                                <div>
-                                    <div class="market-card-header">
-                                        <span class="market-card-category" style="color: var(--color-gold);"><i class="fa-solid fa-star"></i> Sponsored</span>
-                                        <span class="badge badge-primary">Active</span>
-                                    </div>
-                                    <h3 class="market-card-title">Will Bitcoin reach $150k by end of 2026?</h3>
-                                    <p style="font-size: 0.85rem; color: var(--text-muted);">Trade with zero fees on this sponsored market provided by CryptoExchange Inc.</p>
+                            <div class="card" style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(30,30,30,0) 100%); border: 1px solid rgba(212,175,55,0.2); opacity: 0.6; pointer-events: none;">
+                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                    <h3 class="text-gold font-bold"><i class="ph-fill ph-star"></i> Featured Prediction</h3>
+                                    <span class="badge badge-warning">Coming Soon</span>
                                 </div>
-                                <div style="margin-top: var(--spacing-4);">
-                                    <button class="btn btn-outline w-full" style="color: var(--color-gold); border-color: var(--color-gold);">Trade Now</button>
+                                <h4 style="font-size: 1.1rem; margin-bottom: 8px;">Will OpenAI release GPT-5 before December 2026?</h4>
+                                <div class="flex gap-2" style="margin-top: var(--spacing-4);">
+                                    <button class="btn btn-outline" style="flex:1;">Yes 75%</button>
+                                    <button class="btn btn-outline" style="flex:1;">No 25%</button>
                                 </div>
                             </div>
 
@@ -64,17 +62,17 @@
                     <!-- Right: Trending / Info Sidebar -->
                     <aside class="right-sidebar">
                         
-                        <div class="card" style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(139,92,246,0.1) 100%); border-color: var(--color-gold);">
-                            <h3 style="font-size: 1rem; color: var(--color-gold); margin-bottom: var(--spacing-2);"><i class="fa-solid fa-gift"></i> Daily Rewards</h3>
-                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                <span class="text-sm">Current Streak:</span>
+                        <div class="card" style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(139,92,246,0.1) 100%); border: 1px solid var(--color-gold);">
+                            <h3 style="font-size: 1.1rem; color: var(--color-gold); margin-bottom: var(--spacing-2); font-weight: 600;"><i class="ph-fill ph-gift"></i> Daily Rewards</h3>
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-5);">
+                                <span class="text-sm" style="color: var(--text-secondary);">Current Streak:</span>
                                 <span class="badge badge-gold"><span id="streakCount">--</span> Days</span>
                             </div>
                             <button class="btn btn-primary w-full" id="claimDailyBtn" onclick="claimDailyReward()">Claim Today's Bonus</button>
                         </div>
 
-                        <div class="card">
-                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4);"><i class="fa-solid fa-bolt text-gold"></i> Fast Movers</h3>
+                        <div class="card" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
+                            <h3 style="font-size: 1.1rem; margin-bottom: var(--spacing-4); font-weight: 600;"><i class="ph-fill ph-lightning text-gold"></i> Fast Movers</h3>
                             <div id="trendingContainer">
                                 <div class="skeleton skeleton-text"></div>
                                 <div class="skeleton skeleton-text"></div>
@@ -82,10 +80,10 @@
                             </div>
                         </div>
                         
-                        <div class="card" style="background: var(--color-primary-light); border-color: var(--color-primary);">
-                            <h3 style="font-size: 1rem; color: #c4b5fd;">Join the Community</h3>
-                            <p style="font-size: 0.85rem; color: #a78bfa; margin-bottom: var(--spacing-4);">Discuss strategies, propose markets, and chat with top forecasters.</p>
-                            <button class="btn btn-primary w-full"><i class="fa-brands fa-discord"></i> Join Discord</button>
+                        <div class="card" style="background: var(--color-primary-light); border: 1px solid var(--color-primary);">
+                            <h3 style="font-size: 1.1rem; color: #c4b5fd; font-weight: 600; margin-bottom: var(--spacing-2);">Join the Community</h3>
+                            <p style="font-size: 0.9rem; color: #a78bfa; margin-bottom: var(--spacing-5); line-height: 1.5;">Discuss strategies, propose markets, and chat with top forecasters.</p>
+                            <button class="btn btn-primary w-full" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);"><i class="ph-fill ph-discord-logo"></i> Join Discord</button>
                         </div>
                     </aside>
                 </div>

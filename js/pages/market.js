@@ -2,6 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
+import { escapeHTML } from '../utils/escape.js';
 
 /**
  * PROPHIT - Market Detail Logic
@@ -37,21 +38,23 @@ async function loadMarketDetails() {
         document.getElementById('marketDesc').textContent = market.description;
         document.getElementById('marketCategory').textContent = market.category;
         
-        document.getElementById('marketCloseDate').textContent = new Date(market.close_time).toLocaleDateString();
+        document.getElementById('marketCloseDate').textContent = market.lock_time 
+            ? new Date(market.lock_time).toLocaleDateString() 
+            : (market.end_date ? new Date(market.end_date).toLocaleDateString() : 'TBD');
 
-        const isClosed = new Date(market.close_time) < new Date();
+        const isClosed = market.lock_time ? new Date(market.lock_time) < new Date() : false;
         const statusEl = document.getElementById('marketStatus');
         
-        if (market.status === 'Resolved') {
-            statusEl.textContent = `Resolved: ${market.outcome}`;
+        if (market.resolution_status === 'Resolved') {
+            statusEl.textContent = `Resolved: ${market.correct_option}`;
             statusEl.className = 'badge badge-success';
-            document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved</h3>`;
-        } else if (isClosed) {
-            statusEl.textContent = `Resolving`;
+            document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved: ${market.correct_option}</h3>`;
+        } else if (market.resolution_status === 'Locked' || market.resolution_status === 'Awaiting Resolution') {
+            statusEl.textContent = 'Resolving';
             statusEl.className = 'badge badge-warning';
             document.querySelector('.trade-card').innerHTML = `<h3 class="text-warning text-center">Market is closed. Awaiting resolution.</h3>`;
         } else {
-            statusEl.textContent = `Active`;
+            statusEl.textContent = market.resolution_status || 'Active';
             statusEl.className = 'badge badge-primary';
         }
 
@@ -145,10 +148,10 @@ async function executeTrade() {
     if (!currentSelection) return;
 
     try {
-        await ApiClient.post('/me/predictions', {
+        await ApiClient.post('/predictions', {
             market_id: parseInt(currentMarketId),
-            prediction: currentSelection,
-            amount: parseFloat(amount)
+            choice: currentSelection,
+            amount: parseInt(amount, 10)
         });
         
         showToast(`Successfully predicted ${currentSelection} with ${amount} PTS!`, 'success');
@@ -181,10 +184,10 @@ async function loadComments() {
         list.innerHTML = comments.map(c => `
             <div class="comment-item">
                 <div class="flex justify-between items-center" style="margin-bottom: 4px;">
-                    <div class="font-bold text-primary">@${c.User?.username || 'Unknown'}</div>
+                    <div class="font-bold text-primary">@${escapeHTML(c.User?.username || 'Unknown')}</div>
                     <div class="text-muted" style="font-size: 0.8rem;">${new Date(c.created_at).toLocaleString()}</div>
                 </div>
-                <div class="text-secondary" style="font-size: 0.95rem;">${c.content}</div>
+                <div class="text-secondary" style="font-size: 0.95rem;">${escapeHTML(c.content)}</div>
             </div>
         `).join('');
 
@@ -208,5 +211,6 @@ async function postComment() {
     }
 }
 
-window.submitPrediction = submitPrediction;
+window.selectPrediction = selectPrediction;
+window.executeTrade = executeTrade;
 window.postComment = postComment;

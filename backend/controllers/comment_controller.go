@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,9 +51,15 @@ func AddComment(c *gin.Context) {
 	}
 
 	// Broadcast the comment
-	BroadcastUpdate("new_comment", gin.H{
-		"market_id": market.ID,
-		"comment":   comment,
+	services.BroadcastToAll("new_comment", gin.H{
+		"market_id": marketID,
+		"comment": gin.H{
+			"id":         comment.ID,
+			"user_id":    user.ID,
+			"username":   user.Username,
+			"content":    comment.Content,
+			"created_at": comment.CreatedAt,
+		},
 	})
 
 	c.JSON(http.StatusOK, comment)

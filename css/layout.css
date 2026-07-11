@@ -18,6 +18,86 @@ app-sidebar {
     height: 100%;
 }
 
+/* Sidebar Internals */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--spacing-4) 0;
+}
+
+.sidebar-header {
+    padding: 0 var(--spacing-6) var(--spacing-6);
+    margin-bottom: var(--spacing-2);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-header .logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+}
+
+.sidebar-header .logo-icon {
+    font-size: 1.5rem;
+}
+
+.sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    padding: 0 var(--spacing-4);
+    overflow-y: auto;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) var(--spacing-4);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.nav-link i {
+    font-size: 1.25rem;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: var(--bg-surface-elevated);
+    color: var(--text-primary);
+}
+
+.nav-link.active {
+    background-color: rgba(139, 92, 246, 0.1); /* transparent primary */
+    color: var(--color-primary);
+}
+
+.wallet-widget {
+    margin: var(--spacing-4);
+    padding: var(--spacing-4);
+    background: var(--bg-surface-elevated);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+}
+
+.wallet-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 .main-content {
     display: flex;
     flex-direction: column;

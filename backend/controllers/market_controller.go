@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"profhit-backend/config"
@@ -12,17 +13,51 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetAllMarkets fetches all open markets, optionally filtered by category
+// GetAllMarkets fetches markets with discovery and lifecycle filtering
 func GetAllMarkets(c *gin.Context) {
 	var markets []models.Market
 	category := c.Query("category")
+	status := c.Query("status")
+	sort := c.Query("sort")
 
-	query := config.DB.Where("resolution_status = ?", "Open")
+	// By default, only show Public markets to users. We assume Admin uses a different endpoint or passes a flag if needed.
+	// But let's allow all if admin, else Public. To keep it simple, just filter Public unless status is explicitly Draft.
+	query := config.DB.Where("visibility = ?", "Public")
+	
+	if status != "" {
+		query = query.Where("resolution_status = ?", status)
+	} else {
+		// Default to active-like statuses for general browsing
+		query = query.Where("resolution_status IN ?", []string{"Scheduled", "Live", "Locked", "Awaiting Resolution"})
+	}
+
 	if category != "" {
 		query = query.Where("category = ?", category)
 	}
 
-	if err := query.Order("volume desc").Find(&markets).Error; err != nil {
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	limit := 50
+	offset := 0
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		offset = o
+	}
+
+	// Sorting logic
+	orderClause := "created_at desc"
+	if sort == "trending" {
+		orderClause = "volume desc"
+	} else if sort == "newest" {
+		orderClause = "created_at desc"
+	} else if sort == "ending_soon" {
+		orderClause = "lock_time asc"
+		query = query.Where("lock_time > ?", time.Now())
+	}
+
+	if err := query.Order(orderClause).Limit(limit).Offset(offset).Find(&markets).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch markets"})
 		return
 	}
@@ -38,7 +73,14 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 
-	market.ResolutionStatus = "Open"
+	if market.ResolutionStatus == "" {
+		market.ResolutionStatus = "Draft" // Draft, Scheduled, Live
+	}
+	
+	// Automatically calculate legacy EndDate based on LockTime if missing
+	if market.EndDate.IsZero() && market.LockTime != nil {
+		market.EndDate = *market.LockTime
+	}
 
 	if err := config.DB.Create(&market).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create market"})
@@ -301,5 +343,68 @@ func GetPortfolio(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, portfolio)
+}
+
+// TransitionMarketState allows admins to manually move market through its lifecycle
+func TransitionMarketState(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Status string `json:"status" binding:"required"` // Draft, Scheduled, Live, Locked, Awaiting Resolution, Archived
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	validStatuses := map[string]bool{
+		"Draft": true, "Scheduled": true, "Live": true, "Locked": true, "Awaiting Resolution": true, "Archived": true,
+	}
+	if !validStatuses[req.Status] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+		return
+	}
+
+	var market models.Market
+	if err := config.DB.First(&market, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
+		return
+	}
+
+	market.ResolutionStatus = req.Status
+	if err := config.DB.Save(&market).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transition market state"})
+		return
+	}
+
+	// Trigger WebSocket notification for certain transitions
+	if req.Status == "Live" {
+		services.BroadcastToAll("market_live", fmt.Sprintf("Market '%s' is now LIVE!", market.Title))
+	} else if req.Status == "Locked" {
+		services.BroadcastToAll("market_locked", fmt.Sprintf("Market '%s' is now LOCKED. No more predictions accepted.", market.Title))
+	}
+
+	c.JSON(http.StatusOK, market)
+}
+
+// DeleteMarket allows an admin to archive or hard delete a market (Drafts only).
+func DeleteMarket(c *gin.Context) {
+	id := c.Param("id")
+	
+	var market models.Market
+	if err := config.DB.First(&market, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
+		return
+	}
+
+	if market.ResolutionStatus == "Draft" {
+		config.DB.Unscoped().Delete(&market)
+		c.JSON(http.StatusOK, gin.H{"message": "Draft market deleted successfully"})
+	} else {
+		// Just archive
+		market.ResolutionStatus = "Archived"
+		config.DB.Save(&market)
+		c.JSON(http.StatusOK, gin.H{"message": "Market archived successfully"})
+	}
 }
 

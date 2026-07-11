@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 
@@ -51,9 +52,19 @@ func SubmitReport(c *gin.Context) {
 // GetUserReports returns all reports submitted by the authenticated user
 func GetUserReports(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
-	var reports []models.Report
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	limit := 50
+	offset := 0
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		offset = o
+	}
 
-	if err := config.DB.Where("reporter_id = ?", userID).Order("created_at desc").Find(&reports).Error; err != nil {
+	var reports []models.Report
+	if err := config.DB.Where("reporter_id = ?", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&reports).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
 		return
 	}

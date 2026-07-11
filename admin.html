@@ -6,9 +6,9 @@
     <title>Admin Dashboard - PROPHIT</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -29,10 +29,11 @@
             border-bottom: 2px solid transparent;
             font-weight: 500;
             white-space: nowrap;
+            transition: all var(--transition-fast);
         }
         .admin-tab.active {
-            color: var(--color-primary);
-            border-bottom-color: var(--color-primary);
+            color: var(--color-primary-light);
+            border-bottom-color: var(--color-primary-light);
         }
         .admin-tab:hover:not(.active) {
             color: var(--text-primary);
@@ -51,9 +52,13 @@
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        .data-table tr {
+            transition: background-color var(--transition-fast);
         }
         .data-table tr:hover {
-            background-color: var(--bg-surface-elevated);
+            background-color: rgba(255, 255, 255, 0.02);
         }
     </style>
 </head>
@@ -69,7 +74,7 @@
                 <div class="single-column-grid">
                     
                     <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
-                        <h1 style="margin: 0;"><i class="fa-solid fa-lock text-primary"></i> Admin Dashboard</h1>
+                        <h1 style="margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;"><i class="ph-fill ph-lock-key text-primary"></i> Admin Dashboard</h1>
                     </div>
 
                     <!-- Tabs -->
@@ -83,10 +88,10 @@
 
                     <!-- Tab: Markets -->
                     <div id="tab-markets" class="admin-tab-content">
-                        <div class="card" style="margin-bottom: var(--spacing-6);">
+                        <div class="card" style="border: 1px solid var(--border-subtle); margin-bottom: var(--spacing-6);">
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                <h3 style="margin: 0;">Proposed Markets</h3>
-                                <button class="btn btn-outline" onclick="fetchProposedMarkets()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                                <h3 style="margin: 0; font-size: 1.25rem;">Proposed Markets</h3>
+                                <button class="btn btn-outline" onclick="fetchProposedMarkets()"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
                             </div>
                             <div style="overflow-x: auto;">
                                 <table class="data-table" id="proposalsTable">
@@ -99,7 +104,29 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                        <tr><td colspan="4" class="text-center text-muted" style="padding: var(--spacing-6);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
+                            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
+                                <h3 style="margin: 0; font-size: 1.25rem;">Active & Closed Markets</h3>
+                                <button class="btn btn-outline" onclick="fetchActiveMarkets()"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" id="activeMarketsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Category</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="4" class="text-center text-muted" style="padding: var(--spacing-6);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -108,10 +135,10 @@
 
                     <!-- Tab: KYC -->
                     <div id="tab-kyc" class="admin-tab-content hidden">
-                        <div class="card">
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                <h3 style="margin: 0;">HyperVerge KYC Logs</h3>
-                                <button class="btn btn-outline" onclick="fetchAdminKyc()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                                <h3 style="margin: 0; font-size: 1.25rem;">HyperVerge KYC Logs</h3>
+                                <button class="btn btn-outline" onclick="fetchAdminKyc()"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
                             </div>
                             <div style="overflow-x: auto;">
                                 <table class="data-table" id="kycTable">
@@ -125,7 +152,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                                        <tr><td colspan="5" class="text-center text-muted" style="padding: var(--spacing-6);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -134,10 +161,10 @@
 
                     <!-- Tab: Withdrawals -->
                     <div id="tab-withdrawals" class="admin-tab-content hidden">
-                        <div class="card">
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                <h3 style="margin: 0;">Pending Withdrawals</h3>
-                                <button class="btn btn-outline" onclick="fetchWithdrawals()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                                <h3 style="margin: 0; font-size: 1.25rem;">Pending Withdrawals</h3>
+                                <button class="btn btn-outline" onclick="fetchWithdrawals()"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
                             </div>
                             <div style="overflow-x: auto;">
                                 <table class="data-table" id="withdrawalsTable">
@@ -150,7 +177,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                        <tr><td colspan="4" class="text-center text-muted" style="padding: var(--spacing-6);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -160,31 +187,40 @@
                     <!-- Tab: Analytics -->
                     <div id="tab-analytics" class="admin-tab-content hidden">
                         <div class="dashboard-grid">
-                            <div class="card text-center">
-                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase;">Total Users</div>
-                                <div class="text-gold font-bold" style="font-size: 2.5rem;">1,250</div>
+                            <div class="card text-center" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
+                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Users</div>
+                                <div class="text-gold font-bold" style="font-size: 3rem; letter-spacing: -0.03em;">1,250</div>
                             </div>
-                            <div class="card text-center">
-                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase;">Volume (24h)</div>
-                                <div class="text-primary font-bold" style="font-size: 2.5rem;">452K PTS</div>
+                            <div class="card text-center" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
+                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Volume (24h)</div>
+                                <div class="text-primary-light font-bold" style="font-size: 3rem; letter-spacing: -0.03em;">452K PTS</div>
                             </div>
                         </div>
-                        <div class="card" style="margin-top: var(--spacing-6);">
-                            <h3 style="margin-bottom: var(--spacing-4);">System Health</h3>
-                            <div class="text-muted text-center" style="padding: var(--spacing-6);">Analytics dashboard powered by Grafana (Placeholder).</div>
+                        <div class="card" style="margin-top: var(--spacing-6); border: 1px solid var(--border-subtle);">
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem;">System Health</h3>
+                            <div class="text-muted text-center" style="padding: var(--spacing-8); background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px dashed var(--border-strong);">
+                                <i class="ph-fill ph-chart-line-up" style="font-size: 3rem; margin-bottom: 16px; color: var(--border-strong);"></i>
+                                <div><span class="badge badge-warning">Coming Soon</span> Analytics dashboard powered by Grafana.</div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Tab: Moderation -->
                     <div id="tab-moderation" class="admin-tab-content hidden">
-                        <div class="card">
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                <h3 style="margin: 0;">User Management & Audit</h3>
+                                <h3 style="margin: 0; font-size: 1.25rem;">User Management & Audit</h3>
                             </div>
                             <div class="input-group" style="max-width: 400px; margin-bottom: var(--spacing-6);">
-                                <input type="text" class="input-control" placeholder="Search users by ID or username...">
+                                <div style="position: relative;">
+                                    <i class="ph ph-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                                    <input type="text" class="input-control" placeholder="Search users by ID or username..." style="padding-left: 2.5rem; border-radius: var(--radius-full);">
+                                </div>
                             </div>
-                            <div class="text-muted text-center" style="padding: var(--spacing-6);">No moderation flags pending.</div>
+                            <div class="text-muted text-center" style="padding: var(--spacing-6); background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px dashed var(--border-strong);">
+                                <i class="ph-fill ph-check-circle" style="font-size: 2.5rem; margin-bottom: 12px; color: var(--color-success);"></i>
+                                <div>No moderation flags pending.</div>
+                            </div>
                         </div>
                     </div>
 

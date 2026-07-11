@@ -2,6 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from './api/client.js';
 import { showToast } from './components/toast.js';
+import { escapeHTML } from './utils/escape.js';
 
 /**
  * PROPHIT - Admin Panel Logic
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initial load
     fetchProposedMarkets();
+    fetchActiveMarkets();
 });
 
 function switchTab(tabName, element) {
@@ -38,7 +40,10 @@ function switchTab(tabName, element) {
     document.getElementById(`tab-${tabName}`).classList.remove('hidden');
 
     // Data Fetching
-    if (tabName === 'markets') fetchProposedMarkets();
+    if (tabName === 'markets') {
+        fetchProposedMarkets();
+        fetchActiveMarkets();
+    }
     if (tabName === 'kyc') fetchAdminKyc();
     if (tabName === 'withdrawals') fetchWithdrawals();
 }
@@ -54,8 +59,8 @@ async function fetchProposedMarkets() {
 
         tbody.innerHTML = markets.map(m => `
             <tr>
-                <td class="font-semibold text-primary">${m.title}</td>
-                <td><span class="badge badge-outline">${m.category}</span></td>
+                <td class="font-semibold text-primary">${escapeHTML(m.title)}</td>
+                <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>ID: ${m.created_by}</td>
                 <td>
                     <button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Approve</button>
@@ -68,12 +73,71 @@ async function fetchProposedMarkets() {
     }
 }
 
+async function fetchActiveMarkets() {
+    const tbody = document.querySelector('#activeMarketsTable tbody');
+    if (!tbody) return;
+    try {
+        const markets = await ApiClient.get('/markets');
+        if (!markets || markets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
+            return;
+        }
+
+        // Filter for Open/Closed (not Proposed)
+        const activeOrClosed = markets.filter(m => m.resolution_status !== 'Proposed');
+
+        if (activeOrClosed.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = activeOrClosed.map(m => {
+            let statusBadge = m.resolution_status === 'Open' ? `<span class="badge badge-primary">Open</span>` : `<span class="badge badge-success">${m.resolution_status}</span>`;
+            
+            // If the market is open or closed but not resolved, we can resolve it
+            let resolveBtn = '';
+            if (m.resolution_status === 'Open') {
+                resolveBtn = `<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="resolveMarket(${m.id})">Resolve</button>`;
+            }
+
+            return `
+            <tr>
+                <td class="font-semibold text-primary">${escapeHTML(m.title)}</td>
+                <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${resolveBtn}
+                </td>
+            </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load active markets.</td></tr>';
+    }
+}
+
 async function approveMarket(id) {
     if (!confirm("Make this market live?")) return;
     try {
-        await ApiClient.post(`/admin/markets/${id}/approve`);
+        await ApiClient.post(`/markets/${id}/approve`);
         showToast("Market approved successfully", "success");
         fetchProposedMarkets();
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+async function resolveMarket(id) {
+    const outcome = prompt("Enter the winning option exactly as it appears (e.g. Yes or No):");
+    if (!outcome) return;
+
+    if (!confirm(`Are you sure you want to resolve Market ${id} with winner: ${outcome}? This will trigger payouts and cannot be undone.`)) return;
+
+    try {
+        const res = await ApiClient.post(`/markets/${id}/resolve`, { winner: outcome });
+        showToast(`Market resolved! ${res.winners_paid} winners paid.`, "success");
+        // Optional: refresh markets if we have a table for open markets
     } catch (err) {
         showToast(err.message, "error");
     }
@@ -149,10 +213,9 @@ async function processWithdrawal(id, action) {
 
 window.switchTab = switchTab;
 window.fetchProposedMarkets = fetchProposedMarkets;
+window.fetchActiveMarkets = fetchActiveMarkets;
 window.approveMarket = approveMarket;
 window.resolveMarket = resolveMarket;
-window.fetchKycRequests = fetchKycRequests;
-window.reviewKyc = reviewKyc;
+window.fetchAdminKyc = fetchAdminKyc;
 window.fetchWithdrawals = fetchWithdrawals;
-window.approveWithdrawal = approveWithdrawal;
-window.rejectWithdrawal = rejectWithdrawal;
+window.processWithdrawal = processWithdrawal;

@@ -7,9 +7,13 @@ import (
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/routes"
+	"profhit-backend/services"
 )
 
 func main() {
+	// Validate required environment variables first
+	config.ValidateEnv()
+
 	// Initialize Database Connection
 	config.ConnectDB()
 
@@ -36,6 +40,15 @@ func main() {
 		&models.ReferralEvent{},      // Referral events
 		&models.AuditLog{},           // Audit logs
 		&models.Report{},             // Reports
+		&models.WeeklyChallenge{},
+		&models.ChallengeParticipant{},
+		&models.Achievement{},
+		&models.UserAchievement{},
+		&models.Badge{},
+		&models.UserBadge{},
+		&models.RewardItem{},
+		&models.Redemption{},
+		&models.CoinBatch{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: \n", err)
@@ -43,6 +56,9 @@ func main() {
 
 	// Seed dummy data if empty
 	config.SeedDatabase()
+
+	// Start Background Jobs
+	services.StartCronJobs()
 
 	// Setup Router
 	r := routes.SetupRouter()

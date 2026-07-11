@@ -73,68 +73,59 @@
                     <div class="profile-header">
                         <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128&size=120" alt="Avatar" class="profile-avatar" id="profileAvatar">
                         <div>
-                            <h1 id="profileUsername">@Username</h1>
-                            <div class="text-muted" style="margin-bottom: var(--spacing-4);">Joined in 2026</div>
+                            <h1 id="profileUsername" style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em;">@Username</h1>
+                            <div class="text-muted" style="margin-bottom: var(--spacing-4); font-size: 0.95rem;">Joined in 2026</div>
                             <div class="flex gap-2">
-                                <span class="badge badge-gold"><i class="fa-solid fa-crown"></i> Gold Tier</span>
-                                <span class="badge badge-outline" id="profileKycBadge"><i class="fa-solid fa-shield-halved"></i> Checking...</span>
+                                <span class="badge badge-gold"><i class="ph-fill ph-crown"></i> Gold Tier</span>
+                                <span class="badge badge-outline" id="profileKycBadge"><i class="ph-fill ph-shield-check"></i> Checking...</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div class="stat-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);">
                             <div class="stat-value" id="statWinRate">--%</div>
                             <div class="stat-label">Win Rate</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);">
                             <div class="stat-value" id="statMarketsJoined">--</div>
                             <div class="stat-label">Markets Joined</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);">
                             <div class="stat-value text-gold" id="statStreak">--</div>
                             <div class="stat-label">Day Streak</div>
                         </div>
                     </div>
 
-                    <div class="dashboard-grid">
-                        <div class="card">
-                            <h3 style="margin-bottom: var(--spacing-4);">Your Active Predictions</h3>
-                            <div id="portfolioList">
-                                <div class="text-muted text-center" style="padding: var(--spacing-6);">Loading portfolio...</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-4);">
+                        <div class="card" style="border: 1px solid var(--color-primary); background: linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.02) 100%);">
+                            <h3 style="margin-bottom: var(--spacing-4); color: var(--color-primary-light); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-users-three"></i> Refer a Friend</h3>
+                            <p class="text-sm text-muted" style="margin-bottom: var(--spacing-4); line-height: 1.5;">Share your unique code to give your friends 150 PTS when they sign up!</p>
+                            <div class="input-group">
+                                <input type="text" id="myReferralCode" class="input-control font-mono font-bold text-center" style="color: var(--color-primary-light); background: rgba(0,0,0,0.2); border-color: rgba(139,92,246,0.3);" readonly value="Loading...">
                             </div>
+                            <button class="btn btn-primary w-full mt-2" onclick="copyReferral()"><i class="ph-bold ph-copy"></i> Copy Code</button>
                         </div>
 
-                        <aside class="right-sidebar">
-                            <div class="card" style="border: 1px solid var(--color-primary); background: rgba(139,92,246,0.05);">
-                                <h3 style="margin-bottom: var(--spacing-4); color: var(--color-primary);"><i class="fa-solid fa-users"></i> Refer a Friend</h3>
-                                <p class="text-sm text-muted" style="margin-bottom: var(--spacing-4);">Share your unique code to give your friends 150 PTS when they sign up!</p>
-                                <div class="input-group">
-                                    <input type="text" id="myReferralCode" class="input-control font-mono font-bold text-center text-primary" readonly value="Loading...">
-                                </div>
-                                <button class="btn btn-primary w-full mt-2" onclick="copyReferral()"><i class="fa-regular fa-copy"></i> Copy Code</button>
-                            </div>
-
-                            <div class="card" style="margin-top: var(--spacing-4);">
-                                <h3 style="margin-bottom: var(--spacing-4);"><i class="fa-solid fa-medal text-gold"></i> Achievements</h3>
-                                <div class="flex flex-col gap-2">
-                                    <div class="flex items-center gap-4">
-                                        <div style="width:40px; height:40px; border-radius:50%; background:var(--bg-surface-elevated); display:flex; align-items:center; justify-content:center; color:var(--color-gold);"><i class="fa-solid fa-fire"></i></div>
-                                        <div>
-                                            <div class="font-bold">Hot Streak</div>
-                                            <div class="text-xs text-muted">7 day login streak</div>
-                                        </div>
+                        <div class="card" style="border: 1px solid var(--border-subtle);">
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-medal text-gold"></i> Achievements</h3>
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-center gap-4 p-2" style="background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                                    <div style="width:40px; height:40px; border-radius:50%; background:rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.2); display:flex; align-items:center; justify-content:center; color:var(--color-gold); font-size: 1.2rem;"><i class="ph-fill ph-fire"></i></div>
+                                    <div>
+                                        <div class="font-bold" style="font-size: 0.95rem;">Hot Streak</div>
+                                        <div class="text-xs text-muted">7 day login streak</div>
                                     </div>
-                                    <div class="flex items-center gap-4">
-                                        <div style="width:40px; height:40px; border-radius:50%; background:var(--bg-surface-elevated); display:flex; align-items:center; justify-content:center; color:var(--color-primary);"><i class="fa-solid fa-handshake"></i></div>
-                                        <div>
-                                            <div class="font-bold">Influencer</div>
-                                            <div class="text-xs text-muted">Invited 5 friends</div>
-                                        </div>
+                                </div>
+                                <div class="flex items-center gap-4 p-2" style="background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                                    <div style="width:40px; height:40px; border-radius:50%; background:rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); display:flex; align-items:center; justify-content:center; color:var(--color-primary-light); font-size: 1.2rem;"><i class="ph-fill ph-handshake"></i></div>
+                                    <div>
+                                        <div class="font-bold" style="font-size: 0.95rem;">Influencer</div>
+                                        <div class="text-xs text-muted">Invited 5 friends</div>
                                     </div>
                                 </div>
                             </div>
-                        </aside>
+                        </div>
                     </div>
 
                 </div>

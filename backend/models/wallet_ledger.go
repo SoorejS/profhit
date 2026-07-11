@@ -28,8 +28,8 @@ type WalletLedger struct {
 	UserID        uint            `gorm:"not null;index" json:"user_id"`
 	User          User            `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"-"`
 	Type          TransactionType `gorm:"not null;index" json:"type"`
-	Credit        int             `gorm:"not null;default:0" json:"credit"` // Amount added
-	Debit         int             `gorm:"not null;default:0" json:"debit"`  // Amount subtracted
+	Credit        int             `gorm:"not null;default:0;check:credit >= 0" json:"credit"` // Amount added
+	Debit         int             `gorm:"not null;default:0;check:debit >= 0" json:"debit"`  // Amount subtracted
 	BalanceBefore int             `gorm:"not null" json:"balance_before"`
 	BalanceAfter  int             `gorm:"not null" json:"balance_after"`
 	ReferenceID   uint            `gorm:"default:0" json:"reference_id"` // e.g., Market ID, Redemption ID

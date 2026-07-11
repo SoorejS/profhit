@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="support"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="single-column-grid" style="max-width: 900px; margin: 0 auto;">
+                    
+                    <div style="margin-bottom: var(--spacing-6); text-align: center;">
+                        <h1 style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary);"><i class="ph-fill ph-headset"></i> Help & Support</h1>
+                        <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Got a question? Need help with your account? We're here for you.</p>
+                    </div>
+
+                    <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+                        
+                        <!-- Left Col: FAQ -->
+                        <div>
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Frequently Asked Questions</h3>
+                            
+                            <div class="card" style="margin-bottom: var(--spacing-4); border: 1px solid var(--border-subtle);">
+                                <h4 style="font-weight: 600; margin-bottom: 8px;">How are markets resolved?</h4>
+                                <p class="text-muted text-sm">Markets are resolved by administrators based on the official resolution criteria and source provided when the market was created.</p>
+                            </div>
+                            
+                            <div class="card" style="margin-bottom: var(--spacing-4); border: 1px solid var(--border-subtle);">
+                                <h4 style="font-weight: 600; margin-bottom: 8px;">What happens if a market ties?</h4>
+                                <p class="text-muted text-sm">If a market results in a tie or is cancelled, the market is resolved as "Void" and all users receive a full refund of their initial prediction.</p>
+                            </div>
+
+                            <div class="card" style="margin-bottom: var(--spacing-4); border: 1px solid var(--border-subtle);">
+                                <h4 style="font-weight: 600; margin-bottom: 8px;">How long do rewards take to process?</h4>
+                                <p class="text-muted text-sm">Redemptions are manually reviewed to prevent fraud. Please allow 24-48 hours for your voucher or payout to arrive.</p>
+                            </div>
+                        </div>
+
+                        <!-- Right Col: Contact Form -->
+                        <div>
+                            <div class="card" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
+                                <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Contact Us</h3>
+                                
+                                <form id="supportForm" onsubmit="submitSupport(event)">
+                                    <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                        <label>Issue Type</label>
+                                        <select id="sCategory" class="input-control" required>
+                                            <option value="Account Access">Account Access</option>
+                                            <option value="Deposit / Withdrawal">Deposit / Withdrawal Issue</option>
+                                            <option value="Market Dispute">Market Resolution Dispute</option>
+                                            <option value="Bug Report">Bug Report</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="input-group" style="margin-bottom: var(--spacing-4);">
+                                        <label>Description</label>
+                                        <textarea id="sDescription" class="input-control" rows="5" placeholder="Please describe your issue in detail..." required></textarea>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary w-full" style="padding: 1rem;"><i class="ph-bold ph-paper-plane-right"></i> Send Email</button>
+                                </form>
+                                <p class="text-muted text-center mt-4 text-xs">Note: This will open your default email client to send the request to support@profhit.com.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/pages/support.js"></script>
+</body>
+</html>

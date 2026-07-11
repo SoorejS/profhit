@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Propose Market - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="propose"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="single-column-grid" style="max-width: 800px; margin: 0 auto;">
+                    
+                    <div style="margin-bottom: var(--spacing-6); text-align: center;">
+                        <h1 style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary);"><i class="ph-fill ph-lightbulb"></i> Propose a Market</h1>
+                        <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Got a great idea for a prediction market? Submit it for admin review!</p>
+                    </div>
+
+                    <div class="card" style="border: 1px solid var(--border-subtle); padding: var(--spacing-8);">
+                        <form id="proposeForm" onsubmit="submitProposal(event)">
+                            <div class="input-group" style="margin-bottom: var(--spacing-5);">
+                                <label style="font-weight: 600;">Market Title <span class="text-danger">*</span></label>
+                                <input type="text" id="pTitle" class="input-control" placeholder="e.g. Will Bitcoin cross $100k before December 2026?" required>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: var(--spacing-5);">
+                                <label style="font-weight: 600;">Category <span class="text-danger">*</span></label>
+                                <select id="pCategory" class="input-control" required>
+                                    <option value="Financial Markets">Financial Markets</option>
+                                    <option value="Sports">Sports</option>
+                                    <option value="Politics">Politics</option>
+                                    <option value="Entertainment">Entertainment</option>
+                                    <option value="Weather">Weather</option>
+                                    <option value="Wild Card">Wild Card</option>
+                                </select>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: var(--spacing-5);">
+                                <label style="font-weight: 600;">Description & Resolution Criteria <span class="text-danger">*</span></label>
+                                <textarea id="pDescription" class="input-control" rows="4" placeholder="Explain exactly how and when this market resolves..." required></textarea>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: var(--spacing-5);">
+                                <label style="font-weight: 600;">Official Resolution Source <span class="text-danger">*</span></label>
+                                <input type="url" id="pSource" class="input-control" placeholder="https://example.com/official-data" required>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: var(--spacing-5);">
+                                <label style="font-weight: 600;">Lock Time (When to stop predictions) <span class="text-danger">*</span></label>
+                                <input type="datetime-local" id="pLockTime" class="input-control" required>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: var(--spacing-8);">
+                                <label style="font-weight: 600;">Options (Fixed)</label>
+                                <div class="flex gap-4">
+                                    <input type="text" class="input-control font-bold" value="Yes" readonly style="color: var(--color-success); background: rgba(16, 185, 129, 0.1);">
+                                    <input type="text" class="input-control font-bold" value="No" readonly style="color: var(--color-danger); background: rgba(239, 68, 68, 0.1);">
+                                </div>
+                                <small class="text-muted mt-2 block">Currently only binary (Yes/No) markets are supported for user proposals.</small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-full" style="padding: 1rem; font-size: 1.1rem; border-radius: var(--radius-lg);" id="submitBtn">
+                                Submit Proposal for Review
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/pages/propose-market.js"></script>
+</body>
+</html>

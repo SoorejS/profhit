@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
@@ -11,8 +12,19 @@ import (
 
 // GetWithdrawals returns all pending withdrawal requests
 func GetWithdrawals(c *gin.Context) {
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	limit := 50
+	offset := 0
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		offset = o
+	}
+
 	var reqs []models.WithdrawalRequest
-	if err := config.DB.Where("status = ?", "Pending").Order("created_at asc").Find(&reqs).Error; err != nil {
+	if err := config.DB.Where("status = ?", "Pending").Order("created_at asc").Limit(limit).Offset(offset).Find(&reqs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch withdrawals"})
 		return
 	}

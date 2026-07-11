@@ -6,9 +6,9 @@
     <title>Wallet & Identity - PROPHIT</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-        <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
@@ -16,19 +16,24 @@
     <link rel="stylesheet" href="css/pages/dashboard.css">
     <style>
         .wallet-header {
-            background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(139,92,246,0.1) 100%);
-            padding: var(--spacing-8);
+            background: linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(139,92,246,0.1) 100%);
+            padding: var(--spacing-8) var(--spacing-10);
             border-radius: var(--radius-lg);
             border: 1px solid var(--border-subtle);
             margin-bottom: var(--spacing-6);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
         .balance-huge {
-            font-size: 3rem;
+            font-size: 3.5rem;
             font-weight: 800;
             color: var(--text-primary);
+            letter-spacing: -0.03em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .transaction-item {
             display: flex;
@@ -55,13 +60,13 @@
                     
                     <div class="wallet-header">
                         <div>
-                            <div class="text-secondary font-semibold" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em;">Total Balance</div>
-                            <div class="balance-huge"><i class="fa-solid fa-coins text-gold"></i> <span id="walletBalance">--</span></div>
-                            <div class="text-muted" style="margin-top: var(--spacing-2);">1 PTS = ₹1 (Play Money)</div>
+                            <div class="text-secondary font-semibold" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.9rem;">Total Balance</div>
+                            <div class="balance-huge"><i class="ph-fill ph-coins text-gold"></i> <span id="walletBalance">--</span></div>
+                            <div class="text-muted" style="margin-top: var(--spacing-2); font-size: 0.95rem;">1 PTS = ₹1 (Play Money)</div>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <button class="btn btn-primary" onclick="openDeposit()"><i class="fa-solid fa-plus"></i> Deposit Funds</button>
-                            <button class="btn btn-outline" onclick="openWithdraw()"><i class="fa-solid fa-arrow-right-arrow-left"></i> Redeem / Withdraw</button>
+                        <div class="flex flex-col gap-3">
+                            <button class="btn btn-primary" onclick="openDeposit()" style="padding: 0.8rem 1.5rem; font-size: 1.05rem;"><i class="ph-bold ph-plus"></i> Deposit Funds</button>
+                            <button class="btn btn-outline" onclick="openWithdraw()" style="padding: 0.8rem 1.5rem; font-size: 1.05rem;"><i class="ph-bold ph-arrows-left-right"></i> Redeem / Withdraw</button>
                         </div>
                     </div>
 
@@ -69,63 +74,33 @@
                         
                         <!-- Left Col: Transactions -->
                         <div>
-                            <div class="card">
+                            <div class="card" style="border: 1px solid var(--border-subtle);">
                                 <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                    <h3 style="margin: 0;">Transaction Ledger</h3>
-                                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="loadLedger()"><i class="fa-solid fa-rotate-right"></i></button>
+                                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Transaction Ledger</h3>
+                                    <button class="btn btn-outline" style="padding: 0.4rem 0.6rem; font-size: 1rem; border-radius: var(--radius-md);" onclick="loadLedger()"><i class="ph-bold ph-arrows-clockwise"></i></button>
                                 </div>
                                 <div id="ledgerList">
-                                    <div class="text-muted text-center" style="padding: var(--spacing-6);">Loading transactions...</div>
+                                    <div class="text-muted text-center" style="padding: var(--spacing-6);"><i class="ph ph-spinner ph-spin" style="margin-right: 8px;"></i> Loading transactions...</div>
                                 </div>
                             </div>
 
-                            <div class="card" style="margin-top: var(--spacing-6);" id="rewards">
-                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                    <h3 style="margin: 0;"><i class="fa-solid fa-gift text-gold"></i> Redemption Center</h3>
-                                    <span class="badge badge-gold">Available</span>
-                                </div>
-                                <p class="text-muted" style="margin-bottom: var(--spacing-4); font-size: 0.9rem;">Exchange your winning PTS for real-world rewards and vouchers.</p>
-                                
-                                <div class="markets-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-                                    <!-- Amazon Voucher -->
-                                    <div class="card market-card" style="text-align: center;">
-                                        <i class="fa-brands fa-amazon" style="font-size: 2.5rem; margin-bottom: 10px; color: #ff9900;"></i>
-                                        <div class="font-bold">₹500 Gift Card</div>
-                                        <div class="text-gold font-bold" style="margin-bottom: var(--spacing-4);">550 PTS</div>
-                                        <button class="btn btn-outline w-full" onclick="openWithdraw(550, 'Amazon ₹500')">Redeem</button>
-                                    </div>
-                                    <!-- UPI Cash -->
-                                    <div class="card market-card" style="text-align: center;">
-                                        <i class="fa-solid fa-money-bill-transfer" style="font-size: 2.5rem; margin-bottom: 10px; color: var(--color-success);"></i>
-                                        <div class="font-bold">UPI Transfer</div>
-                                        <div class="text-gold font-bold" style="margin-bottom: var(--spacing-4);">1,000 PTS = ₹1000</div>
-                                        <button class="btn btn-outline w-full" onclick="openWithdraw(1000, 'UPI ₹1000')">Redeem</button>
-                                    </div>
-                                    <!-- iPhone Placeholder -->
-                                    <div class="card market-card" style="text-align: center;">
-                                        <i class="fa-brands fa-apple" style="font-size: 2.5rem; margin-bottom: 10px; color: #fff;"></i>
-                                        <div class="font-bold">iPhone 16 Pro</div>
-                                        <div class="text-gold font-bold" style="margin-bottom: var(--spacing-4);">150,000 PTS</div>
-                                        <button class="btn btn-outline w-full" onclick="openWithdraw(150000, 'iPhone 16 Pro')">Redeem</button>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Rewards moved to dedicated page -->
                         </div>
 
                         <!-- Right Col: KYC & Identity -->
                         <aside class="right-sidebar">
-                            <div class="card">
-                                <h3 style="margin-bottom: var(--spacing-4);"><i class="fa-solid fa-shield-halved text-primary"></i> Identity Verification</h3>
+                            <div class="card" style="border: 1px solid var(--border-subtle);">
+                                <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-shield-check text-primary"></i> Identity Verification</h3>
                                 
-                                <div id="kycStatusContainer" style="text-align: center; padding: var(--spacing-4) 0;">
-                                    <div id="kycIcon" style="font-size: 3rem; margin-bottom: var(--spacing-2); color: var(--text-muted);"><i class="fa-solid fa-circle-question"></i></div>
-                                    <h4 id="kycStatusText" style="margin-bottom: var(--spacing-4);">Unverified</h4>
+                                <div id="kycStatusContainer" style="text-align: center; padding: var(--spacing-6) 0;">
+                                    <div id="kycIcon" style="font-size: 3.5rem; margin-bottom: var(--spacing-3); color: var(--text-muted);"><i class="ph-fill ph-question"></i></div>
+                                    <h4 id="kycStatusText" style="margin-bottom: var(--spacing-5); font-size: 1.2rem;">Unverified</h4>
                                     
                                     <button id="kycBtn" class="btn btn-primary w-full" onclick="startKyc()">Start HyperVerge KYC</button>
                                 </div>
                                 
-                                <div class="text-muted" style="font-size: 0.85rem; margin-top: var(--spacing-4); text-align: center;">
-                                    <i class="fa-solid fa-lock"></i> Secured by HyperVerge
+                                <div class="text-muted" style="font-size: 0.85rem; margin-top: var(--spacing-4); text-align: center; padding-top: var(--spacing-4); border-top: 1px solid var(--border-subtle);">
+                                    <i class="ph-fill ph-lock-key"></i> Secured by HyperVerge
                                 </div>
                             </div>
                         </aside>
@@ -138,17 +113,20 @@
     </div>
 
     <!-- Deposit Modal -->
-    <div id="depositModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
-        <div class="card" style="width: 400px; max-width: 90vw;">
-            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                <h3>Deposit Funds</h3>
-                <i class="fa-solid fa-xmark" style="cursor: pointer;" onclick="document.getElementById('depositModal').classList.add('hidden')"></i>
+    <div id="depositModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div class="card" style="width: 400px; max-width: 90vw; border: 1px solid var(--border-strong); box-shadow: var(--shadow-xl);">
+            <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
+                <h3 style="font-size: 1.25rem; font-weight: 700;">Deposit Funds</h3>
+                <i class="ph-bold ph-x" style="cursor: pointer; font-size: 1.2rem; color: var(--text-muted);" onclick="document.getElementById('depositModal').classList.add('hidden')"></i>
             </div>
-            <div class="input-group">
-                <label>Amount to Deposit (INR)</label>
-                <input type="number" id="depositAmount" class="input-control" placeholder="1000">
+            <div class="input-group" style="margin-bottom: var(--spacing-6);">
+                <label style="font-weight: 500;">Amount to Deposit (INR)</label>
+                <div style="position: relative;">
+                    <i class="ph ph-currency-inr" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                    <input type="number" id="depositAmount" class="input-control" placeholder="1000" style="padding-left: 2.5rem; font-size: 1.1rem; font-weight: 600;">
+                </div>
             </div>
-            <button class="btn btn-primary w-full" onclick="processDeposit()">Proceed to Razorpay</button>
+            <button class="btn btn-primary w-full" onclick="processDeposit()" style="padding: 1rem; font-size: 1.05rem;">Proceed to Razorpay</button>
         </div>
     </div>
 

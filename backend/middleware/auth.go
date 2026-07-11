@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"profhit-backend/config"
@@ -19,6 +20,13 @@ type Claims struct {
 	Tier     string `json:"tier"`
 	Role     string `json:"role"` // RBAC role embedded in token
 	jwt.RegisteredClaims
+}
+
+var jwtBlacklist sync.Map
+
+// InvalidateToken adds a JWT string to the blacklist
+func InvalidateToken(token string) {
+	jwtBlacklist.Store(token, time.Now())
 }
 
 // AuthRequired validates JWT and sets user context values
@@ -51,6 +59,13 @@ func AuthRequired() gin.HandlerFunc {
 
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.Abort()
+			return
+		}
+
+		// Check if token is blacklisted
+		if _, blacklisted := jwtBlacklist.Load(parts[1]); blacklisted {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has been invalidated"})
 			c.Abort()
 			return
 		}
