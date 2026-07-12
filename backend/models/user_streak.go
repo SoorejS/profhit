@@ -12,7 +12,7 @@ type UserStreak struct {
 	UserID          uint      `gorm:"uniqueIndex;not null" json:"user_id"`
 	User            User      `json:"-"`
 	CurrentStreak   int       `gorm:"default:0" json:"current_streak"`     // Consecutive days logged in
-	LongestStreak   int       `gorm:"default:0" json:"longest_streak"`     // All-time best
+	LongestStreak   int       `gorm:"index;default:0" json:"longest_streak"`     // All-time best
 	LastLoginDate   time.Time `json:"last_login_date"`                     // Midnight-normalised date of last login
 	TotalLogins     int       `gorm:"default:0" json:"total_logins"`       // Lifetime login count
 	CreatedAt       time.Time `json:"created_at"`

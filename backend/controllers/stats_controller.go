@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"time"
@@ -164,4 +165,137 @@ func GetTopWinRate(c *gin.Context) {
 		rows = []WinRateRow{}
 	}
 	c.JSON(http.StatusOK, rows)
+}
+
+// GetUnifiedLeaderboard returns a paginated leaderboard with dynamic sorting
+func GetUnifiedLeaderboard(c *gin.Context) {
+	sort := c.DefaultQuery("sort", "points")
+	search := c.Query("search")
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "50")
+
+	page, _ := strconv.Atoi(pageStr)
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(limitStr)
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+
+	var total int64
+	var currentUserID uint
+	if uid, exists := c.Get("userID"); exists {
+		currentUserID = uid.(uint)
+	}
+
+	response := gin.H{
+		"data": []gin.H{},
+		"meta": gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": 0,
+		},
+		"current_user": nil,
+	}
+
+	if sort == "streak" {
+		var streaks []models.UserStreak
+		query := config.DB.Model(&models.UserStreak{}).Preload("User").Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL")
+		if search != "" {
+			query = query.Where("users.username LIKE ?", "%"+search+"%")
+		}
+
+		query.Count(&total)
+		query.Order("longest_streak DESC, users.created_at ASC").Limit(limit).Offset(offset).Find(&streaks)
+
+		var data []gin.H
+		for i, s := range streaks {
+			if s.User.ID != 0 {
+				data = append(data, gin.H{
+					"id":             s.User.ID,
+					"username":       s.User.Username,
+					"longest_streak": s.LongestStreak,
+					"rank":           offset + i + 1,
+				})
+			}
+		}
+		response["data"] = data
+		response["meta"].(gin.H)["total"] = total
+
+		if currentUserID != 0 {
+			var myStreak models.UserStreak
+			if err := config.DB.Where("user_id = ?", currentUserID).First(&myStreak).Error; err == nil {
+				var rank int64
+				config.DB.Model(&models.UserStreak{}).Where("longest_streak > ?", myStreak.LongestStreak).Count(&rank)
+				response["current_user"] = gin.H{
+					"id":             currentUserID,
+					"longest_streak": myStreak.LongestStreak,
+					"rank":           rank + 1,
+				}
+			}
+		}
+
+	} else {
+		var users []models.User
+		query := config.DB.Model(&models.User{})
+		if search != "" {
+			query = query.Where("username LIKE ?", "%"+search+"%")
+		}
+
+		if sort == "winrate" {
+			query = query.Where("total_predictions >= 10")
+			query.Order("win_rate DESC, created_at ASC")
+		} else {
+			query.Order("points DESC, created_at ASC")
+		}
+
+		query.Count(&total)
+		query.Select("id, username, tier, points, win_rate, total_predictions").Limit(limit).Offset(offset).Find(&users)
+
+		var data []gin.H
+		for i, u := range users {
+			data = append(data, gin.H{
+				"id":                u.ID,
+				"username":          u.Username,
+				"tier":              u.Tier,
+				"points":            u.Points,
+				"win_rate":          u.WinRate,
+				"total_predictions": u.TotalPredictions,
+				"rank":              offset + i + 1,
+			})
+		}
+		if data == nil {
+			data = []gin.H{}
+		}
+		response["data"] = data
+		response["meta"].(gin.H)["total"] = total
+
+		if currentUserID != 0 {
+			var me models.User
+			if err := config.DB.Select("id, points, win_rate, total_predictions").First(&me, currentUserID).Error; err == nil {
+				var rank int64
+				if sort == "winrate" {
+					if me.TotalPredictions >= 10 {
+						config.DB.Model(&models.User{}).Where("total_predictions >= 10 AND win_rate > ?", me.WinRate).Count(&rank)
+						response["current_user"] = gin.H{
+							"id":       currentUserID,
+							"win_rate": me.WinRate,
+							"rank":     rank + 1,
+						}
+					}
+				} else {
+					config.DB.Model(&models.User{}).Where("points > ?", me.Points).Count(&rank)
+					response["current_user"] = gin.H{
+						"id":     currentUserID,
+						"points": me.Points,
+						"rank":   rank + 1,
+					}
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }

@@ -2,8 +2,14 @@ import ApiClient from '../api/client.js';
 
 export class AppSidebar extends HTMLElement {
     connectedCallback() {
-        const activePage = this.getAttribute('active') || 'home';
+        let activePage = this.getAttribute('active') || 'home';
         const mode = this.getAttribute('mode') || 'user';
+        
+        // Dynamic overrides based on query params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('view') === 'markets') {
+            activePage = 'markets';
+        }
         
         let navLinks = '';
         
@@ -27,9 +33,9 @@ export class AppSidebar extends HTMLElement {
                 <a href="/portfolio.html" class="nav-link ${activePage === 'portfolio' ? 'active' : ''}"><i class="ph ph-chart-pie-slice"></i> Portfolio</a>
                 <a href="/wallet.html" class="nav-link ${activePage === 'wallet' ? 'active' : ''}"><i class="ph ph-wallet"></i> Wallet</a>
                 <a href="/rewards.html" class="nav-link ${activePage === 'rewards' ? 'active' : ''}"><i class="ph ph-gift"></i> Rewards</a>
-                <a href="/dashboard.html?view=leaderboard" class="nav-link ${activePage === 'leaderboard' ? 'active' : ''}"><i class="ph ph-ranking"></i> Leaderboard</a>
+                <a href="/leaderboard.html" class="nav-link ${activePage === 'leaderboard' ? 'active' : ''}"><i class="ph ph-ranking"></i> Leaderboard</a>
                 <a href="/notifications.html" class="nav-link ${activePage === 'notifications' ? 'active' : ''}"><i class="ph ph-bell"></i> Notifications</a>
-                <a href="/profile.html" class="nav-link"><i class="ph ph-user"></i> Profile</a>
+                <a href="/profile.html" class="nav-link ${activePage === 'profile' ? 'active' : ''}"><i class="ph ph-user"></i> Profile</a>
                 <a href="/settings.html" class="nav-link ${activePage === 'settings' ? 'active' : ''}"><i class="ph ph-gear"></i> Settings</a>
                 <a href="/support.html" class="nav-link ${activePage === 'support' ? 'active' : ''}"><i class="ph ph-headset"></i> Support</a>
                 

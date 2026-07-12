@@ -17,9 +17,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const category = urlParams.get('category');
+    const view = urlParams.get('view');
     
     if (category) {
         document.getElementById('categoryTitle').textContent = escapeHTML(category.charAt(0).toUpperCase() + category.slice(1) + ' Markets');
+    }
+    
+    if (view === 'markets') {
+        const grid = document.querySelector('.dashboard-grid');
+        const rightSidebar = document.querySelector('.right-sidebar');
+        if (grid) grid.style.gridTemplateColumns = '1fr';
+        if (rightSidebar) rightSidebar.style.display = 'none';
+        document.getElementById('categoryTitle').textContent = 'All Markets';
     }
 
     fetchMarkets(category);

@@ -216,6 +216,31 @@ func ResolveMarket(c *gin.Context) {
 		return
 	}
 
+	// Recalculate WinRate and TotalPredictions for all users involved in this market
+	if len(predictions) > 0 {
+		var userIDs []uint
+		for _, p := range predictions {
+			userIDs = append(userIDs, p.UserID)
+		}
+		
+		if err := tx.Exec(`
+			UPDATE users
+			SET total_predictions = (
+				SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
+			),
+			win_rate = COALESCE((
+				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(id), 0)
+				FROM prediction_submissions 
+				WHERE user_id = users.id AND deleted_at IS NULL
+			), 0)
+			WHERE id IN ?
+		`, userIDs).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user stats"})
+			return
+		}
+	}
+
 	_ = services.LogAction(tx, adminID, "RESOLVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Resolved market with winner: "+correctOption, c.ClientIP())
 
 	if err := tx.Commit().Error; err != nil {

@@ -57,6 +57,20 @@ func main() {
 	// Seed dummy data if empty
 	config.SeedDatabase()
 
+	// Backfill win_rate and total_predictions
+	log.Println("Backfilling user win rates...")
+	config.DB.Exec(`
+		UPDATE users
+		SET total_predictions = (
+			SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
+		),
+		win_rate = COALESCE((
+			SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(id), 0)
+			FROM prediction_submissions 
+			WHERE user_id = users.id AND deleted_at IS NULL
+		), 0)
+	`)
+
 	// Start Background Jobs
 	services.StartCronJobs()
 

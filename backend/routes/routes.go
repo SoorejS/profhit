@@ -86,7 +86,8 @@ func SetupRouter() *gin.Engine {
 		api.GET("/markets/:id/comments", controllers.GetComments)
 
 		// Public leaderboard & activity
-		api.GET("/leaderboard", controllers.GetLeaderboard)
+		api.GET("/leaderboard", controllers.GetUnifiedLeaderboard)
+		api.GET("/leaderboard/legacy", controllers.GetLeaderboard) // rename old points leaderboard to legacy temporarily
 		api.GET("/leaderboard/streak", controllers.GetTopStreak)
 		api.GET("/leaderboard/winrate", controllers.GetTopWinRate)
 		api.GET("/activity", controllers.GetActivity)

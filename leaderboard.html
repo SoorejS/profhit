@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - PROPHIT</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <style>
+        .leaderboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-6);
+        }
+        .leaderboard-tabs {
+            display: flex;
+            gap: var(--spacing-2);
+            background: rgba(0,0,0,0.2);
+            padding: var(--spacing-1);
+            border-radius: var(--radius-full);
+            border: 1px solid var(--border-subtle);
+        }
+        .leaderboard-tab {
+            padding: var(--spacing-2) var(--spacing-4);
+            border-radius: var(--radius-full);
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .leaderboard-tab.active {
+            background: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .leaderboard-tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-3);
+        }
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-4) var(--spacing-6);
+            transition: transform var(--transition-fast), border-color var(--transition-fast);
+        }
+        .leaderboard-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--color-primary);
+        }
+        
+        .rank-badge {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: 800;
+            font-size: 1.1rem;
+            margin-right: var(--spacing-5);
+            background: var(--bg-base);
+            border: 2px solid var(--border-strong);
+            color: var(--text-secondary);
+        }
+        
+        .rank-1 { background: rgba(212,175,55,0.15); border-color: var(--color-gold); color: var(--color-gold); }
+        .rank-2 { background: rgba(192,192,192,0.15); border-color: #C0C0C0; color: #C0C0C0; }
+        .rank-3 { background: rgba(205,127,50,0.15); border-color: #CD7F32; color: #CD7F32; }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-4);
+            flex: 1;
+        }
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--border-subtle);
+        }
+        .user-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 2px;
+        }
+        .user-tier {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .score-box {
+            text-align: right;
+        }
+        .score-value {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--color-primary-light);
+            font-variant-numeric: tabular-nums;
+        }
+        .score-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <app-sidebar active="leaderboard"></app-sidebar>
+
+        <main class="main-content">
+            <app-topbar></app-topbar>
+
+            <div class="content-wrapper scroll-y">
+                
+                <div class="single-column-grid" style="max-width: 900px; margin: 0 auto;">
+                    
+                    <div class="leaderboard-header">
+                        <div>
+                            <h1 style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: var(--spacing-2); display: flex; align-items: center; gap: 12px;">
+                                <i class="ph-fill ph-trophy text-gold"></i> Hall of Fame
+                            </h1>
+                            <p class="text-secondary">See how you rank against the best forecasters in the world.</p>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: var(--spacing-4); align-items: flex-end;">
+                            <div class="leaderboard-tabs">
+                                <div class="leaderboard-tab active" onclick="switchTab('points')" id="tab-points" role="button" aria-label="Sort by Top Points">Top Points</div>
+                                <div class="leaderboard-tab" onclick="switchTab('streak')" id="tab-streak" role="button" aria-label="Sort by Hot Streaks">Hot Streaks</div>
+                                <div class="leaderboard-tab" onclick="switchTab('winrate')" id="tab-winrate" role="button" aria-label="Sort by Win Rate">Win Rate</div>
+                            </div>
+                            
+                            <div class="search-box" style="position: relative; width: 100%; max-width: 300px;">
+                                <i class="ph ph-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                                <input type="text" id="searchInput" placeholder="Search users..." style="width: 100%; padding: 8px 12px 8px 36px; border-radius: var(--radius-full); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); outline: none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current User Sticky Card (Injected dynamically) -->
+                    <div id="currentUserCard" style="margin-bottom: var(--spacing-6); display: none;"></div>
+
+                    <div class="leaderboard-list" id="leaderboardList">
+                        <!-- Loading State -->
+                        <div class="card skeleton" style="height: 80px; border-radius: var(--radius-lg);"></div>
+                        <div class="card skeleton" style="height: 80px; border-radius: var(--radius-lg);"></div>
+                        <div class="card skeleton" style="height: 80px; border-radius: var(--radius-lg);"></div>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--spacing-6); padding-top: var(--spacing-4); border-top: 1px solid var(--border-subtle);">
+                        <button id="prevPageBtn" class="btn btn-outline" onclick="changePage(-1)" disabled>
+                            <i class="ph ph-caret-left"></i> Previous
+                        </button>
+                        <span id="pageIndicator" class="text-secondary" style="font-size: 0.9rem; font-weight: 500;">Page 1</span>
+                        <button id="nextPageBtn" class="btn btn-outline" onclick="changePage(1)" disabled>
+                            Next <i class="ph ph-caret-right"></i>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="js/pages/leaderboard.js"></script>
+</body>
+</html>
