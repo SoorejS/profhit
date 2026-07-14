@@ -16,7 +16,57 @@ func setupTestDB() {
 		panic("failed to connect database")
 	}
 	config.DB = db
-	config.DB.AutoMigrate(&models.User{}, &models.UserAchievement{}, &models.WalletLedger{}, &models.Achievement{})
+
+	// Drop tables first to prevent shared memory cache contamination between tests
+	config.DB.Migrator().DropTable(
+		&models.User{},
+		&models.Market{},
+		&models.PredictionSubmission{},
+		&models.Comment{},
+		&models.HyperVergeKYC{},
+		&models.WithdrawalRequest{},
+		&models.WalletLedger{},
+		&models.UserStreak{},
+		&models.PasswordResetToken{},
+		&models.ReferralEvent{},
+		&models.AuditLog{},
+		&models.Report{},
+		&models.WeeklyChallenge{},
+		&models.ChallengeParticipant{},
+		&models.Achievement{},
+		&models.UserAchievement{},
+		&models.Badge{},
+		&models.UserBadge{},
+		&models.RewardItem{},
+		&models.Redemption{},
+		&models.CoinBatch{},
+		&models.PaymentTransaction{},
+	)
+
+	config.DB.AutoMigrate(
+		&models.User{},
+		&models.Market{},
+		&models.PredictionSubmission{},
+		&models.Comment{},
+		&models.HyperVergeKYC{},
+		&models.WithdrawalRequest{},
+		&models.WalletLedger{},
+		&models.UserStreak{},
+		&models.PasswordResetToken{},
+		&models.ReferralEvent{},
+		&models.AuditLog{},
+		&models.Report{},
+		&models.WeeklyChallenge{},
+		&models.ChallengeParticipant{},
+		&models.Achievement{},
+		&models.UserAchievement{},
+		&models.Badge{},
+		&models.UserBadge{},
+		&models.RewardItem{},
+		&models.Redemption{},
+		&models.CoinBatch{},
+		&models.PaymentTransaction{},
+	)
 }
 
 func TestProfileCompletionAchievement(t *testing.T) {
