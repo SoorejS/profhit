@@ -37,6 +37,7 @@ func runEveryMinute() {
 
 func runEveryHour() {
 	processCoinExpiries()
+	processPendingReferrals()
 	publishDailyWildCard()
 }
 
@@ -93,6 +94,44 @@ func processCoinExpiries() {
 			tx.Rollback()
 			log.Println("Failed to process coin expiry for batch:", batch.ID, err)
 		}
+	}
+}
+
+// processPendingReferrals finds all ReferralEvent records whose 48-hour pending
+// window has elapsed and credits the earned coins to the referrer via WalletLedger.
+// This cron fulfills PDF §4.3 — delayed referral payouts survive server restarts
+// because the pending state is persisted in the database.
+func processPendingReferrals() {
+	now := time.Now()
+	var pendingEvents []models.ReferralEvent
+
+	config.DB.Where("is_paid = ? AND pending_until <= ? AND deleted_at IS NULL", false, now).
+		Find(&pendingEvents)
+
+	for _, event := range pendingEvents {
+		tx := config.DB.Begin()
+
+		// Credit coins to referrer via immutable ledger
+		err := CreditWalletTx(tx, event.ReferrerID, event.Earnings,
+			models.TxTypeReferralBonus, event.ReferredID,
+			fmt.Sprintf("Referral bonus: milestone '%s' (User %d)", event.Status, event.ReferredID),
+			nil,
+		)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("[Cron] Failed to pay referral event %d: %v", event.ID, err)
+			continue
+		}
+
+		// Mark as paid so it is never processed again
+		if err := tx.Model(&event).Update("is_paid", true).Error; err != nil {
+			tx.Rollback()
+			log.Printf("[Cron] Failed to mark referral event %d as paid: %v", event.ID, err)
+			continue
+		}
+
+		tx.Commit()
+		log.Printf("[Cron] Paid referral event %d: %d coins to user %d", event.ID, event.Earnings, event.ReferrerID)
 	}
 }
 

@@ -48,6 +48,13 @@ func RegisterUser(c *gin.Context) {
 		Email        string `json:"email" binding:"required,email"`
 		Password     string `json:"password" binding:"required,min=8"`
 		ReferralCode string `json:"referral_code"`
+		// PDF §2.1 — Demographic fields (all optional at registration)
+		Phone       string `json:"phone"`
+		DateOfBirth string `json:"date_of_birth"` // Expected format: YYYY-MM-DD
+		City        string `json:"city"`
+		Country     string `json:"country"`
+		Location    string `json:"location"`
+		Interests   string `json:"interests"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -71,6 +78,15 @@ func RegisterUser(c *gin.Context) {
 
 	newReferralCode := services.GenerateReferralCode()
 
+	// Parse optional DateOfBirth
+	var dob *time.Time
+	if input.DateOfBirth != "" {
+		parsed, err := time.Parse("2006-01-02", input.DateOfBirth)
+		if err == nil {
+			dob = &parsed
+		}
+	}
+
 	user := models.User{
 		Username:     input.Username,
 		Email:        input.Email,
@@ -81,7 +97,14 @@ func RegisterUser(c *gin.Context) {
 		IsActive:     true,
 		KycStatus:    false,
 		ReferralCode: newReferralCode,
-		ReferredBy:   0, // Filled in by ProcessReferral if valid
+		ReferredBy:   0,
+		// Demographics
+		Phone:       input.Phone,
+		DateOfBirth: dob,
+		City:        input.City,
+		Country:     input.Country,
+		Location:    input.Location,
+		Interests:   input.Interests,
 	}
 
 	tx := config.DB.Begin()
@@ -277,15 +300,23 @@ func GetMe(c *gin.Context) {
 	go services.CheckProfileCompletion(userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":         user.ID,
-		"username":   user.Username,
-		"email":      user.Email,
-		"tier":       user.Tier,
-		"role":       user.Role,
-		"is_active":  user.IsActive,
-		"points":     user.Points,
-		"kyc_status": user.KycStatus,
-		"created_at": user.CreatedAt,
+		"id":           user.ID,
+		"username":     user.Username,
+		"email":        user.Email,
+		"tier":         user.Tier,
+		"role":         user.Role,
+		"is_active":    user.IsActive,
+		"points":       user.Points,
+		"kyc_status":   user.KycStatus,
+		"referral_code": user.ReferralCode,
+		"created_at":   user.CreatedAt,
+		// PDF §2.1 demographics
+		"phone":         user.Phone,
+		"date_of_birth": user.DateOfBirth,
+		"city":          user.City,
+		"country":       user.Country,
+		"location":      user.Location,
+		"interests":     user.Interests,
 	})
 }
 

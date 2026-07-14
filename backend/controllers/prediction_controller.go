@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -36,6 +37,31 @@ func SubmitPrediction(c *gin.Context) {
 	acceptableStatuses := map[string]bool{"Open": true, "Live": true, "Scheduled": true}
 	if !acceptableStatuses[market.ResolutionStatus] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "This market is no longer accepting predictions"})
+		return
+	}
+
+	// ── PDF §4.3: One prediction per topic/category per day ─────────────────
+	// A user may only predict on one market per category per calendar day.
+	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+	tomorrowStart := todayStart.Add(24 * time.Hour)
+
+	var topicCount int64
+	config.DB.Raw(`
+		SELECT COUNT(ps.id)
+		FROM prediction_submissions ps
+		INNER JOIN markets m ON m.id = ps.market_id
+		WHERE ps.user_id = ?
+		  AND m.category = ?
+		  AND ps.created_at >= ?
+		  AND ps.created_at < ?
+		  AND ps.deleted_at IS NULL
+		  AND m.deleted_at IS NULL
+	`, userID, market.Category, todayStart, tomorrowStart).Scan(&topicCount)
+
+	if topicCount > 0 {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": "You have already placed a prediction in the '" + market.Category + "' category today. Try again tomorrow!",
+		})
 		return
 	}
 

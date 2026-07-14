@@ -73,10 +73,41 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 
+	// ── PDF §3.1 / §4.1: Validate difficulty enum ─────────────────────────────
+	validDifficulties := map[string]bool{"Easy": true, "Medium": true, "Hard": true}
+	if market.Difficulty != "" && !validDifficulties[market.Difficulty] {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid difficulty. Must be one of: Easy, Medium, Hard",
+		})
+		return
+	}
+
+	// ── PDF §4.1: Enforce difficulty-based payout bounds ─────────────────────
+	// Easy: 20–40 coins | Medium: 50–100 coins | Hard: 120–400 coins
+	if market.Payout > 0 {
+		type payoutRange struct{ min, max int }
+		payoutBounds := map[string]payoutRange{
+			"Easy":   {min: 20, max: 40},
+			"Medium": {min: 50, max: 100},
+			"Hard":   {min: 120, max: 400},
+		}
+		if bounds, ok := payoutBounds[market.Difficulty]; ok {
+			if market.Payout < bounds.min || market.Payout > bounds.max {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf(
+						"Payout %d is outside the allowed range for %s difficulty (%d–%d coins)",
+						market.Payout, market.Difficulty, bounds.min, bounds.max,
+					),
+				})
+				return
+			}
+		}
+	}
+
 	if market.ResolutionStatus == "" {
 		market.ResolutionStatus = "Draft" // Draft, Scheduled, Live
 	}
-	
+
 	// Automatically calculate legacy EndDate based on LockTime if missing
 	if market.EndDate.IsZero() && market.LockTime != nil {
 		market.EndDate = *market.LockTime

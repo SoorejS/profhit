@@ -24,7 +24,8 @@ func GenerateReferralCode() string {
 }
 
 // ProcessReferral is called during user registration.
-// It finds the referrer, links the new user, and records the initial SignedUp event.
+// It finds the referrer, links the new user, and records the initial SignedUp event
+// with the mandatory 48-hour pending period before coins are credited.
 func ProcessReferral(tx *gorm.DB, newUserID uint, referralCode string) error {
 	if referralCode == "" {
 		return nil // No referral code provided
@@ -42,39 +43,65 @@ func ProcessReferral(tx *gorm.DB, newUserID uint, referralCode string) error {
 		return errors.New("cannot refer yourself")
 	}
 
+	// ── PDF §4.3: Enforce 20-referral cap ─────────────────────────────────────
+	var paidCount int64
+	tx.Model(&models.ReferralEvent{}).
+		Where("referrer_id = ? AND is_paid = ?", referrer.ID, true).
+		Count(&paidCount)
+	var pendingCount int64
+	tx.Model(&models.ReferralEvent{}).
+		Where("referrer_id = ? AND is_paid = ? AND deleted_at IS NULL", referrer.ID, false).
+		Count(&pendingCount)
+
+	if paidCount+pendingCount >= int64(models.MaxReferralRewards) {
+		// Silently succeed — new user is still registered, referrer just gets no more bonus
+		if err := tx.Model(&models.User{}).Where("id = ?", newUserID).Update("referred_by", referrer.ID).Error; err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// Link user to referrer
 	if err := tx.Model(&models.User{}).Where("id = ?", newUserID).Update("referred_by", referrer.ID).Error; err != nil {
 		return err
 	}
 
-	// Create ReferralEvent for "signed_up" (e.g. 50 coins reward)
+	// ── PDF §4.3: 48-hour pending delay ────────────────────────────────────────
 	signupReward := 50
+	pendingUntil := time.Now().Add(48 * time.Hour)
+
 	event := models.ReferralEvent{
-		ReferrerID: referrer.ID,
-		ReferredID: newUserID,
-		Status:     models.ReferralStatusSignedUp,
-		Earnings:   signupReward,
+		ReferrerID:   referrer.ID,
+		ReferredID:   newUserID,
+		Status:       models.ReferralStatusSignedUp,
+		Earnings:     signupReward,
+		PendingUntil: pendingUntil,
+		IsPaid:       false, // Will be credited by cron after 48h
 	}
 
 	if err := tx.Create(&event).Error; err != nil {
 		return err
 	}
 
-	// Reward referrer
-	if err := CreditWalletTx(tx, referrer.ID, signupReward, models.TxTypeReferralBonus, newUserID, fmt.Sprintf("Referral signup bonus (User %d)", newUserID), nil); err != nil {
-		return err
+	// Also create a pending event for the new user's welcome bonus
+	welcomeEvent := models.ReferralEvent{
+		ReferrerID:   newUserID,  // new user is "referrer" of their own welcome bonus
+		ReferredID:   referrer.ID,
+		Status:       models.ReferralStatusSignedUp,
+		Earnings:     signupReward,
+		PendingUntil: pendingUntil,
+		IsPaid:       false,
 	}
-	
-	// Reward new user
-	if err := CreditWalletTx(tx, newUserID, signupReward, models.TxTypeReferralBonus, referrer.ID, "Welcome bonus from referral", nil); err != nil {
+	if err := tx.Create(&welcomeEvent).Error; err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// TriggerReferralEvent checks if a referred user has reached a milestone (KYC, FirstDeposit, etc)
-// and rewards the referrer if the milestone hasn't been rewarded yet.
+// TriggerReferralEvent checks if a referred user has reached a milestone
+// and creates a PENDING referral event if eligible.
+// Actual coin crediting is deferred to the cron job after 48 hours.
 func TriggerReferralEvent(userID uint, status models.ReferralStatus, rewardAmount int) error {
 	return config.DB.Transaction(func(tx *gorm.DB) error {
 		var user models.User
@@ -86,29 +113,39 @@ func TriggerReferralEvent(userID uint, status models.ReferralStatus, rewardAmoun
 			return nil // User wasn't referred
 		}
 
-		// Check if event already exists to prevent duplicate abuse
+		// ── PDF §4.3: Check duplicate milestone (prevent re-award) ───────────
 		var existing models.ReferralEvent
 		if err := tx.Where("referred_id = ? AND status = ?", userID, status).First(&existing).Error; err == nil {
-			return nil // Already rewarded for this milestone
+			return nil // Already created an event for this milestone
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
 
-		// Create event
+		// ── PDF §4.3: Enforce 20-referral cap ─────────────────────────────────
+		var totalEvents int64
+		tx.Model(&models.ReferralEvent{}).
+			Where("referrer_id = ? AND deleted_at IS NULL", user.ReferredBy).
+			Count(&totalEvents)
+
+		if totalEvents >= int64(models.MaxReferralRewards) {
+			return nil // Cap reached — no more rewards for this referrer
+		}
+
+		// ── PDF §4.3: 48-hour pending delay ─────────────────────────────────
 		event := models.ReferralEvent{
-			ReferrerID: user.ReferredBy,
-			ReferredID: userID,
-			Status:     status,
-			Earnings:   rewardAmount,
+			ReferrerID:   user.ReferredBy,
+			ReferredID:   userID,
+			Status:       status,
+			Earnings:     rewardAmount,
+			PendingUntil: time.Now().Add(48 * time.Hour),
+			IsPaid:       false,
 		}
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
 
-		// Reward referrer
-		if err := CreditWalletTx(tx, user.ReferredBy, rewardAmount, models.TxTypeReferralBonus, userID, fmt.Sprintf("Referral milestone bonus: %s (User %d)", status, userID), nil); err != nil {
-			return err
-		}
+		_ = fmt.Sprintf("Pending referral event created for referrer %d, will pay %d coins after %s",
+			user.ReferredBy, rewardAmount, event.PendingUntil.Format(time.RFC3339))
 
 		return nil
 	})

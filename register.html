@@ -64,6 +64,35 @@
                     </div>
                 </div>
 
+                <!-- PDF §2.1: Optional demographic fields -->
+                <div style="margin-top: var(--spacing-6); padding-top: var(--spacing-4); border-top: 1px solid var(--border-subtle);">
+                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: var(--spacing-4); display:flex; align-items:center; gap:6px;">
+                        <i class="ph ph-info"></i> Optional — help us personalise your experience
+                    </p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-3);">
+                        <div class="input-group">
+                            <label for="phone" style="font-size:0.85rem;">Phone Number</label>
+                            <input type="tel" id="phone" class="input-control" placeholder="+91 98765 43210" style="font-size:0.9rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="dob" style="font-size:0.85rem;">Date of Birth</label>
+                            <input type="date" id="dob" class="input-control" style="font-size:0.9rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="city" style="font-size:0.85rem;">City</label>
+                            <input type="text" id="city" class="input-control" placeholder="Mumbai" style="font-size:0.9rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="country" style="font-size:0.85rem;">Country</label>
+                            <input type="text" id="country" class="input-control" placeholder="India" style="font-size:0.9rem;">
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-top: var(--spacing-3);">
+                        <label for="interests" style="font-size:0.85rem;">Interests (comma-separated)</label>
+                        <input type="text" id="interests" class="input-control" placeholder="Sports, Finance, Politics" style="font-size:0.9rem;">
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary w-full" style="padding:0.85rem; font-size:1.05rem; margin-top:1.5rem; justify-content: center;"><i class="ph-bold ph-user-plus"></i> Create Account</button>
             </form>
 

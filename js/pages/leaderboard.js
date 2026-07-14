@@ -126,23 +126,23 @@ function renderLeaderboardRow(user, tab, isCurrentUser = false) {
     }
     
     const username = user.username || 'You';
-    const avatar = \`https://ui-avatars.com/api/?name=\${encodeURIComponent(username)}&background=1E1E1E&color=D4AF37&size=48\`;
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=1E1E1E&color=D4AF37&size=48`;
     const bgClass = isCurrentUser ? 'style="border-color: var(--color-primary); background: rgba(212,175,55,0.05);"' : '';
     
-    return \`
-        <div class="leaderboard-item" \${bgClass}>
-            <div class="rank-badge \${rankBadgeClass}">\${rank || '-'}</div>
+    return `
+        <div class="leaderboard-item" ${bgClass}>
+            <div class="rank-badge ${rankBadgeClass}">${rank || '-'}</div>
             <div class="user-info">
-                <img src="\${avatar}" alt="\${escapeHTML(username)}" class="user-avatar">
+                <img src="${avatar}" alt="${escapeHTML(username)}" class="user-avatar">
                 <div style="min-width: 0;">
-                    <div class="user-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@\${escapeHTML(username)}</div>
-                    \${isCurrentUser ? '<div class="user-tier text-primary">Current User</div>' : '<div class="user-tier"><i class="ph-fill ph-medal text-gold"></i> Top Forecaster</div>'}
+                    <div class="user-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@${escapeHTML(username)}</div>
+                    ${isCurrentUser ? '<div class="user-tier text-primary">Current User</div>' : '<div class="user-tier"><i class="ph-fill ph-medal text-gold"></i> Top Forecaster</div>'}
                 </div>
             </div>
             <div class="score-box">
-                <div class="score-value">\${scoreValue}</div>
-                <div class="score-label">\${scoreLabel}</div>
+                <div class="score-value">${scoreValue}</div>
+                <div class="score-label">${scoreLabel}</div>
             </div>
         </div>
-    \`;
+    `;
 }

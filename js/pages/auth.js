@@ -81,12 +81,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('regPassword').value;
             const referralCode = document.getElementById('referralCode')?.value || '';
 
+            // PDF §2.1: Optional demographic fields
+            const phone = document.getElementById('phone')?.value || '';
+            const date_of_birth = document.getElementById('dob')?.value || '';
+            const city = document.getElementById('city')?.value || '';
+            const country = document.getElementById('country')?.value || '';
+            const interests = document.getElementById('interests')?.value || '';
+
             try {
                 await ApiClient.post('/auth/register', { 
                     username, 
                     email, 
                     password,
-                    referral_code: referralCode
+                    referral_code: referralCode,
+                    phone,
+                    date_of_birth,
+                    city,
+                    country,
+                    interests,
                 });
                 showToast('Registration successful! Please log in.', 'success');
                 setTimeout(() => window.location.href = 'login.html', 1500);
