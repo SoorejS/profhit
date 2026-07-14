@@ -37,6 +37,7 @@ func runEveryMinute() {
 
 func runEveryHour() {
 	processCoinExpiries()
+	sendExpiryReminders()
 	processPendingReferrals()
 	publishDailyWildCard()
 }
@@ -166,5 +167,24 @@ func publishDailyWildCard() {
 		if err := config.DB.Create(&m).Error; err == nil {
 			BroadcastToAll("market_live", "The Daily Wild Card market is now LIVE!")
 		}
+	}
+}
+
+// sendExpiryReminders finds coin batches expiring within 30 days that haven't received a reminder
+func sendExpiryReminders() {
+	now := time.Now()
+	thirtyDaysFromNow := now.AddDate(0, 0, 30)
+
+	var expiringBatches []models.CoinBatch
+	config.DB.Where("expires_at <= ? AND balance > 0 AND reminder_sent_at IS NULL", thirtyDaysFromNow).Find(&expiringBatches)
+
+	for _, batch := range expiringBatches {
+		// In a real application, we would use an email service or push notification service here.
+		// For now, we simulate sending the reminder.
+		log.Printf("[Cron] Sending 30-day expiry reminder to UserID: %d for %d coins (Batch %d)", batch.UserID, batch.Balance, batch.ID)
+		
+		// Mark as sent
+		batch.ReminderSentAt = &now
+		config.DB.Save(&batch)
 	}
 }

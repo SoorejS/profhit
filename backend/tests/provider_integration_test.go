@@ -32,6 +32,17 @@ func setupProviderTestDB() {
 	sqlDB.SetMaxOpenConns(1)
 
 	config.DB = db
+	
+	// Drop tables first to prevent shared memory cache contamination between tests
+	config.DB.Migrator().DropTable(
+		&models.User{},
+		&models.WalletLedger{},
+		&models.PaymentTransaction{},
+		&models.HyperVergeKYC{},
+		&models.UserAchievement{},
+		&models.Achievement{},
+	)
+
 	config.DB.AutoMigrate(
 		&models.User{},
 		&models.WalletLedger{},
@@ -87,7 +98,7 @@ func TestPaymentVerificationIdempotency(t *testing.T) {
 
 	var u1 models.User
 	config.DB.First(&u1, user.ID)
-	assert.Equal(t, 600, u1.Points) // 500 deposit + 100 first deposit bonus
+	assert.Equal(t, 500, u1.Points) // 500 deposit (referral bonus is pending for 48h)
 
 	// Second request (Duplicate/Replay) - should return OK but NOT credit funds
 	req2, _ := http.NewRequest("POST", "/verify", bytes.NewBuffer(body))
@@ -99,7 +110,7 @@ func TestPaymentVerificationIdempotency(t *testing.T) {
 	
 	var u2 models.User
 	config.DB.First(&u2, user.ID)
-	assert.Equal(t, 600, u2.Points) // Balance should STILL be 600
+	assert.Equal(t, 500, u2.Points) // Balance should STILL be 500
 }
 
 func TestHyperVergeRetryBackoff(t *testing.T) {

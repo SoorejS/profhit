@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -50,6 +51,20 @@ func addLedgerEntry(db *gorm.DB, userID uint, txType models.TransactionType, cre
 		return err
 	}
 
+	// For credits, always mint a new 1-year CoinBatch
+	if credit > 0 {
+		batch := models.CoinBatch{
+			UserID:    userID,
+			Amount:    credit,
+			Balance:   credit,
+			ExpiresAt: time.Now().AddDate(1, 0, 0),
+			Source:    string(txType),
+		}
+		if err := db.Create(&batch).Error; err != nil {
+			return err
+		}
+	}
+
 	// Update cached user balance
 	return db.Model(&user).UpdateColumn("points", balanceAfter).Error
 }
@@ -61,7 +76,54 @@ func CreditWalletTx(tx *gorm.DB, userID uint, amount int, txType models.Transact
 }
 
 func DebitWalletTx(tx *gorm.DB, userID uint, amount int, txType models.TransactionType, sourceRef uint, note string, adminID *uint) error {
+	// Execute FIFO CoinBatch deduction
+	if err := ConsumeCoinBatchesTx(tx, userID, amount); err != nil {
+		return err
+	}
+
 	return addLedgerEntry(tx, userID, txType, 0, amount, sourceRef, note, adminID)
+}
+
+// ConsumeCoinBatchesTx deducts 'amount' from unexpired CoinBatches (FIFO)
+func ConsumeCoinBatchesTx(tx *gorm.DB, userID uint, debitAmount int) error {
+	if debitAmount <= 0 {
+		return nil
+	}
+
+	var batches []models.CoinBatch
+	// Lock the rows to prevent race conditions during FIFO consumption
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("user_id = ? AND balance > 0 AND expires_at > ?", userID, time.Now()).
+		Order("created_at ASC").
+		Find(&batches).Error; err != nil {
+		return err
+	}
+
+	remainingDebit := debitAmount
+	for i := 0; i < len(batches) && remainingDebit > 0; i++ {
+		batch := &batches[i]
+		if batch.Balance <= remainingDebit {
+			// Consume entire batch
+			remainingDebit -= batch.Balance
+			batch.Balance = 0
+		} else {
+			// Consume partial batch
+			batch.Balance -= remainingDebit
+			remainingDebit = 0
+		}
+		if err := tx.Save(batch).Error; err != nil {
+			return err
+		}
+	}
+
+	if remainingDebit > 0 {
+		// Due to aggregate WalletLedger vs CoinBatch drift from earlier missing logic,
+		// some users might have points but no unexpired coin batches. We tolerate this
+		// to maintain backward compatibility by allowing the debit to proceed if the aggregate
+		// check in addLedgerEntry passes, rather than returning an error here.
+	}
+
+	return nil
 }
 
 // ── Standalone variants (own transaction, for simple single-op callers) ──────

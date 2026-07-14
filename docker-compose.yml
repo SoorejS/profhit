@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  profhit-db:
+    image: postgres:15-alpine
+    container_name: profhit_db
+    restart: always
+    environment:
+      POSTGRES_USER: profhit_user
+      POSTGRES_PASSWORD: profhit_password
+      POSTGRES_DB: profhit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - profhit_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profhit_user -d profhit_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  profhit-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: profhit_api
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      profhit-db:
+        condition: service_healthy
+    environment:
+      - USE_SQLITE=false
+      - DB_HOST=profhit-db
+      - DB_USER=profhit_user
+      - DB_PASSWORD=profhit_password
+      - DB_NAME=profhit_db
+      - DB_PORT=5432
+      - JWT_SECRET=super_secret_jwt_key_for_production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  profhit_pgdata:

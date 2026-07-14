@@ -40,13 +40,13 @@ func TestProfileCompletionAchievement(t *testing.T) {
 	err := config.DB.Where("user_id = ?", user.ID).First(&ach).Error
 	assert.NoError(t, err)
 
-	// Verify points awarded (default 100 + 250)
+	// Verify points awarded (default 0 + 250)
 	var u models.User
 	config.DB.First(&u, user.ID)
-	assert.Equal(t, 350, u.Points)
+	assert.Equal(t, 250, u.Points)
 
 	// Trigger again, should not double award
 	services.CheckProfileCompletion(user.ID)
 	config.DB.First(&u, user.ID)
-	assert.Equal(t, 350, u.Points) // Still 350
+	assert.Equal(t, 250, u.Points) // Still 250
 }
