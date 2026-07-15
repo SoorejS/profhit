@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"net/http"
-	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )

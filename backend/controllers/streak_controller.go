@@ -139,7 +139,6 @@ func DailyLogin(c *gin.Context) {
 	})
 }
 
-
 // GetStreakInfo handles GET /api/me/streak
 func GetStreakInfo(c *gin.Context) {
 	userIDVal, _ := c.Get("userID")

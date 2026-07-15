@@ -14,9 +14,9 @@ func JSONRecoveryMiddleware() gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Printf("PANIC RECOVERED: %v\n%s", err, debug.Stack())
-				
+
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-					"error": "Internal Server Error",
+					"error":   "Internal Server Error",
 					"message": "An unexpected error occurred. Our team has been notified.",
 				})
 			}

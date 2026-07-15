@@ -1,8 +1,8 @@
 package services
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"profhit-backend/config"
 	"profhit-backend/models"
 )

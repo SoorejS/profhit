@@ -62,7 +62,7 @@ func StartKYCSession(c *gin.Context) {
 	// In a real integration, we'd POST to https://auth.hyperverge.co/login to get a JWT
 	// Then POST to https://kyc-api.hyperverge.co/v1/transaction to create the transaction
 	// For this code, we assume the URL and auth works as per HV documentation:
-	
+
 	payload := map[string]interface{}{
 		"transactionId": transactionID,
 		"workflowId":    workflowID,
@@ -94,7 +94,7 @@ func StartKYCSession(c *gin.Context) {
 		if reqErr == nil && resp.StatusCode < 500 {
 			break
 		}
-		
+
 		// If it's the last attempt, don't sleep
 		if i == maxRetries-1 {
 			break
@@ -246,7 +246,7 @@ func HypervergeWebhook(c *gin.Context) {
 		kyc.Status = "Verified"
 		now := time.Now()
 		kyc.VerifiedAt = &now
-		
+
 		user.KycStatus = true
 		if user.Tier == "Bronze" {
 			user.Tier = "Gold" // Auto upgrade tier upon KYC
@@ -286,4 +286,3 @@ func SimulatorSignWebhook(c *gin.Context) {
 	mac.Write(body)
 	c.JSON(http.StatusOK, gin.H{"signature": hex.EncodeToString(mac.Sum(nil))})
 }
-

@@ -1,11 +1,11 @@
 package services
 
 import (
-	"log"
-	"time"
 	"fmt"
+	"log"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"time"
 )
 
 // StartCronJobs initializes background workers for the application
@@ -85,7 +85,7 @@ func processCoinExpiries() {
 	for _, batch := range expiredBatches {
 		// Deduct via ledger
 		tx := config.DB.Begin()
-		
+
 		err := DebitWalletTx(tx, batch.UserID, batch.Balance, models.TxTypeExpired, 0, "Coin Expiry", nil)
 		if err == nil {
 			batch.Balance = 0
@@ -150,18 +150,18 @@ func publishDailyWildCard() {
 		res := lock.Add(12 * time.Hour)
 
 		m := models.Market{
-			Title: "Will it rain in London tomorrow?",
-			Description: "Daily Wild Card. Predict the weather in London.",
-			Category: "Wild Card",
-			Difficulty: "Easy",
-			Payout: 50,
-			Options: `["Yes", "No"]`,
+			Title:            "Will it rain in London tomorrow?",
+			Description:      "Daily Wild Card. Predict the weather in London.",
+			Category:         "Wild Card",
+			Difficulty:       "Easy",
+			Payout:           50,
+			Options:          `["Yes", "No"]`,
 			ResolutionStatus: "Live",
-			Visibility: "Public",
-			StartTime: &start,
-			LockTime: &lock,
-			ResolutionTime: &res,
-			EndDate: lock,
+			Visibility:       "Public",
+			StartTime:        &start,
+			LockTime:         &lock,
+			ResolutionTime:   &res,
+			EndDate:          lock,
 		}
 
 		if err := config.DB.Create(&m).Error; err == nil {
@@ -182,7 +182,7 @@ func sendExpiryReminders() {
 		// In a real application, we would use an email service or push notification service here.
 		// For now, we simulate sending the reminder.
 		log.Printf("[Cron] Sending 30-day expiry reminder to UserID: %d for %d coins (Batch %d)", batch.UserID, batch.Balance, batch.ID)
-		
+
 		// Mark as sent
 		batch.ReminderSentAt = &now
 		config.DB.Save(&batch)

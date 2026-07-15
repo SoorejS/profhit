@@ -124,11 +124,11 @@ func SubmitPrediction(c *gin.Context) {
 	services.BroadcastToAll("trade_placed", gin.H{"market_id": market.ID})
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":            "Prediction locked! Good luck 🎯",
-		"choice":             prediction.Choice,
-		"staked":             prediction.Amount,
-		"potential_payout":   prediction.Potential,
-		"market_title":       market.Title,
+		"message":          "Prediction locked! Good luck 🎯",
+		"choice":           prediction.Choice,
+		"staked":           prediction.Amount,
+		"potential_payout": prediction.Potential,
+		"market_title":     market.Title,
 	})
 }
 

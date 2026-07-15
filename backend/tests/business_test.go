@@ -1,13 +1,13 @@
 package tests
 
 import (
-	"testing"
+	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
+	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
-	"profhit-backend/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
+	"testing"
 )
 
 func setupTestDB() {
@@ -74,10 +74,10 @@ func TestProfileCompletionAchievement(t *testing.T) {
 
 	// Create user
 	user := models.User{
-		Username: "achieve_test",
-		Email: "achieve@test.com",
-		Points: 0,
-		KycStatus: true,
+		Username:        "achieve_test",
+		Email:           "achieve@test.com",
+		Points:          0,
+		KycStatus:       true,
 		TwoFactorSecret: "SECRET",
 	}
 	config.DB.Create(&user)

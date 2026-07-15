@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"profhit-backend/config"
 	"profhit-backend/middleware"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -194,7 +194,7 @@ func LoginUser(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "2fa_required"})
 			return
 		}
-		
+
 		valid := totp.Validate(input.TwoFactorCode, user.TwoFactorSecret)
 		if !valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid 2FA code"})
@@ -258,7 +258,7 @@ func GetUserStats(c *gin.Context) {
 
 	// Coins earned via predictions, referral bonuses, or admin adjustments
 	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionWin), string(models.TxTypeAdminAdjustment), string(models.TxTypeReferralBonus)}).Select("COALESCE(SUM(credit), 0)").Scan(&coinsEarned)
-	
+
 	// Coins spent via predictions and withdrawals
 	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionStake), string(models.TxTypeRedemption)}).Select("COALESCE(SUM(debit), 0)").Scan(&coinsSpent)
 
@@ -300,16 +300,16 @@ func GetMe(c *gin.Context) {
 	go services.CheckProfileCompletion(userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":           user.ID,
-		"username":     user.Username,
-		"email":        user.Email,
-		"tier":         user.Tier,
-		"role":         user.Role,
-		"is_active":    user.IsActive,
-		"points":       user.Points,
-		"kyc_status":   user.KycStatus,
+		"id":            user.ID,
+		"username":      user.Username,
+		"email":         user.Email,
+		"tier":          user.Tier,
+		"role":          user.Role,
+		"is_active":     user.IsActive,
+		"points":        user.Points,
+		"kyc_status":    user.KycStatus,
 		"referral_code": user.ReferralCode,
-		"created_at":   user.CreatedAt,
+		"created_at":    user.CreatedAt,
 		// PDF §2.1 demographics
 		"phone":         user.Phone,
 		"date_of_birth": user.DateOfBirth,
@@ -337,7 +337,6 @@ func GetUser(c *gin.Context) {
 		"points":   user.Points,
 	})
 }
-
 
 // ForgotPassword generates a secure reset token, persists it, and emails the user.
 func ForgotPassword(c *gin.Context) {
@@ -447,4 +446,3 @@ func ResetPassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully. Please log in with your new password."})
 }
-

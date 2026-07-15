@@ -3,10 +3,10 @@ package controllers
 import (
 	"fmt"
 	"net/http"
-	"time"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +32,7 @@ func GetReports(c *gin.Context) {
 // ResolveReport handles a report and applies moderation action if required
 func ResolveReport(c *gin.Context) {
 	reportID := c.Param("id")
-	
+
 	var req struct {
 		Action       string `json:"action" binding:"required"` // "Dismiss", "Mute", "Suspend", "Ban", "DeleteComment"
 		DurationDays int    `json:"duration_days"`             // Optional: for Mute/Suspend
@@ -57,6 +57,11 @@ func ResolveReport(c *gin.Context) {
 	adminID := c.MustGet("userID").(uint)
 
 	tx := config.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
 	switch req.Action {
 	case "Dismiss":

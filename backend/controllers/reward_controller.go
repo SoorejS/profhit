@@ -22,7 +22,7 @@ func GetRewardCatalog(c *gin.Context) {
 // SubmitRedemption allows a user to redeem coins for an item
 func SubmitRedemption(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
-	
+
 	var req struct {
 		RewardItemID uint `json:"reward_item_id" binding:"required"`
 	}
@@ -63,7 +63,7 @@ func SubmitRedemption(c *gin.Context) {
 	}()
 
 	// Deduct points
-	if err := services.DebitWalletTx(tx, userID, item.Cost, models.TxTypeRedemption, 0, "Redemption: " + item.Name, nil); err != nil {
+	if err := services.DebitWalletTx(tx, userID, item.Cost, models.TxTypeRedemption, 0, "Redemption: "+item.Name, nil); err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to deduct coins. " + err.Error()})
 		return
@@ -173,7 +173,7 @@ func AdminProcessRedemption(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund coins"})
 			return
 		}
-		
+
 		// Restore inventory if applicable
 		var item models.RewardItem
 		if err := tx.First(&item, redemption.RewardItemID).Error; err == nil && item.Inventory >= 0 {

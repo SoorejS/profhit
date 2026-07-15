@@ -3,10 +3,10 @@ package controllers
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -128,10 +128,10 @@ func UpdateUserRole(c *gin.Context) {
 	_ = services.LogAction(nil, callerID, "UPDATE_ROLE", fmt.Sprintf("user_%d", target.ID), fmt.Sprintf("Changed role from %s to %s", target.Role, req.Role), ip)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":     "Role updated successfully",
-		"user_id":     target.ID,
-		"username":    target.Username,
-		"new_role":    req.Role,
+		"message":  "Role updated successfully",
+		"user_id":  target.ID,
+		"username": target.Username,
+		"new_role": req.Role,
 	})
 }
 
@@ -167,10 +167,10 @@ func BanUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user"})
 		return
 	}
-	
+
 	ip := c.ClientIP()
 	_ = services.LogAction(nil, callerID, "BAN_USER", fmt.Sprintf("user_%d", target.ID), "Banned user", ip)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "User banned successfully", "user_id": target.ID, "username": target.Username})
 }
 
@@ -195,7 +195,6 @@ func UnbanUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned successfully", "user_id": target.ID, "username": target.Username})
 }
-
 
 // GetPlatformStats returns aggregate admin dashboard statistics
 func GetPlatformStats(c *gin.Context) {

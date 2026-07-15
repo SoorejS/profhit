@@ -2,10 +2,10 @@ package controllers
 
 import (
 	"net/http"
-	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -107,4 +107,3 @@ func RejectWithdrawal(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Withdrawal rejected and coins refunded"})
 }
-

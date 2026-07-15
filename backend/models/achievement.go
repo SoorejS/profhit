@@ -1,8 +1,8 @@
 package models
 
 import (
-	"time"
 	"gorm.io/gorm"
+	"time"
 )
 
 // Achievement represents an unlockable milestone.
@@ -12,7 +12,7 @@ type Achievement struct {
 	Title       string         `gorm:"not null" json:"title"`
 	Description string         `json:"description"`
 	Reward      int            `gorm:"default:0" json:"reward"` // Coin reward
-	Icon        string         `json:"icon"` // URL or class
+	Icon        string         `json:"icon"`                    // URL or class
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -40,8 +40,8 @@ type Badge struct {
 
 // UserBadge tracks a user earning a badge.
 type UserBadge struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `gorm:"not null;uniqueIndex:idx_user_badge" json:"user_id"`
-	BadgeID   uint      `gorm:"not null;uniqueIndex:idx_user_badge" json:"badge_id"`
-	EarnedAt  time.Time `json:"earned_at"`
+	ID       uint      `gorm:"primaryKey" json:"id"`
+	UserID   uint      `gorm:"not null;uniqueIndex:idx_user_badge" json:"user_id"`
+	BadgeID  uint      `gorm:"not null;uniqueIndex:idx_user_badge" json:"badge_id"`
+	EarnedAt time.Time `json:"earned_at"`
 }

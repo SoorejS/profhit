@@ -1,8 +1,8 @@
 package models
 
 import (
-	"time"
 	"gorm.io/gorm"
+	"time"
 )
 
 // MaxReferralRewards is the maximum number of referral milestone rewards
@@ -30,8 +30,8 @@ type ReferralEvent struct {
 	Referrer     User           `gorm:"foreignKey:ReferrerID;constraint:OnDelete:CASCADE" json:"-"`
 	Referred     User           `gorm:"foreignKey:ReferredID;constraint:OnDelete:CASCADE" json:"-"`
 	Status       ReferralStatus `gorm:"not null;index" json:"status"`
-	Earnings     int            `gorm:"default:0" json:"earnings"`    // Points to be awarded
-	PendingUntil time.Time      `gorm:"index" json:"pending_until"`   // Award not before this time (48h delay)
+	Earnings     int            `gorm:"default:0" json:"earnings"`          // Points to be awarded
+	PendingUntil time.Time      `gorm:"index" json:"pending_until"`         // Award not before this time (48h delay)
 	IsPaid       bool           `gorm:"default:false;index" json:"is_paid"` // Flipped by cron after delay elapses
 	CreatedAt    time.Time      `gorm:"index" json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

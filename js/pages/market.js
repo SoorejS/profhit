@@ -28,6 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
     loadMarketDetails();
     loadComments();
     initChart();
+
+    // Register amount input listener once (prevents stacking on repeated Yes/No clicks)
+    const amountInput = document.getElementById('tradeAmount');
+    if (amountInput) {
+        amountInput.addEventListener('input', () => {
+            const amt = parseFloat(amountInput.value);
+            if (amt > 0) {
+                document.getElementById('potentialReturn').textContent = `+${Math.floor(amt * 1.8)} PTS`;
+            } else {
+                document.getElementById('potentialReturn').textContent = '--';
+            }
+        });
+    }
 });
 
 async function loadMarketDetails() {
@@ -48,7 +61,7 @@ async function loadMarketDetails() {
         if (market.resolution_status === 'Resolved') {
             statusEl.textContent = `Resolved: ${market.correct_option}`;
             statusEl.className = 'badge badge-success';
-            document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved: ${market.correct_option}</h3>`;
+            document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved: ${escapeHTML(market.correct_option)}</h3>`;
         } else if (market.resolution_status === 'Locked' || market.resolution_status === 'Awaiting Resolution') {
             statusEl.textContent = 'Resolving';
             statusEl.className = 'badge badge-warning';
@@ -122,20 +135,9 @@ function selectPrediction(outcome) {
     currentSelection = outcome;
     document.getElementById('tradeForm').classList.remove('hidden');
     
-    // Reset button styles
+    // Update button styles
     document.querySelector('.btn-yes').style.opacity = outcome === 'Yes' ? '1' : '0.5';
     document.querySelector('.btn-no').style.opacity = outcome === 'No' ? '1' : '0.5';
-
-    // Calculate mock return
-    const input = document.getElementById('tradeAmount');
-    input.addEventListener('input', () => {
-        const amt = parseFloat(input.value);
-        if (amt > 0) {
-            document.getElementById('potentialReturn').textContent = `+${Math.floor(amt * 1.8)} PTS`;
-        } else {
-            document.getElementById('potentialReturn').textContent = '--';
-        }
-    });
 }
 
 async function executeTrade() {
@@ -184,7 +186,7 @@ async function loadComments() {
         list.innerHTML = comments.map(c => `
             <div class="comment-item">
                 <div class="flex justify-between items-center" style="margin-bottom: 4px;">
-                    <div class="font-bold text-primary">@${escapeHTML(c.User?.username || 'Unknown')}</div>
+                    <div class="font-bold text-primary">@${escapeHTML(c.username || 'Unknown')}</div>
                     <div class="text-muted" style="font-size: 0.8rem;">${new Date(c.created_at).toLocaleString()}</div>
                 </div>
                 <div class="text-secondary" style="font-size: 0.95rem;">${escapeHTML(c.content)}</div>

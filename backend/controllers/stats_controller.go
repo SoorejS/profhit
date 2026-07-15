@@ -1,12 +1,12 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"net/http"
-	"strconv"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"strconv"
 	"time"
-	"github.com/gin-gonic/gin"
 )
 
 // GetLeaderboard fetches top 10 users ranked by Points

@@ -23,7 +23,7 @@ func GetAllMarkets(c *gin.Context) {
 	// By default, only show Public markets to users. We assume Admin uses a different endpoint or passes a flag if needed.
 	// But let's allow all if admin, else Public. To keep it simple, just filter Public unless status is explicitly Draft.
 	query := config.DB.Where("visibility = ?", "Public")
-	
+
 	if status != "" {
 		query = query.Where("resolution_status = ?", status)
 	} else {
@@ -146,8 +146,11 @@ func ResolveMarket(c *gin.Context) {
 		return
 	}
 
-	if market.ResolutionStatus != "Open" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Market is already resolved or not open"})
+	// Allow resolution from Locked or Awaiting Resolution states.
+	// "Open" was a legacy value that never existed in the real lifecycle.
+	resolvableStatuses := map[string]bool{"Locked": true, "Awaiting Resolution": true, "Live": true}
+	if !resolvableStatuses[market.ResolutionStatus] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Market must be Locked or Awaiting Resolution before it can be resolved. Current status: " + market.ResolutionStatus})
 		return
 	}
 
@@ -253,7 +256,7 @@ func ResolveMarket(c *gin.Context) {
 		for _, p := range predictions {
 			userIDs = append(userIDs, p.UserID)
 		}
-		
+
 		if err := tx.Exec(`
 			UPDATE users
 			SET total_predictions = (
@@ -356,15 +359,15 @@ func GetPortfolio(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
 	type PortfolioEntry struct {
-		ID              uint       `json:"id"`
-		MarketID        uint       `json:"market_id"`
-		MarketTitle     string     `json:"market"`
-		MarketStatus    string     `json:"market_status"`
-		CorrectOption   string     `json:"correct_option"`
-		Choice          string     `json:"choice"`
-		PotentialPayout int        `json:"potential_payout"`
-		IsCorrect       *bool      `json:"is_correct"`
-		CreatedAt       time.Time  `json:"created_at"`
+		ID              uint      `json:"id"`
+		MarketID        uint      `json:"market_id"`
+		MarketTitle     string    `json:"market"`
+		MarketStatus    string    `json:"market_status"`
+		CorrectOption   string    `json:"correct_option"`
+		Choice          string    `json:"choice"`
+		PotentialPayout int       `json:"potential_payout"`
+		IsCorrect       *bool     `json:"is_correct"`
+		CreatedAt       time.Time `json:"created_at"`
 	}
 
 	var portfolio []PortfolioEntry
@@ -446,7 +449,7 @@ func TransitionMarketState(c *gin.Context) {
 // DeleteMarket allows an admin to archive or hard delete a market (Drafts only).
 func DeleteMarket(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	var market models.Market
 	if err := config.DB.First(&market, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
@@ -463,4 +466,3 @@ func DeleteMarket(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Market archived successfully"})
 	}
 }
-

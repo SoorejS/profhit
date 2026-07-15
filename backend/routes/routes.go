@@ -2,6 +2,7 @@ package routes
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"profhit-backend/controllers"
@@ -26,29 +27,30 @@ func SetupRouter() *gin.Engine {
 		c.Writer.Header().Set("X-Content-Type-Options", "nosniff")
 		c.Writer.Header().Set("X-Frame-Options", "DENY")
 		c.Writer.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://checkout.razorpay.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:8080 https://api.razorpay.com; frame-src https://checkout.razorpay.com;")
+		c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://checkout.razorpay.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://profhit.onrender.com http://localhost:8080 https://api.razorpay.com; frame-src https://checkout.razorpay.com;")
 		c.Writer.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Strict CORS
-		appURL := os.Getenv("APP_URL")
-		if appURL == "" {
-			appURL = "http://localhost:5173" // fallback for dev frontend
+		// ── CORS ─────────────────────────────────────────────────────────────
+		// ALLOWED_ORIGINS is a comma-separated list of permitted frontend origins.
+		// e.g. "https://profhit.vercel.app,https://www.profhit.in"
+		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+		if allowedOriginsEnv == "" {
+			// Sensible defaults: Vercel deployment + local dev
+			allowedOriginsEnv = "https://profhit.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
 		}
-		
+
 		origin := c.Request.Header.Get("Origin")
 		allowedOrigin := ""
-		if appURL != "" && origin == appURL {
-			allowedOrigin = origin
-		} else if origin == "http://localhost:3000" ||
-			origin == "http://localhost:5173" ||
-			origin == "http://127.0.0.1:3000" ||
-			origin == "http://127.0.0.1:5173" {
-			allowedOrigin = origin
+		for _, allowed := range strings.Split(allowedOriginsEnv, ",") {
+			if strings.TrimSpace(allowed) == origin {
+				allowedOrigin = origin
+				break
+			}
 		}
 		if allowedOrigin != "" {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		}
-		
+
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -74,7 +76,7 @@ func SetupRouter() *gin.Engine {
 			auth.POST("/forgot-password", controllers.ForgotPassword)
 			auth.POST("/reset-password", controllers.ResetPassword)
 		}
-		
+
 		api.GET("/health", controllers.HealthCheck)
 		api.POST("/webhooks/hyperverge", controllers.HypervergeWebhook)
 		api.POST("/webhooks/razorpay", controllers.RazorpayWebhook)
@@ -119,7 +121,7 @@ func SetupRouter() *gin.Engine {
 			protected.GET("/me/streak", controllers.GetStreakInfo)
 			protected.GET("/wallet/history", controllers.GetWalletHistory)
 			protected.GET("/wallet/transaction/:id", controllers.GetWalletTransaction)
-			
+
 			// Referrals
 			protected.GET("/referrals/analytics", controllers.GetReferralAnalytics)
 

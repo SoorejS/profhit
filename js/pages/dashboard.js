@@ -89,13 +89,13 @@ async function fetchMarkets(category) {
             container.innerHTML = filtered.map(renderMarketCard).join('');
         }
 
-        // Render Trending Sidebar (Top 3 by volume or ID for now)
+        // Render Trending Sidebar (Top 5 by volume)
         if (trendingContainer) {
-            const trending = [...markets].sort((a, b) => (b.id) - (a.id)).slice(0, 5); // Mock logic for trending
+            const trending = [...markets].sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 5);
             trendingContainer.innerHTML = trending.map(m => `
                 <div class="trending-item">
                     <a href="market.html?id=${m.id}" class="trending-item-title">${escapeHTML(m.title)}</a>
-                    <div class="trending-item-vol"><i class="fa-solid fa-coins"></i> ${Math.floor(Math.random() * 50000) + 1000} Vol.</div>
+                    <div class="trending-item-vol"><i class="fa-solid fa-coins"></i> ${(m.volume || 0).toLocaleString()} Vol.</div>
                 </div>
             `).join('');
         }
@@ -141,8 +141,8 @@ function renderMarketCard(m) {
             
             <div style="margin-top: var(--spacing-4);">
                 <div class="market-card-stats">
-                    <span><i class="fa-solid fa-users"></i> ${Math.floor(Math.random() * 500) + 10} Traders</span>
-                    <span><i class="fa-solid fa-clock"></i> ${new Date(m.close_time).toLocaleDateString()}</span>
+                    <span><i class="fa-solid fa-users"></i> ${m.volume || 0} Predictions</span>
+                    <span><i class="fa-solid fa-clock"></i> ${m.lock_time ? new Date(m.lock_time).toLocaleDateString() : (m.end_date ? new Date(m.end_date).toLocaleDateString() : 'TBD')}</span>
                 </div>
                 
                 <div class="flex justify-between" style="font-size: 0.85rem; font-weight: 600; margin-bottom: var(--spacing-1);">

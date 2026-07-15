@@ -8,9 +8,9 @@ import (
 
 	"profhit-backend/models"
 
+	"github.com/glebarez/sqlite"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

@@ -1,8 +1,8 @@
 package models
 
 import (
-	"time"
 	"gorm.io/gorm"
+	"time"
 )
 
 // WeeklyChallenge represents a time-bound challenge with a reward pool.
@@ -21,12 +21,12 @@ type WeeklyChallenge struct {
 
 // ChallengeParticipant tracks a user's progress in a specific challenge.
 type ChallengeParticipant struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	ChallengeID uint           `gorm:"not null;index" json:"challenge_id"`
-	UserID      uint           `gorm:"not null;index" json:"user_id"`
-	Score       int            `gorm:"default:0" json:"score"` // e.g., points earned or wins
-	Rank        int            `json:"rank"`
-	RewardWon   int            `json:"reward_won"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	ChallengeID uint      `gorm:"not null;index" json:"challenge_id"`
+	UserID      uint      `gorm:"not null;index" json:"user_id"`
+	Score       int       `gorm:"default:0" json:"score"` // e.g., points earned or wins
+	Rank        int       `json:"rank"`
+	RewardWon   int       `json:"reward_won"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

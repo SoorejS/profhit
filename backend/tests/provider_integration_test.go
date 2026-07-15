@@ -27,12 +27,12 @@ func setupProviderTestDB() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	
+
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(1)
 
 	config.DB = db
-	
+
 	// Drop tables first to prevent shared memory cache contamination between tests
 	config.DB.Migrator().DropTable(
 		&models.User{},
@@ -124,7 +124,7 @@ func TestPaymentVerificationIdempotency(t *testing.T) {
 	router.ServeHTTP(w1, req1)
 
 	assert.Equal(t, http.StatusOK, w1.Code)
-	
+
 	// Wait for async referral bonus to trigger
 	time.Sleep(100 * time.Millisecond)
 
@@ -139,7 +139,7 @@ func TestPaymentVerificationIdempotency(t *testing.T) {
 	router.ServeHTTP(w2, req2)
 
 	assert.Equal(t, http.StatusOK, w2.Code) // Idempotent success response
-	
+
 	var u2 models.User
 	config.DB.First(&u2, user.ID)
 	assert.Equal(t, 500, u2.Points) // Balance should STILL be 500
@@ -198,14 +198,14 @@ func TestHyperVergeRetryBackoff(t *testing.T) {
 func TestWebhookSignatureValidation(t *testing.T) {
 	setupProviderTestDB()
 	gin.SetMode(gin.TestMode)
-	
+
 	os.Setenv("RAZORPAY_WEBHOOK_SECRET", "webhooksecret")
 
 	router := gin.Default()
 	router.POST("/webhook", controllers.RazorpayWebhook)
 
 	payload := `{"event": "payment.authorized"}`
-	
+
 	// Request with missing signature
 	req1, _ := http.NewRequest("POST", "/webhook", bytes.NewBuffer([]byte(payload)))
 	w1 := httptest.NewRecorder()

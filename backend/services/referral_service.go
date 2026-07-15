@@ -2,9 +2,9 @@ package services
 
 import (
 	"errors"
+	"log"
 	"math/rand"
 	"time"
-	"fmt"
 
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -15,7 +15,6 @@ import (
 // GenerateReferralCode creates a unique 8-character alphanumeric string
 func GenerateReferralCode() string {
 	var charset = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	rand.Seed(time.Now().UnixNano())
 	b := make([]rune, 8)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]
@@ -85,7 +84,7 @@ func ProcessReferral(tx *gorm.DB, newUserID uint, referralCode string) error {
 
 	// Also create a pending event for the new user's welcome bonus
 	welcomeEvent := models.ReferralEvent{
-		ReferrerID:   newUserID,  // new user is "referrer" of their own welcome bonus
+		ReferrerID:   newUserID, // new user is "referrer" of their own welcome bonus
 		ReferredID:   referrer.ID,
 		Status:       models.ReferralStatusSignedUp,
 		Earnings:     signupReward,
@@ -144,7 +143,7 @@ func TriggerReferralEvent(userID uint, status models.ReferralStatus, rewardAmoun
 			return err
 		}
 
-		_ = fmt.Sprintf("Pending referral event created for referrer %d, will pay %d coins after %s",
+		log.Printf("[Referral] Pending event created for referrer %d: %d coins due after %s",
 			user.ReferredBy, rewardAmount, event.PendingUntil.Format(time.RFC3339))
 
 		return nil

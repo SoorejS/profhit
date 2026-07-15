@@ -15,14 +15,14 @@ func HealthCheck(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "error", "message": "Database not reachable"})
 		return
 	}
-	
+
 	if err := sqlDB.Ping(); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "error", "message": "Database ping failed"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
+		"status":  "ok",
 		"message": "PROPHIT Backend is running",
 	})
 }

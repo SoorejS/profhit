@@ -4,8 +4,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -37,10 +39,14 @@ func CreateRazorpayOrder(c *gin.Context) {
 
 	client := razorpay.NewClient(keyID, keySecret)
 
+	userID := c.MustGet("userID").(uint)
+	// Generate a unique receipt ID per order to prevent Razorpay duplicate-receipt errors
+	receiptID := fmt.Sprintf("receipt_%d_%d", userID, time.Now().UnixMilli())
+
 	data := map[string]interface{}{
 		"amount":   int(req.Amount * 100), // convert to paise
 		"currency": "INR",
-		"receipt":  "receipt_prophit_1",
+		"receipt":  receiptID,
 	}
 
 	body, err := client.Order.Create(data, nil)
