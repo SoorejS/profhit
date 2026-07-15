@@ -54,10 +54,20 @@ class ApiClient {
                 return null;
             }
 
-            const data = await response.json();
+            let data;
+            const textResponse = await response.text();
+            try {
+                data = JSON.parse(textResponse);
+            } catch (parseError) {
+                // If it's not JSON, throw a standard HTTP error instead of a JSON SyntaxError
+                if (!response.ok) {
+                    throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+                }
+                data = { message: textResponse };
+            }
             
             if (!response.ok) {
-                throw new Error(data.error || data.message || 'Request failed');
+                throw new Error(data.error || data.message || `Request failed (${response.status})`);
             }
             
             return data;
