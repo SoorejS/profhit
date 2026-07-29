@@ -144,14 +144,28 @@ func publishDailyWildCard() {
 	config.DB.Model(&models.Market{}).Where("category = ? AND created_at > ?", "Wild Card", yesterday).Count(&count)
 
 	if count == 0 {
-		// Create a mock wild card market
+		// Fetch top news for the Wild Card
+		articles, err := GetTrendingNews()
+		
+		title := "Will it rain in London tomorrow?"
+		desc := "Daily Wild Card. Predict the weather in London."
+		
+		if err == nil && len(articles) > 0 {
+			// Use the top headline for the market
+			title = fmt.Sprintf("News follow-up: %s", articles[0].Title)
+			if len(title) > 100 {
+				title = title[:97] + "..."
+			}
+			desc = fmt.Sprintf("Based on today's trending news: %s... Will there be a major update on this story within 24 hours?", articles[0].Description)
+		}
+
 		start := time.Now()
 		lock := start.Add(12 * time.Hour)
 		res := lock.Add(12 * time.Hour)
 
 		m := models.Market{
-			Title:            "Will it rain in London tomorrow?",
-			Description:      "Daily Wild Card. Predict the weather in London.",
+			Title:            title,
+			Description:      desc,
 			Category:         "Wild Card",
 			Difficulty:       "Easy",
 			Payout:           50,

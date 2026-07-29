@@ -82,6 +82,9 @@ func SetupRouter() *gin.Engine {
 		api.POST("/webhooks/razorpay", controllers.RazorpayWebhook)
 		api.POST("/simulator/sign-webhook", controllers.SimulatorSignWebhook)
 
+		// Public news endpoint
+		api.GET("/news", controllers.GetTrendingNews)
+
 		// Public market browsing
 		api.GET("/markets", controllers.GetAllMarkets)
 		api.GET("/markets/:id", controllers.GetMarketByID)

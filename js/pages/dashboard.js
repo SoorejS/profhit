@@ -33,7 +33,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchMarkets(category);
     fetchStreak();
+    fetchNews();
 });
+
+async function fetchNews() {
+    const container = document.getElementById('newsContainer');
+    if (!container) return;
+
+    try {
+        const articles = await ApiClient.get('/news');
+        if (!articles || articles.length === 0) {
+            container.innerHTML = '<p class="text-sm text-secondary">No news available.</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        // Only show top 3 to fit the sidebar nicely
+        articles.slice(0, 3).forEach(article => {
+            const el = document.createElement('a');
+            el.href = article.url || '#';
+            el.target = '_blank';
+            el.className = 'flex items-center gap-3 p-2 rounded hover-bg transition-colors';
+            el.style.textDecoration = 'none';
+            el.style.color = 'inherit';
+
+            const imgSrc = article.image || 'https://via.placeholder.com/60?text=News';
+            
+            el.innerHTML = `
+                <img src="${imgSrc}" alt="News" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold truncate" style="color: var(--text-primary); margin-bottom: 2px;">${escapeHTML(article.title)}</div>
+                    <div class="text-xs truncate" style="color: var(--text-secondary);">${escapeHTML(article.description || '')}</div>
+                </div>
+            `;
+            container.appendChild(el);
+        });
+
+    } catch (err) {
+        console.error("Failed to fetch news:", err);
+        container.innerHTML = '<p class="text-sm text-error">Could not load news.</p>';
+    }
+}
 
 async function fetchStreak() {
     try {
