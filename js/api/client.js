@@ -47,8 +47,8 @@ class ApiClient {
         try {
             const response = await fetch(`${API_URL}${endpoint}`, config);
             
-            // Handle 401 Unauthorized globally
-            if (response.status === 401) {
+            // Handle 401 Unauthorized globally (but not for login itself to prevent loops)
+            if (response.status === 401 && !endpoint.includes('/auth/login')) {
                 this.removeToken();
                 window.location.href = '/login.html';
                 return null;

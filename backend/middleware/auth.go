@@ -85,7 +85,11 @@ func AuthRequired() gin.HandlerFunc {
 		// DB Check for active/suspended status to ensure real-time bans apply
 		var user models.User
 		if err := config.DB.First(&user, claims.UserID).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User no longer exists"})
+			if err.Error() == "record not found" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "User no longer exists"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error while validating user session"})
+			}
 			c.Abort()
 			return
 		}
