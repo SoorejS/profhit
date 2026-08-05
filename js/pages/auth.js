@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const interests = document.getElementById('interests')?.value || '';
 
             try {
-                await ApiClient.post('/auth/register', { 
+                const res = await ApiClient.post('/auth/register', { 
                     username, 
                     email, 
                     password,
@@ -100,8 +100,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     country,
                     interests,
                 });
-                showToast('Registration successful! Please log in.', 'success');
-                setTimeout(() => window.location.href = 'login.html', 1500);
+                if (res && res.token) {
+                    ApiClient.setToken(res.token);
+                    showToast('Account created successfully! Welcome to PROPHIT.', 'success');
+                    setTimeout(() => window.location.href = 'dashboard.html', 1000);
+                } else {
+                    showToast('Registration successful! Please log in.', 'success');
+                    setTimeout(() => window.location.href = 'login.html', 1500);
+                }
             } catch (err) {
                 showToast(err.message, 'error');
                 btn.disabled = false;

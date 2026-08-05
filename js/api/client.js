@@ -35,9 +35,13 @@ class ApiClient {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout for Render cold-starts
+
         const config = {
             ...options,
             headers,
+            signal: controller.signal
         };
 
         if (config.body && typeof config.body === 'object') {
@@ -46,6 +50,7 @@ class ApiClient {
 
         try {
             const response = await fetch(`${API_URL}${endpoint}`, config);
+            clearTimeout(timeoutId);
             
             // Handle 401 Unauthorized globally (but not for login itself to prevent loops)
             if (response.status === 401 && !endpoint.includes('/auth/login')) {
@@ -72,8 +77,12 @@ class ApiClient {
             
             return data;
         } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                console.error(`[API Timeout] ${endpoint}`);
+                throw new Error('Server connection timed out. The server may be waking up, please try again in a few seconds.');
+            }
             console.error(`[API Error] ${endpoint}:`, error);
-            // We can integrate with ToastManager here later, or throw and let caller handle
             throw error;
         }
     }
