@@ -73,6 +73,7 @@ func SetupRouter() *gin.Engine {
 			// Public Auth & Webhooks
 			auth.POST("/register", controllers.RegisterUser)
 			auth.POST("/login", controllers.LoginUser)
+			auth.POST("/google", controllers.GoogleLogin)
 			auth.POST("/forgot-password", controllers.ForgotPassword)
 			auth.POST("/reset-password", controllers.ResetPassword)
 		}

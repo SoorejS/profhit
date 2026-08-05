@@ -11,6 +11,7 @@ import (
 	"profhit-backend/middleware"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,10 +21,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func generateToken(user models.User) (string, error) {
+func GenerateToken(user models.User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		return "", errors.New("JWT_SECRET not configured")
+	}
+
+	expiryMinutes := 7 * 24 * 60 // default 7 days
+	if expStr := os.Getenv("JWT_EXPIRY_MINUTES"); expStr != "" {
+		if parsed, err := strconv.Atoi(expStr); err == nil && parsed > 0 {
+			expiryMinutes = parsed
+		}
 	}
 
 	claims := middleware.Claims{
@@ -32,13 +40,17 @@ func generateToken(user models.User) (string, error) {
 		Tier:     user.Tier,
 		Role:     user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryMinutes) * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
+}
+
+func generateToken(user models.User) (string, error) {
+	return GenerateToken(user)
 }
 
 // RegisterUser creates a new user with hashed password
@@ -374,20 +386,8 @@ func ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Build reset link — APP_URL can be set in env, fallback to localhost for dev
-	appURL := os.Getenv("APP_URL")
-	if appURL == "" {
-		appURL = "http://localhost:8080"
-	}
-	resetLink := fmt.Sprintf("%s/reset-password?token=%s", appURL, token)
-
-	body := fmt.Sprintf(
-		"Hello %s,\n\nClick the link below to reset your PROPHIT password:\n\n%s\n\n"+
-			"This link expires in 1 hour.\n\nIf you did not request this, ignore this email.\n\n"+
-			"The PROPHIT Team",
-		user.Username, resetLink,
-	)
-	go services.SendEmail(user.Email, "Reset Your PROPHIT Password", body)
+	// Send formatted HTML reset email asynchronously
+	go services.SendPasswordResetEmail(user.Email, user.Username, token)
 
 	c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent."})
 }

@@ -5,6 +5,24 @@ import { showToast } from '../components/toast.js';
  * PROPHIT - Authentication Logic
  */
 
+// Global Google OAuth callback handler
+window.handleGoogleCredentialResponse = async (response) => {
+    if (!response || !response.credential) {
+        showToast('Google Sign-In failed', 'error');
+        return;
+    }
+    try {
+        const res = await ApiClient.post('/auth/google', { credential: response.credential });
+        if (res && res.token) {
+            ApiClient.setToken(res.token);
+            showToast('Google Sign-In successful! Welcome to PROPHIT.', 'success');
+            setTimeout(() => window.location.href = 'dashboard.html', 1000);
+        }
+    } catch (err) {
+        showToast(err.message || 'Google Sign-In failed', 'error');
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // Password toggle visibility
     const toggles = document.querySelectorAll('.password-toggle');

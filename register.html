@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/utilities.css">
     <link rel="stylesheet" href="css/pages/auth.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <div class="animated-bg"></div>
@@ -22,6 +23,31 @@
                 <a href="index.html" style="display:inline-block; margin-bottom:1rem; color:var(--color-primary); font-size:2.5rem;"><i class="ph-fill ph-trend-up"></i></a>
                 <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Create Account</h2>
                 <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Start predicting the future with PROPHIT.</p>
+            </div>
+
+            <!-- Google Sign In Button Container -->
+            <div id="g_id_onload"
+                 data-client_id="1058560813765-sohlfa2fike3vc0nt4uvasvk6an58r16.apps.googleusercontent.com"
+                 data-context="signup"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signup_with"
+                 data-size="large"
+                 data-logo_alignment="left"
+                 data-width="100%">
+            </div>
+
+            <div style="display: flex; align-items: center; margin: 1.25rem 0; color: var(--text-muted); font-size: 0.85rem;">
+                <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
+                <span style="padding: 0 10px;">or register with email</span>
+                <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
             </div>
 
             <form id="registerForm">
