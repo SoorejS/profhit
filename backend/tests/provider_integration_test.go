@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,72 +19,11 @@ import (
 	"profhit-backend/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm"
 )
 
 func setupProviderTestDB() {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	sqlDB, _ := db.DB()
-	sqlDB.SetMaxOpenConns(1)
-
-	config.DB = db
-
-	// Drop tables first to prevent shared memory cache contamination between tests
-	config.DB.Migrator().DropTable(
-		&models.User{},
-		&models.Market{},
-		&models.PredictionSubmission{},
-		&models.Comment{},
-		&models.HyperVergeKYC{},
-		&models.WithdrawalRequest{},
-		&models.WalletLedger{},
-		&models.UserStreak{},
-		&models.PasswordResetToken{},
-		&models.ReferralEvent{},
-		&models.AuditLog{},
-		&models.Report{},
-		&models.WeeklyChallenge{},
-		&models.ChallengeParticipant{},
-		&models.Achievement{},
-		&models.UserAchievement{},
-		&models.Badge{},
-		&models.UserBadge{},
-		&models.RewardItem{},
-		&models.Redemption{},
-		&models.CoinBatch{},
-		&models.PaymentTransaction{},
-	)
-
-	config.DB.AutoMigrate(
-		&models.User{},
-		&models.Market{},
-		&models.PredictionSubmission{},
-		&models.Comment{},
-		&models.HyperVergeKYC{},
-		&models.WithdrawalRequest{},
-		&models.WalletLedger{},
-		&models.UserStreak{},
-		&models.PasswordResetToken{},
-		&models.ReferralEvent{},
-		&models.AuditLog{},
-		&models.Report{},
-		&models.WeeklyChallenge{},
-		&models.ChallengeParticipant{},
-		&models.Achievement{},
-		&models.UserAchievement{},
-		&models.Badge{},
-		&models.UserBadge{},
-		&models.RewardItem{},
-		&models.Redemption{},
-		&models.CoinBatch{},
-		&models.PaymentTransaction{},
-	)
+	setupTestDB()
 }
 
 func TestPaymentVerificationIdempotency(t *testing.T) {
@@ -93,12 +34,18 @@ func TestPaymentVerificationIdempotency(t *testing.T) {
 	config.DB.Create(&user)
 
 	os.Setenv("RAZORPAY_KEY_SECRET", "testsecret")
+	config.DB.Create(&models.PaymentTransaction{UserID: user.ID, ProviderOrderID: "order_123", Amount: 500, AmountPaise: 50000, Status: "Pending"})
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"id":"pay_123","order_id":"order_123","amount":50000,"currency":"INR","status":"captured"}`))}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
 
 	// Payload
 	payload := controllers.PaymentVerification{
 		RazorpayOrderID:   "order_123",
 		RazorpayPaymentID: "pay_123",
-		Points:            500,
+		Points:            999999, // Tampered client credit must be ignored.
 	}
 
 	// Generate valid signature
@@ -230,3 +177,7 @@ func TestWebhookSignatureValidation(t *testing.T) {
 	router.ServeHTTP(w3, req3)
 	assert.Equal(t, http.StatusOK, w3.Code)
 }
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

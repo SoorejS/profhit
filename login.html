@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/utilities.css">
     <link rel="stylesheet" href="css/pages/auth.css">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
 </head>
 <body>
     <div class="animated-bg"></div>
@@ -26,23 +26,7 @@
             </div>
 
             <!-- Google Sign In Button Container -->
-            <div id="g_id_onload"
-                 data-client_id="1058560813765-sohlfa2fike3vc0nt4uvasvk6an58r16.apps.googleusercontent.com"
-                 data-context="signin"
-                 data-ux_mode="popup"
-                 data-callback="handleGoogleCredentialResponse"
-                 data-auto_prompt="false">
-            </div>
-
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-shape="rectangular"
-                 data-theme="outline"
-                 data-text="signin_with"
-                 data-size="large"
-                 data-logo_alignment="left"
-                 data-width="100%">
-            </div>
+            <div id="googleSignIn"><p class="text-sm text-muted">Checking Google Sign-In availability...</p></div>
 
             <div style="display: flex; align-items: center; margin: 1.25rem 0; color: var(--text-muted); font-size: 0.85rem;">
                 <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
@@ -67,10 +51,11 @@
                     <div class="password-input-wrapper" style="position: relative;">
                         <i class="ph ph-lock-key" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
                         <input type="password" id="password" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required>
-                        <i class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></i>
+                        <button type="button" aria-label="Show or hide password" class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></button>
                     </div>
                 </div>
 
+                <div class="input-group"><label for="twoFactorCode">Authenticator code (if enabled)</label><input id="twoFactorCode" class="input-control" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></div>
                 <button type="submit" class="btn btn-primary w-full" style="padding:0.85rem; font-size:1.05rem; margin-top:1.5rem; justify-content: center;"><i class="ph-bold ph-sign-in"></i> Log In</button>
             </form>
 

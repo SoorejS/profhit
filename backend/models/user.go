@@ -15,13 +15,14 @@ const (
 )
 
 type User struct {
-	ID       uint   `gorm:"primaryKey" json:"id"`
-	Username string `gorm:"uniqueIndex;not null" json:"username"`
-	Email    string `gorm:"uniqueIndex;not null" json:"email"`
-	Password string `gorm:"not null" json:"-"` // Omitted from JSON responses
-	Tier     string `gorm:"default:'Standard'" json:"tier"`
-	Role     string `gorm:"default:'user'" json:"role"`    // RBAC role
-	IsActive bool   `gorm:"default:true" json:"is_active"` // false = banned
+	TokenVersion uint   `gorm:"not null;default:0" json:"-"`
+	ID           uint   `gorm:"primaryKey" json:"id"`
+	Username     string `gorm:"uniqueIndex;not null" json:"username"`
+	Email        string `gorm:"uniqueIndex;not null" json:"email"`
+	Password     string `gorm:"not null" json:"-"` // Omitted from JSON responses
+	Tier         string `gorm:"default:'Standard'" json:"tier"`
+	Role         string `gorm:"default:'user'" json:"role"`    // RBAC role
+	IsActive     bool   `gorm:"default:true" json:"is_active"` // false = banned
 
 	// ── Core Platform Fields ──────────────────────────────────────────────────
 	Points           int        `gorm:"index;default:0;check:points >= 0" json:"points"`

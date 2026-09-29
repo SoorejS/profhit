@@ -15,7 +15,8 @@ func GetLeaderboard(c *gin.Context) {
 
 	if err := config.DB.
 		Select("id, username, tier, points").
-		Order("points desc").
+		Where("is_active = ?", true).
+		Order("points desc, id asc").
 		Limit(10).
 		Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard"})
@@ -66,6 +67,8 @@ func GetActivity(c *gin.Context) {
 		WHERE ps.deleted_at IS NULL
 		  AND u.deleted_at  IS NULL
 		  AND m.deleted_at  IS NULL
+           AND m.visibility = 'Public'
+           AND m.resolution_status NOT IN ('Draft', 'Proposed')
 		ORDER BY ps.created_at DESC
 		LIMIT 15
 	`).Scan(&rows).Error
@@ -146,13 +149,13 @@ func GetTopWinRate(c *gin.Context) {
 			u.id,
 			u.username,
 			COUNT(ps.id) AS total,
-			(SUM(CASE WHEN ps.is_correct = true THEN 1 ELSE 0 END)::float / COUNT(ps.id)::float) * 100 AS win_rate
+			SUM(CASE WHEN ps.is_correct = true THEN 1 ELSE 0 END) * 100.0 / COUNT(ps.id) AS win_rate
 		FROM users u
 		JOIN prediction_submissions ps ON ps.user_id = u.id
-		WHERE ps.deleted_at IS NULL AND u.deleted_at IS NULL
+		WHERE ps.deleted_at IS NULL AND u.deleted_at IS NULL AND u.is_active = true AND ps.is_correct IS NOT NULL
 		GROUP BY u.id, u.username
 		HAVING COUNT(ps.id) >= 10
-		ORDER BY win_rate DESC
+		ORDER BY win_rate DESC, u.id ASC
 		LIMIT 10
 	`).Scan(&rows).Error
 
@@ -186,8 +189,13 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 
 	var total int64
 	var currentUserID uint
+	var currentUsername string
 	if uid, exists := c.Get("userID"); exists {
 		currentUserID = uid.(uint)
+		if err := config.DB.Model(&models.User{}).Where("id = ?", currentUserID).Pluck("username", &currentUsername).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not load current leaderboard user"})
+			return
+		}
 	}
 
 	response := gin.H{
@@ -202,15 +210,21 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 
 	if sort == "streak" {
 		var streaks []models.UserStreak
-		query := config.DB.Model(&models.UserStreak{}).Preload("User").Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL")
+		query := config.DB.Model(&models.UserStreak{}).Preload("User").Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true")
 		if search != "" {
 			query = query.Where("users.username LIKE ?", "%"+search+"%")
 		}
 
-		query.Count(&total)
-		query.Order("longest_streak DESC, users.created_at ASC").Limit(limit).Offset(offset).Find(&streaks)
+		if err := query.Count(&total).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not load leaderboard"})
+			return
+		}
+		if err := query.Order("longest_streak DESC, users.id ASC").Limit(limit).Offset(offset).Find(&streaks).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not load leaderboard"})
+			return
+		}
 
-		var data []gin.H
+		data := []gin.H{}
 		for i, s := range streaks {
 			if s.User.ID != 0 {
 				data = append(data, gin.H{
@@ -228,9 +242,13 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 			var myStreak models.UserStreak
 			if err := config.DB.Where("user_id = ?", currentUserID).First(&myStreak).Error; err == nil {
 				var rank int64
-				config.DB.Model(&models.UserStreak{}).Where("longest_streak > ?", myStreak.LongestStreak).Count(&rank)
+				if err := config.DB.Model(&models.UserStreak{}).Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true").Where("longest_streak > ? OR (longest_streak = ? AND user_id < ?)", myStreak.LongestStreak, myStreak.LongestStreak, currentUserID).Count(&rank).Error; err != nil {
+					c.JSON(500, gin.H{"error": "Could not load leaderboard rank"})
+					return
+				}
 				response["current_user"] = gin.H{
 					"id":             currentUserID,
+					"username":       currentUsername,
 					"longest_streak": myStreak.LongestStreak,
 					"rank":           rank + 1,
 				}
@@ -239,22 +257,28 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 
 	} else {
 		var users []models.User
-		query := config.DB.Model(&models.User{})
+		query := config.DB.Model(&models.User{}).Where("is_active = ?", true)
 		if search != "" {
 			query = query.Where("username LIKE ?", "%"+search+"%")
 		}
 
 		if sort == "winrate" {
-			query = query.Where("total_predictions >= 10")
-			query.Order("win_rate DESC, created_at ASC")
+			query = query.Where("id IN (SELECT user_id FROM prediction_submissions WHERE deleted_at IS NULL AND is_correct IS NOT NULL GROUP BY user_id HAVING COUNT(*) >= 10)")
+			query = query.Order("win_rate DESC, id ASC")
 		} else {
-			query.Order("points DESC, created_at ASC")
+			query = query.Order("points DESC, id ASC")
 		}
 
-		query.Count(&total)
-		query.Select("id, username, tier, points, win_rate, total_predictions").Limit(limit).Offset(offset).Find(&users)
+		if err := query.Count(&total).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not load leaderboard"})
+			return
+		}
+		if err := query.Select("id, username, tier, points, win_rate, total_predictions").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not load leaderboard"})
+			return
+		}
 
-		var data []gin.H
+		data := []gin.H{}
 		for i, u := range users {
 			data = append(data, gin.H{
 				"id":                u.ID,
@@ -274,23 +298,36 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 
 		if currentUserID != 0 {
 			var me models.User
-			if err := config.DB.Select("id, points, win_rate, total_predictions").First(&me, currentUserID).Error; err == nil {
+			if err := config.DB.Select("id, username, points, win_rate, total_predictions").First(&me, currentUserID).Error; err == nil {
 				var rank int64
 				if sort == "winrate" {
-					if me.TotalPredictions >= 10 {
-						config.DB.Model(&models.User{}).Where("total_predictions >= 10 AND win_rate > ?", me.WinRate).Count(&rank)
+					var resolved int64
+					if err := config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ? AND is_correct IS NOT NULL", currentUserID).Count(&resolved).Error; err != nil {
+						c.JSON(500, gin.H{"error": "Could not load leaderboard rank"})
+						return
+					}
+					if resolved >= 10 {
+						if err := config.DB.Model(&models.User{}).Where("is_active = true AND id IN (SELECT user_id FROM prediction_submissions WHERE deleted_at IS NULL AND is_correct IS NOT NULL GROUP BY user_id HAVING COUNT(*) >= 10)").Where("win_rate > ? OR (win_rate = ? AND id < ?)", me.WinRate, me.WinRate, me.ID).Count(&rank).Error; err != nil {
+							c.JSON(500, gin.H{"error": "Could not load leaderboard rank"})
+							return
+						}
 						response["current_user"] = gin.H{
 							"id":       currentUserID,
+							"username": me.Username,
 							"win_rate": me.WinRate,
 							"rank":     rank + 1,
 						}
 					}
 				} else {
-					config.DB.Model(&models.User{}).Where("points > ?", me.Points).Count(&rank)
+					if err := config.DB.Model(&models.User{}).Where("is_active = true").Where("points > ? OR (points = ? AND id < ?)", me.Points, me.Points, me.ID).Count(&rank).Error; err != nil {
+						c.JSON(500, gin.H{"error": "Could not load leaderboard rank"})
+						return
+					}
 					response["current_user"] = gin.H{
-						"id":     currentUserID,
-						"points": me.Points,
-						"rank":   rank + 1,
+						"id":       currentUserID,
+						"username": me.Username,
+						"points":   me.Points,
+						"rank":     rank + 1,
 					}
 				}
 			}

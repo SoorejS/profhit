@@ -6,9 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -32,17 +36,29 @@ type HyperVergeTokenResponse struct {
 func StartKYCSession(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
+	tx := config.DB.Begin()
+	defer tx.Rollback()
+	if err := services.LockWalletTx(tx, userID); err != nil {
+		c.JSON(500, gin.H{"error": "Could not start verification"})
+		return
+	}
 	// 1. Check if user already has an active or verified KYC session
 	var existingKYC models.HyperVergeKYC
-	err := config.DB.Where("user_id = ?", userID).Order("created_at desc").First(&existingKYC).Error
+	err := tx.Where("user_id = ?", userID).Order("created_at desc").First(&existingKYC).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(500, gin.H{"error": "Could not check verification status"})
+		return
+	}
 	if err == nil {
 		if existingKYC.Status == "Verified" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "User is already verified"})
 			return
 		}
 		if existingKYC.Status == "Started" || existingKYC.Status == "Pending" {
-			// We could return the existing session ID, but it's safer to create a new one if it expired.
-			// For simplicity, we just create a new one below.
+			if time.Since(existingKYC.CreatedAt) < 24*time.Hour {
+				c.JSON(409, gin.H{"error": "A verification is already in progress. Check its status before retrying."})
+				return
+			}
 		}
 	}
 
@@ -83,7 +99,11 @@ func StartKYCSession(c *gin.Context) {
 	backoff := 500 * time.Millisecond
 
 	for i := 0; i < maxRetries; i++ {
-		req, _ := http.NewRequest("POST", hypervergeURL, bytes.NewBuffer(bodyBytes))
+		req, err := http.NewRequestWithContext(c.Request.Context(), "POST", hypervergeURL, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			c.JSON(503, gin.H{"error": "Verification provider is misconfigured"})
+			return
+		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("appId", appID)
 		req.Header.Set("appKey", appKey)
@@ -131,6 +151,11 @@ func StartKYCSession(c *gin.Context) {
 		return
 	}
 
+	parsedURL, err := url.Parse(verificationURL)
+	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
+		c.JSON(502, gin.H{"error": "Invalid verification URL from provider"})
+		return
+	}
 	// 4. Create the KYC record in DB
 	newKyc := models.HyperVergeKYC{
 		UserID:            userID,
@@ -140,11 +165,15 @@ func StartKYCSession(c *gin.Context) {
 		SessionID:         sessionID,
 		WorkflowID:        workflowID,
 	}
-	if err := config.DB.Create(&newKyc).Error; err != nil {
+	if err := tx.Create(&newKyc).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create KYC session"})
 		return
 	}
 
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not persist verification session"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"verification_url": verificationURL,
 		"session_id":       sessionID,
@@ -157,7 +186,11 @@ func GetKYCStatus(c *gin.Context) {
 
 	var kyc models.HyperVergeKYC
 	if err := config.DB.Where("user_id = ?", userID).Order("created_at desc").First(&kyc).Error; err != nil {
-		c.JSON(http.StatusOK, gin.H{"status": "Not Started"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusOK, gin.H{"status": "Not Started"})
+		} else {
+			c.JSON(500, gin.H{"error": "Could not load verification status"})
+		}
 		return
 	}
 
@@ -170,6 +203,10 @@ func GetKYCStatus(c *gin.Context) {
 // HypervergeWebhook handles the asynchronous verification result from HyperVerge
 func HypervergeWebhook(c *gin.Context) {
 	secret := os.Getenv("HYPERVERGE_WEBHOOK_SECRET")
+	if secret == "" {
+		c.JSON(503, gin.H{"error": "KYC webhooks are not configured"})
+		return
+	}
 	signatureHeader := c.GetHeader("x-hyperverge-signature")
 
 	body, err := io.ReadAll(c.Request.Body)
@@ -209,10 +246,21 @@ func HypervergeWebhook(c *gin.Context) {
 		return
 	}
 
+	if payload.TransactionID == "" || (payload.Status != "auto_approved" && payload.Status != "needs_review" && payload.Status != "rejected") {
+		c.JSON(400, gin.H{"error": "Invalid verification event"})
+		return
+	}
+	tx := config.DB.Begin()
+	defer tx.Rollback()
 	// 3. Find the KYC record
 	var kyc models.HyperVergeKYC
-	if err := config.DB.Where("provider_reference = ?", payload.TransactionID).First(&kyc).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("provider_reference = ?", payload.TransactionID).First(&kyc).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+
+	if err := services.LockReferralWalletsTx(tx, kyc.UserID); err != nil {
+		c.JSON(500, gin.H{"error": "Could not lock verification account"})
 		return
 	}
 
@@ -223,7 +271,6 @@ func HypervergeWebhook(c *gin.Context) {
 	}
 
 	// 4. Update the record
-	tx := config.DB.Begin()
 
 	kyc.WebhookPayload = string(body)
 	kyc.VerificationResult = payload.Status
@@ -236,7 +283,7 @@ func HypervergeWebhook(c *gin.Context) {
 	kyc.FailureReason = payload.Reason
 
 	var user models.User
-	if err := tx.First(&user, kyc.UserID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, kyc.UserID).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
 		return
@@ -251,10 +298,16 @@ func HypervergeWebhook(c *gin.Context) {
 		if user.Tier == "Bronze" {
 			user.Tier = "Gold" // Auto upgrade tier upon KYC
 		}
-		tx.Save(&user)
+		if err := tx.Model(&user).Updates(map[string]interface{}{"kyc_status": true, "tier": user.Tier}).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not update verification status"})
+			return
+		}
 
 		// Trigger referral bonus for KYC completion
-		_ = services.TriggerReferralEvent(user.ID, models.ReferralStatusKYCCompleted, 200)
+		if err := services.TriggerReferralEventTx(tx, user.ID, models.ReferralStatusKYCCompleted, 200); err != nil {
+			c.JSON(500, gin.H{"error": "Could not record verification reward"})
+			return
+		}
 	} else if payload.Status == "rejected" {
 		kyc.Status = "Rejected"
 	} else {
@@ -267,7 +320,10 @@ func HypervergeWebhook(c *gin.Context) {
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not commit verification"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Webhook processed successfully"})
 }
 

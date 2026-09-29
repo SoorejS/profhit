@@ -15,41 +15,39 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadPortfolio() {
     const list = document.getElementById('portfolioList');
     try {
-        const data = await ApiClient.get('/portfolio');
-        
+        const [res, statsRes] = await Promise.allSettled([
+            ApiClient.get('/portfolio'),
+            ApiClient.get('/me/stats')
+        ]);
+
+        const rawData = res.status === 'fulfilled' ? res.value : null;
+        const data = Array.isArray(rawData) ? rawData : (rawData?.items || []);
+
+        if (statsRes.status === 'fulfilled' && statsRes.value) {
+            const stats = statsRes.value;
+            document.getElementById('statMarketsJoined').textContent = stats.total_predictions || '0';
+            document.getElementById('statWinRate').textContent = stats.win_rate || '0%';
+        } else {
+            document.getElementById('statMarketsJoined').textContent = data.length.toString();
+        }
+
         if (!data || data.length === 0) {
             list.innerHTML = `<div class="text-muted text-center" style="padding: var(--spacing-6);">You haven't made any predictions yet.</div>`;
-            document.getElementById('statWinRate').textContent = '0%';
-            document.getElementById('statMarketsJoined').textContent = '0';
             document.getElementById('statTotalPayout').textContent = '0 PTS';
             return;
         }
 
-        document.getElementById('statMarketsJoined').textContent = data.length;
-
-        // Calculate win rate based on resolved markets
-        const resolved = data.filter(p => p.market_status === 'Resolved');
-        const won = resolved.filter(p => p.is_correct === true);
-        
-        if (resolved.length > 0) {
-            const wr = Math.round((won.length / resolved.length) * 100);
-            document.getElementById('statWinRate').textContent = `${wr}%`;
-        } else {
-            document.getElementById('statWinRate').textContent = '--%';
-        }
-        
-        // Calculate potential payout
         let totalPayout = 0;
         data.forEach(p => {
-            if (p.market_status !== 'Resolved') {
-                totalPayout += p.potential_payout;
+            if (p.is_correct === null) {
+                totalPayout += (p.potential_payout || 0);
             }
         });
         document.getElementById('statTotalPayout').textContent = `${totalPayout} PTS`;
 
         list.innerHTML = data.map(p => {
             let status = '';
-            if (p.market_status === 'Resolved') {
+            if (p.is_correct !== null) {
                 const isWin = p.is_correct === true;
                 status = isWin 
                     ? `<span class="text-success font-bold"><i class="ph-fill ph-check-circle"></i> WON</span>` 
@@ -84,7 +82,6 @@ async function loadPortfolio() {
         }).join('');
 
     } catch (err) {
-        console.error(err);
         list.innerHTML = `<div class="text-danger text-center" style="padding: var(--spacing-6);">Failed to load portfolio.</div>`;
     }
 }

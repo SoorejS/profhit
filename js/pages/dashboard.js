@@ -2,7 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
-import { escapeHTML } from '../utils/escape.js';
+import { escapeHTML, safeURL } from '../utils/escape.js';
 
 /**
  * PROPHIT - Dashboard Logic
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const view = urlParams.get('view');
     
     if (category) {
-        document.getElementById('categoryTitle').textContent = escapeHTML(category.charAt(0).toUpperCase() + category.slice(1) + ' Markets');
+        document.getElementById('categoryTitle').textContent = category.charAt(0).toUpperCase() + category.slice(1) + ' Markets';
     }
     
     if (view === 'markets') {
@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('categoryTitle').textContent = 'All Markets';
     }
 
+    document.querySelectorAll('[data-sort]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-sort]').forEach(b => b.setAttribute('aria-pressed', String(b === button))); fetchMarkets(category, button.dataset.sort); }));
     fetchMarkets(category);
     fetchStreak();
     fetchNews();
@@ -51,16 +52,18 @@ async function fetchNews() {
         // Only show top 3 to fit the sidebar nicely
         articles.slice(0, 3).forEach(article => {
             const el = document.createElement('a');
-            el.href = article.url || '#';
+            el.href = safeURL(article.url);
+ if (!el.href) return;
+ el.rel = 'noopener noreferrer';
             el.target = '_blank';
             el.className = 'flex items-center gap-3 p-2 rounded hover-bg transition-colors';
             el.style.textDecoration = 'none';
             el.style.color = 'inherit';
 
-            const imgSrc = article.image || 'https://via.placeholder.com/60?text=News';
+            const imgSrc = safeURL(article.image || '');
             
             el.innerHTML = `
-                <img src="${imgSrc}" alt="News" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
+                <img src="${escapeHTML(imgSrc)}" alt="News" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
                 <div class="flex-1 min-w-0">
                     <div class="text-sm font-semibold truncate" style="color: var(--text-primary); margin-bottom: 2px;">${escapeHTML(article.title)}</div>
                     <div class="text-xs truncate" style="color: var(--text-secondary);">${escapeHTML(article.description || '')}</div>
@@ -70,7 +73,6 @@ async function fetchNews() {
         });
 
     } catch (err) {
-        console.error("Failed to fetch news:", err);
         container.innerHTML = '<p class="text-sm text-error">Could not load news.</p>';
     }
 }
@@ -81,7 +83,8 @@ async function fetchStreak() {
         const el = document.getElementById('streakCount');
         if (el) el.textContent = streakData.current_streak || 0;
     } catch (err) {
-        console.error(err);
+        const el = document.getElementById('streakCount');
+        if (el) el.textContent = 'Unavailable';
     }
 }
 
@@ -93,11 +96,12 @@ window.claimDailyReward = async () => {
     btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Claiming...';
 
     try {
-        await ApiClient.post('/me/daily-login');
-        showToast("Daily reward claimed successfully! +50 PTS", "success");
+        const reward = await ApiClient.post('/me/daily-login');
+        showToast(reward.message, 'success');
         fetchStreak();
         // Update topbar balance
         document.querySelector('app-topbar').fetchBalance();
+        document.querySelector('app-sidebar').fetchBalance();
         btn.innerHTML = 'Claimed <i class="fa-solid fa-check"></i>';
     } catch (err) {
         showToast(err.message, "error");
@@ -106,18 +110,20 @@ window.claimDailyReward = async () => {
     }
 };
 
-async function fetchMarkets(category) {
+async function fetchMarkets(category, sort = "trending") {
     const container = document.getElementById('marketsContainer');
     const trendingContainer = document.getElementById('trendingContainer');
     
     try {
-        const markets = await ApiClient.get('/markets');
+        const markets = await ApiClient.get('/markets?' + new URLSearchParams({sort, ...(category ? {category} : {})}));
         
         let filtered = markets;
         if (category) {
             filtered = markets.filter(m => m.category && m.category.toLowerCase() === category.toLowerCase());
         }
 
+        const search = new URLSearchParams(window.location.search).get('search')?.toLowerCase();
+        if (search) filtered = filtered.filter(m => `${m.title} ${m.category} ${m.description}`.toLowerCase().includes(search));
         if (filtered.length === 0) {
             container.innerHTML = `
                 <div class="card" style="grid-column: 1 / -1; text-align: center; padding: var(--spacing-12);">
@@ -141,18 +147,12 @@ async function fetchMarkets(category) {
         }
 
     } catch (err) {
-        console.error(err);
         container.innerHTML = `<div class="card text-danger" style="grid-column: 1 / -1;">Failed to load markets. ${escapeHTML(err.message)}</div>`;
         if(trendingContainer) trendingContainer.innerHTML = `<div class="text-danger">Failed to load trending</div>`;
     }
 }
 
 function renderMarketCard(m) {
-    // Use market ID as seed for deterministic probability display
-    const seed = m.id % 60;
-    const yesProb = 20 + seed;
-    const noProb = 100 - yesProb;
-
     // Check if the market is closed
     const isClosed = m.lock_time ? new Date(m.lock_time) < new Date() : false;
     
@@ -167,7 +167,7 @@ function renderMarketCard(m) {
     }
 
     return `
-        <div class="card market-card" onclick="window.location.href='market.html?id=${m.id}'" style="cursor: pointer;">
+        <a class="card market-card" href="market.html?id=${m.id}" style="text-decoration: none; color: inherit;">
             <div>
                 <div class="market-card-header">
                     <span class="market-card-category"><i class="fa-solid fa-tag"></i> ${escapeHTML(m.category)}</span>
@@ -185,15 +185,9 @@ function renderMarketCard(m) {
                     <span><i class="fa-solid fa-clock"></i> ${m.lock_time ? new Date(m.lock_time).toLocaleDateString() : (m.end_date ? new Date(m.end_date).toLocaleDateString() : 'TBD')}</span>
                 </div>
                 
-                <div class="flex justify-between" style="font-size: 0.85rem; font-weight: 600; margin-bottom: var(--spacing-1);">
-                    <span class="text-yes">Yes ${yesProb}%</span>
-                    <span class="text-no">No ${noProb}%</span>
-                </div>
-                <div class="prob-bar-container">
-                    <div class="prob-bar-yes" style="width: ${yesProb}%;"></div>
-                    <div class="prob-bar-no" style="width: ${noProb}%;"></div>
-                </div>
+                <div class="text-gold">Fixed payout: ${Number(m.payout)} PTS</div>
+
             </div>
-        </div>
+        </a>
     `;
 }

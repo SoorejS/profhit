@@ -4,191 +4,193 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	razorpay "github.com/razorpay/razorpay-go"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"math"
 	"net/http"
 	"os"
-	"time"
-
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
-
-	"github.com/gin-gonic/gin"
-	razorpay "github.com/razorpay/razorpay-go"
+	"regexp"
+	"time"
 )
 
 type OrderRequest struct {
-	Amount float64 `json:"amount" binding:"required"` // In INR (rupees)
+	Amount float64 `json:"amount" binding:"required"`
 }
 
-// CreateRazorpayOrder generates a unique Order ID to hand to the frontend checkout widget.
 func CreateRazorpayOrder(c *gin.Context) {
 	var req OrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&req); err != nil || req.Amount < 10 || req.Amount > 100000 || math.Trunc(req.Amount) != req.Amount {
+		c.JSON(400, gin.H{"error": "Amount must be a whole number of INR between 10 and 100000"})
 		return
 	}
-
-	keyID := os.Getenv("RAZORPAY_KEY_ID")
-	keySecret := os.Getenv("RAZORPAY_KEY_SECRET")
-
-	if keyID == "" || keySecret == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Razorpay credentials not configured"})
+	key, secret := os.Getenv("RAZORPAY_KEY_ID"), os.Getenv("RAZORPAY_KEY_SECRET")
+	if key == "" || secret == "" {
+		c.JSON(503, gin.H{"error": "Payments are not configured"})
 		return
 	}
-
-	client := razorpay.NewClient(keyID, keySecret)
-
 	userID := c.MustGet("userID").(uint)
-	// Generate a unique receipt ID per order to prevent Razorpay duplicate-receipt errors
-	receiptID := fmt.Sprintf("receipt_%d_%d", userID, time.Now().UnixMilli())
-
-	data := map[string]interface{}{
-		"amount":   int(req.Amount * 100), // convert to paise
-		"currency": "INR",
-		"receipt":  receiptID,
-	}
-
-	body, err := client.Order.Create(data, nil)
+	amount := int(req.Amount) * 100
+	body, err := razorpay.NewClient(key, secret).Order.Create(map[string]interface{}{"amount": amount, "currency": "INR", "receipt": fmt.Sprintf("r_%d_%d", userID, time.Now().UnixNano())}, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Razorpay order"})
+		c.JSON(502, gin.H{"error": "Payment provider could not create an order"})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"order_id": body["id"],
-		"amount":   body["amount"],
-		"currency": body["currency"],
-		"key":      keyID,
-	})
+	orderID, ok := body["id"].(string)
+	if !ok || orderID == "" {
+		c.JSON(502, gin.H{"error": "Invalid payment provider response"})
+		return
+	}
+	order := models.PaymentTransaction{UserID: userID, ProviderOrderID: orderID, Amount: req.Amount, AmountPaise: amount, Status: "Pending"}
+	if err := config.DB.Create(&order).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not record payment order"})
+		return
+	}
+	c.JSON(200, gin.H{"order_id": orderID, "amount": amount, "currency": "INR", "key": key})
 }
 
 type PaymentVerification struct {
-	RazorpayPaymentID string  `json:"razorpay_payment_id" binding:"required"`
-	RazorpayOrderID   string  `json:"razorpay_order_id" binding:"required"`
-	RazorpaySignature string  `json:"razorpay_signature" binding:"required"`
-	Points            float64 `json:"points" binding:"required"`
+	RazorpayPaymentID string `json:"razorpay_payment_id" binding:"required"`
+	RazorpayOrderID   string `json:"razorpay_order_id" binding:"required"`
+	RazorpaySignature string `json:"razorpay_signature" binding:"required"`
+	// Kept for older clients; never used to determine wallet credit.
+	Points float64 `json:"points"`
 }
 
-// VerifyPayment checks the signature, confirms payment success, and adds points.
+var providerID = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
 func VerifyPayment(c *gin.Context) {
 	var req PaymentVerification
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&req); err != nil || !providerID.MatchString(req.RazorpayPaymentID) || !providerID.MatchString(req.RazorpayOrderID) {
+		c.JSON(400, gin.H{"error": "Invalid payment details"})
 		return
 	}
-
+	secret := os.Getenv("RAZORPAY_KEY_SECRET")
+	if secret == "" {
+		c.JSON(503, gin.H{"error": "Payments are not configured"})
+		return
+	}
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(req.RazorpayOrderID + "|" + req.RazorpayPaymentID))
+	signature, err := hex.DecodeString(req.RazorpaySignature)
+	if err != nil || !hmac.Equal(h.Sum(nil), signature) {
+		c.JSON(400, gin.H{"error": "Invalid payment signature"})
+		return
+	}
 	userID := c.MustGet("userID").(uint)
-	keySecret := os.Getenv("RAZORPAY_KEY_SECRET")
-
-	if keySecret == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Razorpay credentials not configured"})
+	var order models.PaymentTransaction
+	if err := config.DB.Where("provider_order_id = ? AND user_id = ?", req.RazorpayOrderID, userID).First(&order).Error; err != nil {
+		c.JSON(404, gin.H{"error": "Payment order not found"})
 		return
 	}
-
-	// Real HMAC verification
-	data := req.RazorpayOrderID + "|" + req.RazorpayPaymentID
-	h := hmac.New(sha256.New, []byte(keySecret))
-	h.Write([]byte(data))
-	expectedSignature := hex.EncodeToString(h.Sum(nil))
-
-	if expectedSignature != req.RazorpaySignature {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid signature. Payment failed."})
-		return
-	}
-
-	// Verified! Perform Idempotent funding.
-	tx := config.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
+	if order.Status == "Completed" {
+		if order.ProviderPaymentID != req.RazorpayPaymentID {
+			c.JSON(409, gin.H{"error": "Order already paid by another payment"})
+			return
 		}
-	}()
-
-	// Check if this specific Razorpay Order ID has already been credited
-	var existingTx models.PaymentTransaction
-	if err := tx.Where("provider_order_id = ?", req.RazorpayOrderID).First(&existingTx).Error; err == nil {
-		// ALREADY PROCESSED - Idempotent response
-		tx.Rollback()
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Payment already verified",
-		})
+		c.JSON(200, gin.H{"message": "Payment already verified"})
 		return
 	}
-
-	// Create a new record to prevent replay attacks
-	newTx := models.PaymentTransaction{
-		UserID:            userID,
-		ProviderOrderID:   req.RazorpayOrderID,
-		ProviderPaymentID: req.RazorpayPaymentID,
-		Amount:            req.Points,
-		Status:            "Completed",
-	}
-
-	if err := tx.Create(&newTx).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log payment transaction"})
+	payment, err := razorpay.NewClient(os.Getenv("RAZORPAY_KEY_ID"), secret).Payment.Fetch(req.RazorpayPaymentID, nil, nil)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "Could not verify payment with provider; retry verification"})
 		return
 	}
-
-	amount := int(req.Points)
-	if amount <= 0 {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid amount"})
+	amount, ok := payment["amount"].(float64)
+	if !ok || amount != float64(order.AmountPaise) || payment["currency"] != "INR" || payment["status"] != "captured" || payment["order_id"] != req.RazorpayOrderID || payment["id"] != req.RazorpayPaymentID {
+		c.JSON(400, gin.H{"error": "Payment is not captured or does not match the order"})
 		return
 	}
-
-	// Credit via the immutable ledger inside the transaction
-	if err := services.CreditWalletTx(tx, userID, amount, models.TxTypePurchase, newTx.ID, "Wallet top-up via Razorpay", nil); err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit wallet"})
+	if err := settlePayment(req.RazorpayOrderID, req.RazorpayPaymentID, int(amount)); err != nil {
+		c.JSON(500, gin.H{"error": "Could not settle payment; retry verification"})
 		return
 	}
-
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
-		return
-	}
-
-	// Trigger Referral Event for First Deposit asynchronously
-	go services.TriggerReferralEvent(userID, models.ReferralStatusFirstDeposit, 100)
-
-	// Fetch fresh balance to return accurate data
-	var user models.User
-	if err := config.DB.First(&user, userID).Error; err == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Payment verified! Wallet funded.",
-			"balance": user.Points,
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{"message": "Payment verified! Wallet funded."})
-	}
+	c.JSON(200, gin.H{"message": "Payment verified! Wallet funded."})
 }
 
-// RazorpayWebhook processes asynchronous payment events
-func RazorpayWebhook(c *gin.Context) {
-	webhookSecret := os.Getenv("RAZORPAY_WEBHOOK_SECRET")
-	signature := c.GetHeader("X-Razorpay-Signature")
+// Both provider channels converge on the same locked, atomic settlement.
+func settlePayment(orderID, paymentID string, amountPaise int) error {
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.PaymentTransaction
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("provider_order_id = ?", orderID).First(&order).Error; err != nil {
+			return err
+		}
+		if order.Status == "Completed" {
+			if order.ProviderPaymentID != paymentID {
+				return fmt.Errorf("conflicting payment")
+			}
+			return nil
+		}
+		if order.Status != "Pending" || order.AmountPaise != amountPaise || amountPaise < 1000 || amountPaise%100 != 0 {
+			return fmt.Errorf("invalid payment amount or state")
+		}
+		if err := services.LockReferralWalletsTx(tx, order.UserID); err != nil {
+			return err
+		}
+		if err := services.CreditWalletTx(tx, order.UserID, amountPaise/100, models.TxTypePurchase, order.ID, "Wallet top-up via Razorpay", nil); err != nil {
+			return err
+		}
+		if err := tx.Model(&order).Updates(map[string]interface{}{"status": "Completed", "provider_payment_id": paymentID}).Error; err != nil {
+			return err
+		}
+		return services.TriggerReferralEventTx(tx, order.UserID, models.ReferralStatusFirstDeposit, 100)
+	})
+}
 
+func RazorpayWebhook(c *gin.Context) {
+	secret := os.Getenv("RAZORPAY_WEBHOOK_SECRET")
+	if secret == "" {
+		c.JSON(503, gin.H{"error": "Payment webhooks are not configured"})
+		return
+	}
 	body, err := c.GetRawData()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
+		c.JSON(400, gin.H{"error": "Invalid payload"})
 		return
 	}
-
-	// Verify signature
-	h := hmac.New(sha256.New, []byte(webhookSecret))
+	h := hmac.New(sha256.New, []byte(secret))
 	h.Write(body)
-	expectedSignature := hex.EncodeToString(h.Sum(nil))
-
-	if !hmac.Equal([]byte(expectedSignature), []byte(signature)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook signature"})
+	signature, err := hex.DecodeString(c.GetHeader("X-Razorpay-Signature"))
+	if err != nil || !hmac.Equal(h.Sum(nil), signature) {
+		c.JSON(400, gin.H{"error": "Invalid webhook signature"})
 		return
 	}
-
-	// For Phase 2, we just acknowledge the webhook.
-	// Production systems would parse the event JSON and update the DB accordingly.
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	var event struct {
+		Event   string `json:"event"`
+		Payload struct {
+			Payment struct {
+				Entity struct {
+					ID       string `json:"id"`
+					OrderID  string `json:"order_id"`
+					Amount   int    `json:"amount"`
+					Currency string `json:"currency"`
+					Status   string `json:"status"`
+				} `json:"entity"`
+			} `json:"payment"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(body, &event); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid payload"})
+		return
+	}
+	if event.Event == "payment.captured" || event.Event == "order.paid" {
+		p := event.Payload.Payment.Entity
+		if p.Status != "captured" || p.Currency != "INR" || p.OrderID == "" || p.ID == "" {
+			c.JSON(400, gin.H{"error": "Invalid captured payment"})
+			return
+		}
+		if err := settlePayment(p.OrderID, p.ID, p.Amount); err != nil {
+			c.JSON(500, gin.H{"error": "Payment could not be settled; retry webhook"})
+			return
+		}
+	}
+	c.JSON(200, gin.H{"status": "ok"})
 }
 
 // RedeemVoucher allows users with KYC to exchange coins for Amazon vouchers
@@ -244,12 +246,13 @@ func RedeemVoucher(c *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
 	if err := services.DebitWalletTx(tx, user.ID, tierInfo.Coins, models.TxTypeRedemption, 0, "Redeemed "+req.Tier+" Voucher", nil); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deduct coins: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Insufficient unexpired balance or wallet unavailable"})
 		return
 	}
 

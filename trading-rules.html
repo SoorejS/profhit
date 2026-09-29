@@ -19,16 +19,16 @@
         <p class="text-muted" style="margin-bottom: var(--spacing-6);">Understand how markets resolve and how payouts are calculated.</p>
         
         <h3>1. Market States</h3>
-        <p style="margin-bottom: var(--spacing-4);">Markets move through three states: Active (Open for predictions), Locked (Waiting for outcome), and Resolved (Outcome finalized and payouts distributed).</p>
+        <p style="margin-bottom: var(--spacing-4);">Markets are prepared as drafts, may be scheduled, then accept predictions while Open or Live. At the cutoff they become Locked, then Awaiting Resolution or Resolved. Resolved markets may be archived.</p>
         
         <h3>2. Prediction Stakes</h3>
-        <p style="margin-bottom: var(--spacing-4);">Once a prediction is submitted, the staked amount is deducted from your wallet and cannot be refunded unless the market is cancelled by an administrator.</p>
+        <p style="margin-bottom: var(--spacing-4);">The stake is deducted when you submit. The minimum stake is 10 PTS. You may make one prediction per market and one prediction per category per UTC calendar day. Expired coins cannot be spent. Predictions cannot be edited or cancelled.</p>
         
         <h3>3. Payout Calculation</h3>
-        <p style="margin-bottom: var(--spacing-4);">Payouts are calculated based on the fixed odds at the exact time your prediction was placed. The potential return is displayed before you confirm your trade.</p>
+        <p style="margin-bottom: var(--spacing-4);">Each market has a fixed coin payout, shown before confirmation. A correct prediction receives that payout; it is not multiplied by the stake and does not add a separate stake refund. Incorrect predictions receive no payout.</p>
         
         <h3>4. Dispute Resolution</h3>
-        <p style="margin-bottom: var(--spacing-4);">If you believe a market was resolved incorrectly, you have 24 hours to file a dispute via the Support page before payouts are finalized and finalized ledgers are cleared.</p>
+        <p style="margin-bottom: var(--spacing-4);">If you believe a resolution is incorrect, contact Support with the market ID and evidence. Payouts are recorded when the admin resolves the market. The application does not implement a dispute holding period or automatically clear wallet history.</p>
     </div>
 </body>
 </html>

@@ -1,9 +1,13 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
+	"gorm.io/gorm/clause"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"profhit-backend/config"
@@ -22,13 +26,13 @@ func GetAllMarkets(c *gin.Context) {
 
 	// By default, only show Public markets to users. We assume Admin uses a different endpoint or passes a flag if needed.
 	// But let's allow all if admin, else Public. To keep it simple, just filter Public unless status is explicitly Draft.
-	query := config.DB.Where("visibility = ?", "Public")
+	query := config.DB.Where("visibility = ? AND resolution_status NOT IN ?", "Public", []string{"Draft", "Proposed"})
 
 	if status != "" {
 		query = query.Where("resolution_status = ?", status)
 	} else {
 		// Default to active-like statuses for general browsing
-		query = query.Where("resolution_status IN ?", []string{"Scheduled", "Live", "Locked", "Awaiting Resolution"})
+		query = query.Where("resolution_status IN ?", []string{"Open", "Scheduled", "Live", "Locked", "Awaiting Resolution"})
 	}
 
 	if category != "" {
@@ -73,45 +77,11 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 
-	// ── PDF §3.1 / §4.1: Validate difficulty enum ─────────────────────────────
-	validDifficulties := map[string]bool{"Easy": true, "Medium": true, "Hard": true}
-	if market.Difficulty != "" && !validDifficulties[market.Difficulty] {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid difficulty. Must be one of: Easy, Medium, Hard",
-		})
+	if err := validateNewMarket(&market); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-
-	// ── PDF §4.1: Enforce difficulty-based payout bounds ─────────────────────
-	// Easy: 20–40 coins | Medium: 50–100 coins | Hard: 120–400 coins
-	if market.Payout > 0 {
-		type payoutRange struct{ min, max int }
-		payoutBounds := map[string]payoutRange{
-			"Easy":   {min: 20, max: 40},
-			"Medium": {min: 50, max: 100},
-			"Hard":   {min: 120, max: 400},
-		}
-		if bounds, ok := payoutBounds[market.Difficulty]; ok {
-			if market.Payout < bounds.min || market.Payout > bounds.max {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": fmt.Sprintf(
-						"Payout %d is outside the allowed range for %s difficulty (%d–%d coins)",
-						market.Payout, market.Difficulty, bounds.min, bounds.max,
-					),
-				})
-				return
-			}
-		}
-	}
-
-	if market.ResolutionStatus == "" {
-		market.ResolutionStatus = "Draft" // Draft, Scheduled, Live
-	}
-
-	// Automatically calculate legacy EndDate based on LockTime if missing
-	if market.EndDate.IsZero() && market.LockTime != nil {
-		market.EndDate = *market.LockTime
-	}
+	market.CreatorID = c.MustGet("userID").(uint)
 
 	if err := config.DB.Create(&market).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create market"})
@@ -126,7 +96,7 @@ func GetMarketByID(c *gin.Context) {
 	id := c.Param("id")
 	var market models.Market
 
-	if err := config.DB.First(&market, id).Error; err != nil {
+	if err := config.DB.Where("id = ? AND resolution_status NOT IN ?", id, []string{"Draft", "Proposed"}).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
@@ -140,15 +110,17 @@ func GetMarketByID(c *gin.Context) {
 func ResolveMarket(c *gin.Context) {
 	id := c.Param("id")
 
+	tx := config.DB.Begin()
+	defer tx.Rollback()
 	var market models.Market
-	if err := config.DB.First(&market, id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
 
 	// Allow resolution from Locked or Awaiting Resolution states.
 	// "Open" was a legacy value that never existed in the real lifecycle.
-	resolvableStatuses := map[string]bool{"Locked": true, "Awaiting Resolution": true, "Live": true}
+	resolvableStatuses := map[string]bool{"Locked": true, "Awaiting Resolution": true}
 	if !resolvableStatuses[market.ResolutionStatus] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Market must be Locked or Awaiting Resolution before it can be resolved. Current status: " + market.ResolutionStatus})
 		return
@@ -185,7 +157,7 @@ func ResolveMarket(c *gin.Context) {
 
 	// ── Load all predictions for this market ────────────────────────────────
 	var predictions []models.PredictionSubmission
-	if err := config.DB.Where("market_id = ?", market.ID).Find(&predictions).Error; err != nil {
+	if err := tx.Where("market_id = ?", market.ID).Order("user_id ASC").Find(&predictions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load predictions"})
 		return
 	}
@@ -193,12 +165,6 @@ func ResolveMarket(c *gin.Context) {
 	// ── Process everything inside ONE atomic transaction ─────────────────────
 	// CRITICAL FIX: CreditCoinsTx is called with the same tx object, ensuring
 	// that if any payout fails, ALL changes (predictions + coins + market) roll back.
-	tx := config.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
 
 	winnerCount := 0
 	loserCount := 0
@@ -228,7 +194,7 @@ func ResolveMarket(c *gin.Context) {
 			); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": "Payout failed for user " + itoa(int(pred.UserID)) + ": " + err.Error(),
+					"error": "Payout failed; no changes were committed",
 				})
 				return
 			}
@@ -263,7 +229,7 @@ func ResolveMarket(c *gin.Context) {
 				SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
 			),
 			win_rate = COALESCE((
-				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(id), 0)
+				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(is_correct), 0)
 				FROM prediction_submissions 
 				WHERE user_id = users.id AND deleted_at IS NULL
 			), 0)
@@ -301,6 +267,10 @@ func ProposeMarket(c *gin.Context) {
 		return
 	}
 
+	if err := validateNewMarket(&market); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 	userID := c.MustGet("userID").(uint)
 	market.CreatorID = userID
 	market.ResolutionStatus = "Proposed"
@@ -321,7 +291,7 @@ func ApproveMarket(c *gin.Context) {
 	id := c.Param("id")
 	var market models.Market
 
-	if err := config.DB.First(&market, id).Error; err != nil {
+	if err := config.DB.Where("id = ?", id).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
@@ -331,8 +301,13 @@ func ApproveMarket(c *gin.Context) {
 		return
 	}
 
-	market.ResolutionStatus = "Open"
-	if err := config.DB.Save(&market).Error; err != nil {
+	if market.LockTime == nil || !market.LockTime.After(time.Now()) {
+		c.JSON(400, gin.H{"error": "Proposal lock time has passed"})
+		return
+	}
+	market.ResolutionStatus = "Live"
+	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, "Proposed").Update("resolution_status", "Live")
+	if result.Error != nil || result.RowsAffected != 1 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve market"})
 		return
 	}
@@ -358,6 +333,16 @@ func GetProposedMarkets(c *gin.Context) {
 func GetPortfolio(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", c.DefaultQuery("limit", "20")))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
 	type PortfolioEntry struct {
 		ID              uint      `json:"id"`
 		MarketID        uint      `json:"market_id"`
@@ -370,9 +355,23 @@ func GetPortfolio(c *gin.Context) {
 		CreatedAt       time.Time `json:"created_at"`
 	}
 
+	var total int64
+	countErr := config.DB.Raw(`
+		SELECT COUNT(*)
+		FROM prediction_submissions ps
+		INNER JOIN markets m ON m.id = ps.market_id
+		WHERE ps.user_id = ?
+		  AND ps.deleted_at IS NULL
+		  AND m.deleted_at IS NULL
+	`, userID).Scan(&total).Error
+
+	if countErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count portfolio items"})
+		return
+	}
+
 	var portfolio []PortfolioEntry
 
-	// Single JOIN query — eliminates N+1
 	err := config.DB.Raw(`
 		SELECT
 			ps.id,
@@ -389,8 +388,9 @@ func GetPortfolio(c *gin.Context) {
 		WHERE ps.user_id = ?
 		  AND ps.deleted_at IS NULL
 		  AND m.deleted_at IS NULL
-		ORDER BY ps.created_at DESC
-	`, userID).Scan(&portfolio).Error
+		ORDER BY ps.created_at DESC, ps.id DESC
+		LIMIT ? OFFSET ?
+	`, userID, pageSize, offset).Scan(&portfolio).Error
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load portfolio"})
@@ -401,7 +401,15 @@ func GetPortfolio(c *gin.Context) {
 		portfolio = []PortfolioEntry{}
 	}
 
-	c.JSON(http.StatusOK, portfolio)
+	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+
+	c.JSON(http.StatusOK, gin.H{
+		"items":       portfolio,
+		"page":        page,
+		"page_size":   pageSize,
+		"total":       total,
+		"total_pages": totalPages,
+	})
 }
 
 // TransitionMarketState allows admins to manually move market through its lifecycle
@@ -425,13 +433,33 @@ func TransitionMarketState(c *gin.Context) {
 	}
 
 	var market models.Market
-	if err := config.DB.First(&market, id).Error; err != nil {
+	if err := config.DB.Where("id = ?", id).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
 
+	allowed := map[string][]string{"Draft": {"Scheduled", "Live"}, "Scheduled": {"Live"}, "Open": {"Locked"}, "Live": {"Locked"}, "Locked": {"Awaiting Resolution"}, "Resolved": {"Archived"}}
+	legal := false
+	for _, state := range allowed[market.ResolutionStatus] {
+		if state == req.Status {
+			legal = true
+		}
+	}
+	if !legal {
+		c.JSON(400, gin.H{"error": "Illegal market state transition"})
+		return
+	}
+	if (req.Status == "Scheduled" || req.Status == "Live") && (market.LockTime == nil || !market.LockTime.After(time.Now())) {
+		c.JSON(400, gin.H{"error": "Market requires a future lock time"})
+		return
+	}
+	if req.Status == "Scheduled" && (market.StartTime == nil || !market.StartTime.After(time.Now())) {
+		c.JSON(400, gin.H{"error": "Scheduled market requires a future start time"})
+		return
+	}
+	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, market.ResolutionStatus).Update("resolution_status", req.Status)
 	market.ResolutionStatus = req.Status
-	if err := config.DB.Save(&market).Error; err != nil {
+	if result.Error != nil || result.RowsAffected != 1 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transition market state"})
 		return
 	}
@@ -451,18 +479,98 @@ func DeleteMarket(c *gin.Context) {
 	id := c.Param("id")
 
 	var market models.Market
-	if err := config.DB.First(&market, id).Error; err != nil {
+	if err := config.DB.Where("id = ?", id).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
 
-	if market.ResolutionStatus == "Draft" {
-		config.DB.Unscoped().Delete(&market)
-		c.JSON(http.StatusOK, gin.H{"message": "Draft market deleted successfully"})
-	} else {
-		// Just archive
-		market.ResolutionStatus = "Archived"
-		config.DB.Save(&market)
-		c.JSON(http.StatusOK, gin.H{"message": "Market archived successfully"})
+	if market.ResolutionStatus != "Draft" && market.ResolutionStatus != "Resolved" {
+		c.JSON(400, gin.H{"error": "Only drafts and resolved markets may be archived"})
+		return
 	}
+	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, market.ResolutionStatus).Update("resolution_status", "Archived")
+	if result.Error != nil || result.RowsAffected != 1 {
+		c.JSON(409, gin.H{"error": "Market changed; refresh and retry"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Market archived"})
+}
+func validateNewMarket(m *models.Market) error {
+	m.Title = strings.TrimSpace(m.Title)
+	if len(m.Title) < 5 || len(m.Title) > 200 || len(m.Description) > 5000 {
+		return fmt.Errorf("Title must be 5-200 characters and description at most 5000 characters")
+	}
+	categories := map[string]string{"weather": "Weather", "sports": "Sports", "politics": "Politics", "entertainment": "Entertainment", "markets": "Financial Markets", "financial markets": "Financial Markets", "finance": "Financial Markets", "wild card": "Wild Card"}
+	category, ok := categories[strings.ToLower(strings.TrimSpace(m.Category))]
+	if !ok {
+		return fmt.Errorf("Invalid category")
+	}
+	m.Category = category
+	if m.Difficulty == "" {
+		m.Difficulty = "Medium"
+	}
+	bounds := map[string][2]int{"Easy": {20, 40}, "Medium": {50, 100}, "Hard": {120, 400}}
+	bound, ok := bounds[m.Difficulty]
+	if !ok {
+		return fmt.Errorf("Invalid difficulty")
+	}
+	if m.Payout == 0 {
+		m.Payout = bound[0]
+	}
+	if m.Payout < bound[0] || m.Payout > bound[1] {
+		return fmt.Errorf("Payout outside difficulty bounds")
+	}
+	var options []string
+	if m.Options == "" {
+		m.Options = `["Yes","No"]`
+	}
+	if json.Unmarshal([]byte(m.Options), &options) != nil || len(options) < 2 || len(options) > 10 {
+		return fmt.Errorf("Provide 2-10 options")
+	}
+	seen := map[string]bool{}
+	for _, option := range options {
+		if strings.TrimSpace(option) == "" || len(option) > 100 || seen[option] {
+			return fmt.Errorf("Options must be nonempty and unique")
+		}
+		seen[option] = true
+	}
+	if m.LockTime == nil && !m.EndDate.IsZero() {
+		m.LockTime = &m.EndDate
+	}
+	if m.LockTime == nil || !m.LockTime.After(time.Now()) {
+		return fmt.Errorf("A future lock time is required")
+	}
+	if m.StartTime != nil && !m.StartTime.Before(*m.LockTime) {
+		return fmt.Errorf("Start time must precede lock time")
+	}
+	if m.ResolutionTime != nil && m.ResolutionTime.Before(*m.LockTime) {
+		return fmt.Errorf("Resolution time must follow lock time")
+	}
+	m.EndDate = *m.LockTime
+	if m.ResolutionStatus == "" {
+		m.ResolutionStatus = "Draft"
+	}
+	if m.ResolutionStatus != "Draft" && m.ResolutionStatus != "Scheduled" && m.ResolutionStatus != "Live" {
+		return fmt.Errorf("Invalid initial status")
+	}
+	if m.ResolutionStatus == "Scheduled" && (m.StartTime == nil || !m.StartTime.After(time.Now())) {
+		return fmt.Errorf("Scheduled markets need a future start time")
+	}
+	if m.Visibility == "" {
+		m.Visibility = "Public"
+	}
+	if m.Visibility != "Public" && m.Visibility != "Unlisted" {
+		return fmt.Errorf("Invalid visibility")
+	}
+	m.DailyKey = nil
+	m.ID = 0
+	m.Volume = 0
+	m.CorrectOption = ""
+	m.ResolvedAt = nil
+	m.ResolvedByID = 0
+	m.CoinReward = 0
+	m.CreatedAt = time.Time{}
+	m.UpdatedAt = time.Time{}
+	m.DeletedAt.Valid = false
+	return nil
 }

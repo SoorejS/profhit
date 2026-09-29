@@ -79,11 +79,11 @@
 
                     <!-- Tabs -->
                     <div class="admin-nav">
-                        <div class="admin-tab active" onclick="switchTab('markets', this)">Markets</div>
-                        <div class="admin-tab" onclick="switchTab('kyc', this)">KYC Queue</div>
-                        <div class="admin-tab" onclick="switchTab('withdrawals', this)">Withdrawals</div>
-                        <div class="admin-tab" onclick="switchTab('analytics', this)">Analytics</div>
-                        <div class="admin-tab" onclick="switchTab('moderation', this)">Moderation</div>
+                        <button type="button" class="admin-tab active" data-tab="markets" onclick="switchTab('markets', this)">Markets</button>
+                        <button type="button" class="admin-tab" data-tab="kyc" onclick="switchTab('kyc', this)">KYC Queue</button>
+                        <button type="button" class="admin-tab" data-tab="withdrawals" onclick="switchTab('withdrawals', this)">Withdrawals</button>
+                        <button type="button" class="admin-tab" data-tab="analytics" onclick="switchTab('analytics', this)">Analytics</button>
+                        <button type="button" class="admin-tab" data-tab="moderation" onclick="switchTab('moderation', this)">Moderation</button>
                     </div>
 
                     <!-- Tab: Markets -->
@@ -171,7 +171,7 @@
                                     <thead>
                                         <tr>
                                             <th>User</th>
-                                            <th>Amount</th>
+                                            <th>Voucher value (INR)</th>
                                             <th>Status</th>
                                             <th>Action</th>
                                         </tr>
@@ -189,18 +189,18 @@
                         <div class="dashboard-grid">
                             <div class="card text-center" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
                                 <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Users</div>
-                                <div class="text-gold font-bold" style="font-size: 3rem; letter-spacing: -0.03em;">1,250</div>
+                                <div class="text-gold font-bold" style="font-size: 3rem; letter-spacing: -0.03em;" id="adminTotalUsers">Loading...</div>
                             </div>
                             <div class="card text-center" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">
-                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Volume (24h)</div>
-                                <div class="text-primary-light font-bold" style="font-size: 3rem; letter-spacing: -0.03em;">452K PTS</div>
+                                <div class="text-muted" style="margin-bottom: var(--spacing-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Predictions</div>
+                                <div class="text-primary-light font-bold" style="font-size: 3rem; letter-spacing: -0.03em;" id="adminTotalPredictions">Loading...</div>
                             </div>
                         </div>
                         <div class="card" style="margin-top: var(--spacing-6); border: 1px solid var(--border-subtle);">
                             <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem;">System Health</h3>
                             <div class="text-muted text-center" style="padding: var(--spacing-8); background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px dashed var(--border-strong);">
                                 <i class="ph-fill ph-chart-line-up" style="font-size: 3rem; margin-bottom: 16px; color: var(--border-strong);"></i>
-                                <div><span class="badge badge-warning">Coming Soon</span> Analytics dashboard powered by Grafana.</div>
+                                <div id="adminHealth">Loading health...</div>
                             </div>
                         </div>
                     </div>
@@ -214,13 +214,10 @@
                             <div class="input-group" style="max-width: 400px; margin-bottom: var(--spacing-6);">
                                 <div style="position: relative;">
                                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                                    <input type="text" class="input-control" placeholder="Search users by ID or username..." style="padding-left: 2.5rem; border-radius: var(--radius-full);">
+                                    <input type="search" id="adminUserSearch" aria-label="Search users" class="input-control" placeholder="Search by username or email..." style="padding-left: 2.5rem; border-radius: var(--radius-full);">
                                 </div>
                             </div>
-                            <div class="text-muted text-center" style="padding: var(--spacing-6); background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px dashed var(--border-strong);">
-                                <i class="ph-fill ph-check-circle" style="font-size: 2.5rem; margin-bottom: 12px; color: var(--color-success);"></i>
-                                <div>No moderation flags pending.</div>
-                            </div>
+                            <div id="adminUsers">Search or refresh to load users.</div><div class="flex gap-2"><button class="btn btn-outline" id="usersPrev" onclick="changeUsersPage(-1)">Previous users</button><button class="btn btn-outline" id="usersNext" onclick="changeUsersPage(1)">Next users</button></div><button class="btn btn-outline" onclick="fetchAdminUsers()">Refresh users</button><h3 class="mt-4">Pending Reports</h3><div id="adminReports">Loading reports...</div>
                         </div>
                     </div>
 

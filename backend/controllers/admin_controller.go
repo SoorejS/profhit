@@ -13,12 +13,13 @@ import (
 
 // GetAllUsers returns a paginated list of all users (admin/super_admin/it_support)
 func GetAllUsers(c *gin.Context) {
+	limit, offset := getPagination(c)
 	var users []models.User
 	query := config.DB.Select("id, username, email, tier, role, is_active, kyc_status, points, created_at")
 
 	// Optional search by username or email
 	if search := c.Query("search"); search != "" {
-		query = query.Where("username ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("LOWER(username) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?)", "%"+search+"%", "%"+search+"%")
 	}
 	// Optional filter by role
 	if role := c.Query("role"); role != "" {
@@ -31,7 +32,7 @@ func GetAllUsers(c *gin.Context) {
 		query = query.Where("is_active = true")
 	}
 
-	if err := query.Order("created_at desc").Find(&users).Error; err != nil {
+	if err := query.Order("created_at desc").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
 		return
 	}
@@ -107,7 +108,7 @@ func UpdateUserRole(c *gin.Context) {
 
 	// Prevent modifying another super_admin (safety guard)
 	var target models.User
-	if err := config.DB.First(&target, targetID).Error; err != nil {
+	if err := config.DB.Where("id = ?", targetID).First(&target).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -142,7 +143,7 @@ func BanUser(c *gin.Context) {
 	callerRole, _ := c.Get("role")
 
 	var target models.User
-	if err := config.DB.First(&target, targetID).Error; err != nil {
+	if err := config.DB.Where("id = ?", targetID).First(&target).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -179,7 +180,7 @@ func UnbanUser(c *gin.Context) {
 	targetID := c.Param("id")
 
 	var target models.User
-	if err := config.DB.First(&target, targetID).Error; err != nil {
+	if err := config.DB.Where("id = ?", targetID).First(&target).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -205,19 +206,44 @@ func GetPlatformStats(c *gin.Context) {
 	var openMarkets int64
 	var totalTrades int64
 
-	config.DB.Model(&models.User{}).Count(&totalUsers)
-	config.DB.Model(&models.User{}).Where("is_active = true").Count(&activeUsers)
-	config.DB.Model(&models.User{}).Where("is_active = false").Count(&bannedUsers)
-	config.DB.Model(&models.Market{}).Count(&totalMarkets)
-	config.DB.Model(&models.Market{}).Where("resolution_status = ?", "Open").Count(&openMarkets)
-	config.DB.Model(&models.PredictionSubmission{}).Count(&totalTrades)
+	if err := config.DB.Model(&models.User{}).Count(&totalUsers).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
+	if err := config.DB.Model(&models.User{}).Where("is_active = true").Count(&activeUsers).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
+	if err := config.DB.Model(&models.User{}).Where("is_active = false").Count(&bannedUsers).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
+	if err := config.DB.Model(&models.Market{}).Count(&totalMarkets).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
+	if err := config.DB.Model(&models.Market{}).Where("resolution_status IN ?", []string{"Open", "Live"}).Count(&openMarkets).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
+	if err := config.DB.Model(&models.PredictionSubmission{}).Count(&totalTrades).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load platform statistics"})
+		return
+	}
 
 	// Total volume traded (n/a for fixed-odds predictions)
 	var totalVolume struct{ Sum float64 }
+	if err := config.DB.Model(&models.PredictionSubmission{}).Select("COALESCE(SUM(amount),0) AS sum").Scan(&totalVolume).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load prediction volume"})
+		return
+	}
 
 	// Total wallets balance
 	var totalWalletBalance int64
-	config.DB.Model(&models.User{}).Select("COALESCE(SUM(points), 0)").Row().Scan(&totalWalletBalance)
+	if err := config.DB.Model(&models.User{}).Select("COALESCE(SUM(points), 0)").Row().Scan(&totalWalletBalance); err != nil {
+		c.JSON(500, gin.H{"error": "Could not load wallet statistics"})
+		return
+	}
 
 	// Role breakdown
 	type RoleCount struct {
@@ -225,10 +251,13 @@ func GetPlatformStats(c *gin.Context) {
 		Count int64
 	}
 	var roleCounts []RoleCount
-	config.DB.Model(&models.User{}).
+	if err := config.DB.Model(&models.User{}).
 		Select("role, count(*) as count").
 		Group("role").
-		Scan(&roleCounts)
+		Scan(&roleCounts).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load role statistics"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"users": gin.H{

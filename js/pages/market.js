@@ -10,6 +10,7 @@ import { escapeHTML } from '../utils/escape.js';
 
 let currentMarketId = null;
 let currentSelection = null;
+let currentPayout = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!ApiClient || !ApiClient.isAuthenticated()) {
@@ -27,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadMarketDetails();
     loadComments();
-    initChart();
+
 
     // Register amount input listener once (prevents stacking on repeated Yes/No clicks)
     const amountInput = document.getElementById('tradeAmount');
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         amountInput.addEventListener('input', () => {
             const amt = parseFloat(amountInput.value);
             if (amt > 0) {
-                document.getElementById('potentialReturn').textContent = `+${Math.floor(amt * 1.8)} PTS`;
+                document.getElementById('potentialReturn').textContent = `+${currentPayout} PTS`;
             } else {
                 document.getElementById('potentialReturn').textContent = '--';
             }
@@ -45,24 +46,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadMarketDetails() {
     try {
-        const market = await ApiClient.get(`/markets/${currentMarketId}`);
+        const market = await ApiClient.get(`/markets/${encodeURIComponent(currentMarketId)}`);
+        currentPayout = Number(market.payout);
+        document.getElementById('marketFixedPayout').textContent = `${currentPayout} PTS`;
+        document.getElementById('marketPredictionCount').textContent = String(Number(market.volume) || 0);
+        const options = JSON.parse(market.options);
+        const optionsContainer = document.querySelector('.btn-yes')?.parentElement;
+        if (optionsContainer) { optionsContainer.replaceChildren(); options.forEach(option => { const button = document.createElement('button'); button.className = 'btn btn-outline'; button.textContent = option; button.dataset.option = option; button.addEventListener('click', () => selectPrediction(option)); optionsContainer.append(button); }); }
+        document.getElementById('potentialReturn').textContent = `${currentPayout} PTS`;
+        document.getElementById('chartContainer').textContent = 'Historical probability data is not available for fixed-payout markets.';
         
         document.getElementById('marketTitle').textContent = market.title;
         document.getElementById('marketDesc').textContent = market.description;
+        document.getElementById('resolutionRules').textContent = market.resolution_source
+            ? `An authorized reviewer will resolve this market using the configured official source: ${market.resolution_source}`
+            : 'An authorized reviewer will resolve this market from documented, verifiable evidence.';
         document.getElementById('marketCategory').textContent = market.category;
         
         document.getElementById('marketCloseDate').textContent = market.lock_time 
             ? new Date(market.lock_time).toLocaleDateString() 
             : (market.end_date ? new Date(market.end_date).toLocaleDateString() : 'TBD');
 
-        const isClosed = market.lock_time ? new Date(market.lock_time) < new Date() : false;
+        const isClosed = new Date(market.lock_time || market.end_date) <= new Date();
+        const notStarted = market.start_time && new Date(market.start_time) > new Date();
         const statusEl = document.getElementById('marketStatus');
         
-        if (market.resolution_status === 'Resolved') {
+        if (['Resolved', 'Archived'].includes(market.resolution_status) && market.correct_option) {
             statusEl.textContent = `Resolved: ${market.correct_option}`;
             statusEl.className = 'badge badge-success';
             document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved: ${escapeHTML(market.correct_option)}</h3>`;
-        } else if (market.resolution_status === 'Locked' || market.resolution_status === 'Awaiting Resolution') {
+        } else if (market.resolution_status === 'Scheduled' || notStarted) {
+            statusEl.textContent = 'Scheduled';
+            document.querySelector('.trade-card').textContent = 'Predictions open when this market starts.';
+        } else if (!['Open', 'Live'].includes(market.resolution_status) || isClosed) {
             statusEl.textContent = 'Resolving';
             statusEl.className = 'badge badge-warning';
             document.querySelector('.trade-card').innerHTML = `<h3 class="text-warning text-center">Market is closed. Awaiting resolution.</h3>`;
@@ -72,63 +88,16 @@ async function loadMarketDetails() {
         }
 
     } catch (err) {
-        console.error(err);
+        document.getElementById('marketCategory').textContent = 'Unavailable';
+        document.getElementById('marketStatus').textContent = 'Error';
+        document.getElementById('marketTitle').textContent = 'Market unavailable';
+        document.getElementById('marketDesc').textContent = 'Could not load market details. Refresh to retry.';
+        document.getElementById('chartContainer').textContent = 'Market history is unavailable.';
+        document.getElementById('resolutionRules').textContent = 'Resolution criteria are unavailable.';
+        document.querySelector('.trade-card').textContent = 'Predictions are unavailable while market details cannot be loaded.';
+        document.getElementById('marketPredictionCount').textContent = 'Unavailable';
         showToast('Failed to load market details.', 'error');
     }
-}
-
-function initChart() {
-    // Using Lightweight Charts for a modern trading feel
-    const container = document.getElementById('chartContainer');
-    const chart = LightweightCharts.createChart(container, {
-        layout: {
-            background: { type: 'solid', color: '#18181b' },
-            textColor: '#a1a1aa',
-        },
-        grid: {
-            vertLines: { color: '#27272a' },
-            horzLines: { color: '#27272a' },
-        },
-        timeScale: {
-            timeVisible: true,
-            secondsVisible: false,
-        }
-    });
-
-    const yesSeries = chart.addLineSeries({
-        color: '#22c55e',
-        lineWidth: 2,
-    });
-    
-    const noSeries = chart.addLineSeries({
-        color: '#ef4444',
-        lineWidth: 2,
-    });
-
-    // Generate mock probability history
-    const dataYes = [];
-    const dataNo = [];
-    let curYes = 50;
-    const now = Math.floor(Date.now() / 1000);
-    
-    for (let i = 30; i >= 0; i--) {
-        curYes += (Math.random() - 0.5) * 10;
-        if (curYes > 95) curYes = 95;
-        if (curYes < 5) curYes = 5;
-        
-        const time = now - (i * 86400); // Daily points
-        dataYes.push({ time, value: curYes });
-        dataNo.push({ time, value: 100 - curYes });
-    }
-
-    yesSeries.setData(dataYes);
-    noSeries.setData(dataNo);
-    chart.timeScale().fitContent();
-
-    // Handle resize
-    window.addEventListener('resize', () => {
-        chart.applyOptions({ width: container.clientWidth });
-    });
 }
 
 function selectPrediction(outcome) {
@@ -136,13 +105,12 @@ function selectPrediction(outcome) {
     document.getElementById('tradeForm').classList.remove('hidden');
     
     // Update button styles
-    document.querySelector('.btn-yes').style.opacity = outcome === 'Yes' ? '1' : '0.5';
-    document.querySelector('.btn-no').style.opacity = outcome === 'No' ? '1' : '0.5';
+    document.querySelectorAll('[data-option]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.option === outcome)));
 }
 
 async function executeTrade() {
     const amount = document.getElementById('tradeAmount').value;
-    if (!amount || amount < 10) {
+    if (!Number.isInteger(Number(amount)) || Number(amount) < 10) {
         showToast('Minimum trade amount is 10 PTS.', 'error');
         return;
     }
@@ -161,8 +129,8 @@ async function executeTrade() {
         // Reset form
         document.getElementById('tradeForm').classList.add('hidden');
         document.getElementById('tradeAmount').value = '';
-        document.querySelector('.btn-yes').style.opacity = '1';
-        document.querySelector('.btn-no').style.opacity = '1';
+        currentSelection = null;
+        document.querySelectorAll('[data-option]').forEach(button => button.setAttribute('aria-pressed', 'false'));
         
         // Trigger topbar to fetch new balance
         document.querySelector('app-topbar').fetchBalance();
@@ -175,7 +143,8 @@ async function executeTrade() {
 
 async function loadComments() {
     try {
-        const comments = await ApiClient.get(`/markets/${currentMarketId}/comments`);
+        const res = await ApiClient.get(`/markets/${encodeURIComponent(currentMarketId)}/comments`);
+        const comments = Array.isArray(res) ? res : (res?.items || []);
         const list = document.getElementById('commentsList');
         
         if (!comments || comments.length === 0) {
@@ -194,7 +163,7 @@ async function loadComments() {
         `).join('');
 
     } catch (err) {
-        console.error(err);
+        document.getElementById('commentsList').textContent = 'Comments could not load. Refresh to retry.';
     }
 }
 
@@ -204,7 +173,7 @@ async function postComment() {
     if (!content) return;
 
     try {
-        await ApiClient.post(`/markets/${currentMarketId}/comments`, { content });
+        await ApiClient.post(`/markets/${encodeURIComponent(currentMarketId)}/comments`, { content });
         input.value = '';
         showToast('Comment posted.', 'success');
         loadComments();

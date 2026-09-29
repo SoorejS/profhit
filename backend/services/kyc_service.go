@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
 
 // VerifyKYC hits a 3rd-party identity provider (e.g., Digilocker or HyperVerge).
@@ -15,12 +16,8 @@ func VerifyKYC(documentID string) (bool, error) {
 	kycEndpoint := os.Getenv("KYC_API_URL")
 	kycApiKey := os.Getenv("KYC_API_KEY")
 
-	// If no real API is configured, mock it.
 	if kycEndpoint == "" {
-		if documentID == "FAIL_KYC" {
-			return false, nil
-		}
-		return true, nil // Mock success
+		return false, fmt.Errorf("KYC provider is not configured")
 	}
 
 	payload, _ := json.Marshal(map[string]string{
@@ -34,7 +31,7 @@ func VerifyKYC(documentID string) (bool, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+kycApiKey)
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, err

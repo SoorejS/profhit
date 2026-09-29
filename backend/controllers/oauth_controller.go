@@ -1,14 +1,21 @@
 package controllers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/pquerna/otp/totp"
+	"gorm.io/gorm"
 	"net/http"
+	"net/url"
 	"os"
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -27,7 +34,8 @@ type GoogleTokenInfo struct {
 // GoogleLogin handles Google OAuth ID token verification and user auto-provisioning
 func GoogleLogin(c *gin.Context) {
 	var input struct {
-		Credential string `json:"credential" binding:"required"`
+		Credential    string `json:"credential" binding:"required"`
+		TwoFactorCode string `json:"two_factor_code"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -36,12 +44,21 @@ func GoogleLogin(c *gin.Context) {
 	}
 
 	// Verify token with Google's tokeninfo endpoint
-	resp, err := http.Get(fmt.Sprintf("https://oauth2.googleapis.com/tokeninfo?id_token=%s", input.Credential))
-	if err != nil || resp.StatusCode != http.StatusOK {
+	expectedClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	if expectedClientID == "" {
+		c.JSON(503, gin.H{"error": "Google Sign-In is not configured"})
+		return
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Get("https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(input.Credential))
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired Google token"})
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(401, gin.H{"error": "Invalid Google token"})
+		return
+	}
 
 	var gInfo GoogleTokenInfo
 	if err := json.NewDecoder(resp.Body).Decode(&gInfo); err != nil {
@@ -55,8 +72,7 @@ func GoogleLogin(c *gin.Context) {
 	}
 
 	// Optional aud check if GOOGLE_CLIENT_ID is set
-	expectedClientID := os.Getenv("GOOGLE_CLIENT_ID")
-	if expectedClientID != "" && gInfo.Aud != expectedClientID {
+	if gInfo.Aud != expectedClientID || gInfo.EmailVerified != "true" || (gInfo.Iss != "accounts.google.com" && gInfo.Iss != "https://accounts.google.com") || len(gInfo.Sub) < 4 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Google client ID mismatch"})
 		return
 	}
@@ -65,12 +81,16 @@ func GoogleLogin(c *gin.Context) {
 	var user models.User
 	err = config.DB.Where("email = ?", gInfo.Email).First(&user).Error
 
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(500, gin.H{"error": "Could not look up account"})
+		return
+	}
 	if err != nil {
 		// Create new user account via Google Sign-In
 		username := strings.Split(gInfo.Email, "@")[0]
 		// Sanitize username
 		username = strings.ReplaceAll(username, ".", "_")
-		
+
 		// Check username collision
 		var count int64
 		config.DB.Model(&models.User{}).Where("username = ?", username).Count(&count)
@@ -78,7 +98,16 @@ func GoogleLogin(c *gin.Context) {
 			username = fmt.Sprintf("%s_%s", username, gInfo.Sub[:4])
 		}
 
-		dummyPwd, _ := bcrypt.GenerateFromPassword([]byte(gInfo.Sub+"_google_oauth"), 12)
+		randomBytes := make([]byte, 32)
+		if _, err := rand.Read(randomBytes); err != nil {
+			c.JSON(500, gin.H{"error": "Could not create account"})
+			return
+		}
+		dummyPwd, err := bcrypt.GenerateFromPassword([]byte(hex.EncodeToString(randomBytes)), 12)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Could not create account"})
+			return
+		}
 		newReferralCode := services.GenerateReferralCode()
 
 		user = models.User{
@@ -107,11 +136,18 @@ func GoogleLogin(c *gin.Context) {
 			return
 		}
 
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not create account"})
+			return
+		}
 		config.DB.First(&user, user.ID)
 	}
 
-	if !user.IsActive {
+	if user.TwoFactorEnabled && !totp.Validate(input.TwoFactorCode, user.TwoFactorSecret) {
+		c.JSON(401, gin.H{"error": "2fa_required"})
+		return
+	}
+	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now())) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended."})
 		return
 	}

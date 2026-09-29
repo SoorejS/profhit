@@ -8,6 +8,7 @@ export class ToastManager extends HTMLElement {
                     position: fixed;
                     bottom: 20px;
                     right: 20px;
+                    max-width: calc(100vw - 40px);
                     display: flex;
                     flex-direction: column;
                     gap: 10px;
@@ -23,6 +24,7 @@ export class ToastManager extends HTMLElement {
                     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
                     font-family: inherit;
                     font-size: 0.9rem;
+                    overflow-wrap: anywhere;
                     transform: translateX(120%);
                     opacity: 0;
                     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
@@ -35,7 +37,7 @@ export class ToastManager extends HTMLElement {
                 .toast.success { border-left: 4px solid var(--color-success, #10b981); }
                 .toast.error { border-left: 4px solid var(--color-danger, #ef4444); }
             </style>
-            <div id="container"></div>
+            <div id="container" role="status" aria-live="polite"></div>
         `;
     }
 

@@ -1,16 +1,15 @@
 package services
 
 import (
+	"github.com/gorilla/websocket"
 	"log"
+	"profhit-backend/middleware"
 	"sync"
 	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
 
 type WSMessage struct {
-	TargetUserID uint        `json:"-"` // 0 means broadcast to all
+	TargetUserID uint        `json:"-"`
 	Event        string      `json:"event"`
 	Payload      interface{} `json:"payload"`
 }
@@ -18,121 +17,114 @@ type WSMessage struct {
 type Client struct {
 	Conn   *websocket.Conn
 	UserID uint
-	Mu     sync.Mutex
+	Token  string
+	send   chan WSMessage
+	done   chan struct{}
 }
 
 var clients = make(map[*Client]bool)
 var broadcast = make(chan WSMessage, 256)
-var clientsMutex = &sync.Mutex{}
+var clientsMutex sync.Mutex
+var hubOnce sync.Once
 
 const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
+	pingPeriod     = pongWait * 9 / 10
 	maxMessageSize = 512
 )
 
-// UpgradeAndRegister registers a new websocket connection
-func UpgradeAndRegister(conn *websocket.Conn, userID uint) {
-	client := &Client{
-		Conn:   conn,
-		UserID: userID,
-	}
+func StartWebSocketHub() { hubOnce.Do(func() { go HandleConnections() }) }
 
+// Each connection has one bounded writer. A slow client cannot block other
+// users or create unbounded goroutines. The reader owns disconnect cleanup.
+func UpgradeAndRegister(conn *websocket.Conn, userID uint, token string) {
+	client := &Client{Conn: conn, UserID: userID, Token: token, send: make(chan WSMessage, 32), done: make(chan struct{})}
 	clientsMutex.Lock()
 	clients[client] = true
 	clientsMutex.Unlock()
-
+	defer func() {
+		clientsMutex.Lock()
+		delete(clients, client)
+		clientsMutex.Unlock()
+		close(client.done)
+		conn.Close()
+	}()
 	conn.SetReadLimit(maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
-
-	// Start ping ticker for this client
-	go func() {
-		ticker := time.NewTicker(pingPeriod)
-		defer func() {
-			ticker.Stop()
-			conn.Close()
-		}()
-		for range ticker.C {
-			client.Mu.Lock()
-			conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				client.Mu.Unlock()
-				return
-			}
-			client.Mu.Unlock()
-		}
-	}()
-
-	// Read loop
+	conn.SetPongHandler(func(string) error { return conn.SetReadDeadline(time.Now().Add(pongWait)) })
+	client.send <- WSMessage{Event: "connected", Payload: "Authenticated connection established"}
+	go client.writeLoop()
 	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			clientsMutex.Lock()
-			delete(clients, client)
-			clientsMutex.Unlock()
-			conn.Close()
-			break
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
 		}
 	}
 }
 
-// HandleConnections processes messages from the broadcast channel
-func HandleConnections() {
+func (client *Client) writeLoop() {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+	defer client.Conn.Close()
 	for {
-		msg := <-broadcast
+		var msg WSMessage
+		ping := false
+		select {
+		case <-client.done:
+			return
+		case <-ticker.C:
+			ping = true
+		case msg = <-client.send:
+		}
+		// Handshake authentication is not sufficient for long-lived connections.
+		if _, _, err := middleware.ValidateToken(client.Token); err != nil {
+			return
+		}
+		client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+		var err error
+		if ping {
+			err = client.Conn.WriteMessage(websocket.PingMessage, nil)
+		} else {
+			err = client.Conn.WriteJSON(msg)
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+func HandleConnections() {
+	for msg := range broadcast {
 		clientsMutex.Lock()
 		for client := range clients {
-			// If TargetUserID is > 0, only send to that specific user
-			if msg.TargetUserID > 0 && client.UserID != msg.TargetUserID {
+			if msg.TargetUserID != 0 && client.UserID != msg.TargetUserID {
 				continue
 			}
-
-			client.Mu.Lock()
-			client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := client.Conn.WriteJSON(gin.H{
-				"event":   msg.Event,
-				"payload": msg.Payload,
-			})
-			if err != nil {
-				client.Conn.Close()
-				delete(clients, client)
+			select {
+			case <-client.done:
+			case client.send <- msg:
+			default:
+				client.Conn.Close() // Consumer is too slow; reconnect and refetch.
 			}
-			client.Mu.Unlock()
 		}
 		clientsMutex.Unlock()
 	}
 }
 
-// BroadcastToAll sends a message to all connected clients
 func BroadcastToAll(event string, payload interface{}) {
-	msg := WSMessage{
-		TargetUserID: 0,
-		Event:        event,
-		Payload:      payload,
-	}
-	select {
-	case broadcast <- msg:
-	default:
-		log.Println("[ws] broadcast channel full or no receiver, dropping message")
-	}
+	enqueue(WSMessage{Event: event, Payload: payload})
 }
-
-// BroadcastToUser sends a message to a specific user
 func BroadcastToUser(userID uint, event string, payload interface{}) {
 	if userID == 0 {
-		log.Println("[ws] cannot broadcast to user id 0")
+		log.Println("[ws] refused private event without recipient")
 		return
 	}
-	msg := WSMessage{
-		TargetUserID: userID,
-		Event:        event,
-		Payload:      payload,
-	}
+	enqueue(WSMessage{TargetUserID: userID, Event: event, Payload: payload})
+}
+func enqueue(msg WSMessage) {
 	select {
 	case broadcast <- msg:
 	default:
-		log.Println("[ws] broadcast channel full or no receiver, dropping message")
+		log.Println("[ws] event queue full; clients must refetch state")
 	}
 }

@@ -2,9 +2,12 @@ package services
 
 import (
 	"fmt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"log"
 	"profhit-backend/config"
 	"profhit-backend/models"
+	"time"
 )
 
 // CheckProfileCompletion checks if a user has 100% completed their profile.
@@ -18,45 +21,11 @@ func CheckProfileCompletion(userID uint) {
 	// Definition of 100% Profile:
 	// - KYC Status is true
 	// - 2FA is enabled (TwoFactorSecret is not empty)
-	if !user.KycStatus || user.TwoFactorSecret == "" {
+	if !user.KycStatus || !user.TwoFactorEnabled || user.TwoFactorSecret == "" {
 		return
 	}
 
-	// Check if achievement already unlocked
-	var ach models.Achievement
-	if err := config.DB.Where("code = ?", "PROFILE_100").First(&ach).Error; err != nil {
-		// If achievement doesn't exist in DB yet, create it
-		ach = models.Achievement{
-			Code:        "PROFILE_100",
-			Title:       "100% Profile Completed",
-			Description: "Completed KYC and enabled 2FA.",
-			Reward:      250,
-			Icon:        "fa-solid fa-id-card",
-		}
-		config.DB.Create(&ach)
-	}
-
-	var userAch models.UserAchievement
-	if err := config.DB.Where("user_id = ? AND achievement_id = ?", userID, ach.ID).First(&userAch).Error; err == nil {
-		// Already unlocked
-		return
-	}
-
-	// Unlock it
-	config.DB.Create(&models.UserAchievement{
-		UserID:        userID,
-		AchievementID: ach.ID,
-	})
-
-	// Award coins
-	tx := config.DB.Begin()
-	if err := CreditWalletTx(tx, userID, ach.Reward, models.TxTypeAdminAdjustment, 0, "Achievement Unlocked: 100% Profile", nil); err == nil {
-		tx.Commit()
-		BroadcastToUser(userID, "achievement_unlocked", "You unlocked: 100% Profile Completed! +250 Coins")
-	} else {
-		tx.Rollback()
-		log.Println("Failed to award achievement coins:", err)
-	}
+	UnlockAchievement(userID, "PROFILE_100", "100% Profile Completed", "Completed KYC and enabled 2FA.", 250, "fa-solid fa-id-card")
 }
 
 // CheckPredictionAchievements checks and unlocks achievements related to predictions
@@ -65,48 +34,48 @@ func CheckPredictionAchievements(userID uint) {
 	var count int64
 	config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ?", userID).Count(&count)
 
-	if count == 1 {
+	if count >= 1 {
 		UnlockAchievement(userID, "FIRST_PREDICTION", "First Prediction", "Make your first prediction", 50, "fa-solid fa-seedling")
-	} else if count == 10 {
+	}
+	if count >= 10 {
 		UnlockAchievement(userID, "PREDICTIONS_10", "10 Predictions", "Make 10 predictions", 100, "fa-solid fa-tree")
-	} else if count == 100 {
+	}
+	if count >= 100 {
 		UnlockAchievement(userID, "PREDICTIONS_100", "Centurion", "Make 100 predictions", 500, "fa-solid fa-crown")
 	}
 }
 
 // UnlockAchievement is a generic helper
 func UnlockAchievement(userID uint, code, title, desc string, reward int, icon string) {
-	var ach models.Achievement
-	if err := config.DB.Where("code = ?", code).First(&ach).Error; err != nil {
-		ach = models.Achievement{
-			Code:        code,
-			Title:       title,
-			Description: desc,
-			Reward:      reward,
-			Icon:        icon,
+	awarded := false
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		ach := models.Achievement{Code: code, Title: title, Description: desc, Reward: reward, Icon: icon}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&ach).Error; err != nil {
+			return err
 		}
-		config.DB.Create(&ach)
-	}
-
-	var userAch models.UserAchievement
-	if err := config.DB.Where("user_id = ? AND achievement_id = ?", userID, ach.ID).First(&userAch).Error; err == nil {
-		return // Already unlocked
-	}
-
-	config.DB.Create(&models.UserAchievement{
-		UserID:        userID,
-		AchievementID: ach.ID,
+		if err := tx.Where("code = ?", code).First(&ach).Error; err != nil {
+			return err
+		}
+		claim := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.UserAchievement{UserID: userID, AchievementID: ach.ID, UnlockedAt: time.Now()})
+		if claim.Error != nil {
+			return claim.Error
+		}
+		if claim.RowsAffected == 0 {
+			return nil
+		}
+		if ach.Reward > 0 {
+			if err := CreditWalletTx(tx, userID, ach.Reward, models.TxTypeAdminAdjustment, ach.ID, "Achievement unlocked: "+ach.Title, nil); err != nil {
+				return err
+			}
+		}
+		awarded = true
+		return nil
 	})
-
-	if reward > 0 {
-		tx := config.DB.Begin()
-		if err := CreditWalletTx(tx, userID, reward, models.TxTypeAdminAdjustment, 0, "Achievement Unlocked: "+title, nil); err == nil {
-			tx.Commit()
-			BroadcastToUser(userID, "achievement_unlocked", fmt.Sprintf("You unlocked: %s! +%d Coins", title, reward))
-		} else {
-			tx.Rollback()
-		}
-	} else {
-		BroadcastToUser(userID, "achievement_unlocked", "You unlocked: "+title+"!")
+	if err != nil {
+		log.Printf("Achievement award failed: %v", err)
+		return
+	}
+	if awarded {
+		BroadcastToUser(userID, "achievement_unlocked", fmt.Sprintf("You unlocked: %s!", title))
 	}
 }

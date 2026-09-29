@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -15,11 +16,19 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger())
+	// Do not log bearer tokens carried in WebSocket query strings.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipPaths: []string{"/api/ws"}}))
+	_ = r.SetTrustedProxies(nil)
+	if proxies := os.Getenv("TRUSTED_PROXIES"); proxies != "" {
+		if err := r.SetTrustedProxies(strings.Split(proxies, ",")); err != nil {
+			panic(err)
+		}
+	}
+	r.Use(func(c *gin.Context) { c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20); c.Next() })
 	r.Use(middleware.JSONRecoveryMiddleware())
 
 	// Initialize WebSocket Hub
-	go services.HandleConnections()
+	services.StartWebSocketHub()
 
 	// ── SECURITY HEADERS & CORS ───────────────────────────────────────────────
 	r.Use(func(c *gin.Context) {
@@ -39,6 +48,7 @@ func SetupRouter() *gin.Engine {
 			allowedOriginsEnv = "https://profhit.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
 		}
 
+		c.Writer.Header().Add("Vary", "Origin")
 		origin := c.Request.Header.Get("Origin")
 		allowedOrigin := ""
 		for _, allowed := range strings.Split(allowedOriginsEnv, ",") {
@@ -79,9 +89,12 @@ func SetupRouter() *gin.Engine {
 		}
 
 		api.GET("/health", controllers.HealthCheck)
+		api.GET("/auth/config", func(c *gin.Context) { c.JSON(200, gin.H{"google_client_id": os.Getenv("GOOGLE_CLIENT_ID")}) })
 		api.POST("/webhooks/hyperverge", controllers.HypervergeWebhook)
 		api.POST("/webhooks/razorpay", controllers.RazorpayWebhook)
-		api.POST("/simulator/sign-webhook", controllers.SimulatorSignWebhook)
+		if os.Getenv("BETA_MODE") == "true" && os.Getenv("GIN_MODE") != "release" {
+			api.POST("/simulator/sign-webhook", middleware.AuthRequired(), middleware.RoleRequired(models.RoleSuperAdmin), controllers.SimulatorSignWebhook)
+		}
 
 		// Public news endpoint
 		api.GET("/news", controllers.GetTrendingNews)
@@ -92,7 +105,11 @@ func SetupRouter() *gin.Engine {
 		api.GET("/markets/:id/comments", controllers.GetComments)
 
 		// Public leaderboard & activity
-		api.GET("/leaderboard", controllers.GetUnifiedLeaderboard)
+		api.GET("/leaderboard", func(c *gin.Context) {
+			if c.GetHeader("Authorization") != "" {
+				middleware.AuthRequired()(c)
+			}
+		}, controllers.GetUnifiedLeaderboard)
 		api.GET("/leaderboard/legacy", controllers.GetLeaderboard) // rename old points leaderboard to legacy temporarily
 		api.GET("/leaderboard/streak", controllers.GetTopStreak)
 		api.GET("/leaderboard/winrate", controllers.GetTopWinRate)
@@ -118,6 +135,9 @@ func SetupRouter() *gin.Engine {
 
 			// Wallet & Identity
 			protected.GET("/me", controllers.GetMe)
+			protected.GET("/me/achievements", controllers.GetMyAchievements)
+			protected.GET("/notifications", controllers.GetNotifications)
+			protected.POST("/notifications/read", controllers.ReadNotifications)
 			// Real KYC Flow
 			protected.POST("/kyc/start", financeLimit, controllers.StartKYCSession)
 			protected.GET("/kyc/status", controllers.GetKYCStatus)

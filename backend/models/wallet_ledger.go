@@ -30,8 +30,8 @@ type WalletLedger struct {
 	Type          TransactionType `gorm:"not null;index" json:"type"`
 	Credit        int             `gorm:"not null;default:0;check:credit >= 0" json:"credit"` // Amount added
 	Debit         int             `gorm:"not null;default:0;check:debit >= 0" json:"debit"`   // Amount subtracted
-	BalanceBefore int             `gorm:"not null" json:"balance_before"`
-	BalanceAfter  int             `gorm:"not null" json:"balance_after"`
+	BalanceBefore int             `gorm:"not null;check:balance_before >= 0" json:"balance_before"`
+	BalanceAfter  int             `gorm:"not null;check:balance_after >= 0 AND balance_after = balance_before + credit - debit AND ((credit > 0 AND debit = 0) OR (debit > 0 AND credit = 0))" json:"balance_after"`
 	ReferenceID   uint            `gorm:"default:0" json:"reference_id"` // e.g., Market ID, Redemption ID
 	Description   string          `json:"description"`
 	Status        string          `gorm:"default:'completed';index" json:"status"` // pending, completed, failed

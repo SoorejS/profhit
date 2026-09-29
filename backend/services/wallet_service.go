@@ -8,6 +8,7 @@ import (
 	"profhit-backend/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -22,11 +23,14 @@ func addLedgerEntry(db *gorm.DB, userID uint, txType models.TransactionType, cre
 
 	// Lock the user row to ensure strict sequential ledger balances
 	var user models.User
-	if err := db.Set("gorm:query_option", "FOR UPDATE").First(&user, userID).Error; err != nil {
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
 		return err
 	}
 
 	balanceBefore := user.Points
+	if credit > int(^uint(0)>>1)-balanceBefore {
+		return errors.New("balance overflow")
+	}
 	balanceAfter := balanceBefore + credit - debit
 
 	if balanceAfter < 0 {
@@ -76,6 +80,12 @@ func CreditWalletTx(tx *gorm.DB, userID uint, amount int, txType models.Transact
 }
 
 func DebitWalletTx(tx *gorm.DB, userID uint, amount int, txType models.TransactionType, sourceRef uint, note string, adminID *uint) error {
+	if amount <= 0 {
+		return errors.New("amount must be positive")
+	}
+	if err := LockWalletTx(tx, userID); err != nil {
+		return err
+	}
 	// Execute FIFO CoinBatch deduction
 	if err := ConsumeCoinBatchesTx(tx, userID, amount); err != nil {
 		return err
@@ -92,9 +102,9 @@ func ConsumeCoinBatchesTx(tx *gorm.DB, userID uint, debitAmount int) error {
 
 	var batches []models.CoinBatch
 	// Lock the rows to prevent race conditions during FIFO consumption
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("user_id = ? AND balance > 0 AND expires_at > ?", userID, time.Now()).
-		Order("created_at ASC").
+		Order("created_at ASC, id ASC").
 		Find(&batches).Error; err != nil {
 		return err
 	}
@@ -117,10 +127,7 @@ func ConsumeCoinBatchesTx(tx *gorm.DB, userID uint, debitAmount int) error {
 	}
 
 	if remainingDebit > 0 {
-		// Due to aggregate WalletLedger vs CoinBatch drift from earlier missing logic,
-		// some users might have points but no unexpired coin batches. We tolerate this
-		// to maintain backward compatibility by allowing the debit to proceed if the aggregate
-		// check in addLedgerEntry passes, rather than returning an error here.
+		return errors.New("insufficient unexpired coin balance")
 	}
 
 	return nil
@@ -148,4 +155,49 @@ func GetLedger(userID uint) ([]models.WalletLedger, error) {
 		Order("created_at DESC").
 		Find(&txns).Error
 	return txns, err
+}
+
+// LockWalletTx serializes all balance-affecting operations on the user row.
+func LockWalletTx(tx *gorm.DB, userID uint) error {
+	var user models.User
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error
+}
+
+// LockReferralWalletsTx uses the same ascending user order as market payouts.
+// A milestone can affect both wallets; locking the child first can deadlock
+// with a market payout that has already locked its referrer.
+func LockReferralWalletsTx(tx *gorm.DB, userID uint) error {
+	var user models.User
+	if err := tx.First(&user, userID).Error; err != nil {
+		return err
+	}
+	ids := []uint{userID}
+	if user.ReferredBy != 0 && user.ReferredBy != userID {
+		ids = append(ids, user.ReferredBy)
+	}
+	var users []models.User
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", ids).Order("id ASC").Find(&users).Error
+}
+
+// ExpireCoinBatch removes only the expired batch, never an unexpired FIFO batch.
+func ExpireCoinBatch(batchID uint) error {
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		var batch models.CoinBatch
+		if err := tx.First(&batch, batchID).Error; err != nil {
+			return err
+		}
+		if err := LockWalletTx(tx, batch.UserID); err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&batch, batchID).Error; err != nil {
+			return err
+		}
+		if batch.Balance == 0 || batch.ExpiresAt.After(time.Now()) {
+			return nil
+		}
+		if err := addLedgerEntry(tx, batch.UserID, models.TxTypeExpired, 0, batch.Balance, batch.ID, "Coin expiry", nil); err != nil {
+			return err
+		}
+		return tx.Model(&batch).Update("balance", 0).Error
+	})
 }

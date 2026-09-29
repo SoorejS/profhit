@@ -34,12 +34,12 @@
                     <div class="card" style="border: 1px solid var(--border-subtle); padding: var(--spacing-8);">
                         <form id="proposeForm" onsubmit="submitProposal(event)">
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label style="font-weight: 600;">Market Title <span class="text-danger">*</span></label>
+                                <label for="pTitle" style="font-weight: 600;">Market Title <span class="text-danger">*</span></label>
                                 <input type="text" id="pTitle" class="input-control" placeholder="e.g. Will Bitcoin cross $100k before December 2026?" required>
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label style="font-weight: 600;">Category <span class="text-danger">*</span></label>
+                                <label for="pCategory" style="font-weight: 600;">Category <span class="text-danger">*</span></label>
                                 <select id="pCategory" class="input-control" required>
                                     <option value="Financial Markets">Financial Markets</option>
                                     <option value="Sports">Sports</option>
@@ -51,25 +51,25 @@
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label style="font-weight: 600;">Description & Resolution Criteria <span class="text-danger">*</span></label>
+                                <label for="pDescription" style="font-weight: 600;">Description & Resolution Criteria <span class="text-danger">*</span></label>
                                 <textarea id="pDescription" class="input-control" rows="4" placeholder="Explain exactly how and when this market resolves..." required></textarea>
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label style="font-weight: 600;">Official Resolution Source <span class="text-danger">*</span></label>
+                                <label for="pSource" style="font-weight: 600;">Official Resolution Source <span class="text-danger">*</span></label>
                                 <input type="url" id="pSource" class="input-control" placeholder="https://example.com/official-data" required>
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label style="font-weight: 600;">Lock Time (When to stop predictions) <span class="text-danger">*</span></label>
+                                <label for="pLockTime" style="font-weight: 600;">Lock Time (When to stop predictions) <span class="text-danger">*</span></label>
                                 <input type="datetime-local" id="pLockTime" class="input-control" required>
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-8);">
                                 <label style="font-weight: 600;">Options (Fixed)</label>
                                 <div class="flex gap-4">
-                                    <input type="text" class="input-control font-bold" value="Yes" readonly style="color: var(--color-success); background: rgba(16, 185, 129, 0.1);">
-                                    <input type="text" class="input-control font-bold" value="No" readonly style="color: var(--color-danger); background: rgba(239, 68, 68, 0.1);">
+                                    <input type="text" aria-label="First fixed option" class="input-control font-bold" value="Yes" readonly style="color: var(--color-success); background: rgba(16, 185, 129, 0.1);">
+                                    <input type="text" aria-label="Second fixed option" class="input-control font-bold" value="No" readonly style="color: var(--color-danger); background: rgba(239, 68, 68, 0.1);">
                                 </div>
                                 <small class="text-muted mt-2 block">Currently only binary (Yes/No) markets are supported for user proposals.</small>
                             </div>

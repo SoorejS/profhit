@@ -16,13 +16,13 @@ export class AppSidebar extends HTMLElement {
         if (mode === 'admin') {
             navLinks = `
                 <a href="/admin.html" class="nav-link ${activePage === 'home' ? 'active' : ''}"><i class="ph ph-house"></i> Dashboard</a>
-                <a href="javascript:void(0)" class="nav-link"><i class="ph ph-users"></i> Users</a>
-                <a href="javascript:void(0)" class="nav-link"><i class="ph ph-chart-line-up"></i> Markets</a>
-                <a href="javascript:void(0)" class="nav-link"><i class="ph ph-identification-card"></i> KYC</a>
-                <a href="javascript:void(0)" class="nav-link"><i class="ph ph-receipt"></i> Wallet Logs</a>
-                <a href="javascript:void(0)" class="nav-link"><i class="ph ph-chart-pie-slice"></i> Analytics</a>
-                <a href="javascript:void(0)" class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-megaphone"></i> Advertiser Portal <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></a>
-                <a href="javascript:void(0)" class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-star"></i> Sponsored Predictions <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></a>
+                <a href="/admin.html#moderation" class="nav-link"><i class="ph ph-users"></i> Users</a>
+                <a href="/admin.html#markets" class="nav-link"><i class="ph ph-chart-line-up"></i> Markets</a>
+                <a href="/admin.html#kyc" class="nav-link"><i class="ph ph-identification-card"></i> KYC</a>
+                <a href="/admin.html#withdrawals" class="nav-link"><i class="ph ph-receipt"></i> Withdrawals</a>
+                <a href="/admin.html#analytics" class="nav-link"><i class="ph ph-chart-pie-slice"></i> Analytics</a>
+                <span class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-megaphone"></i> Advertiser Portal <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></span>
+                <span class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-star"></i> Sponsored Predictions <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></span>
                 
                 <a href="/dashboard.html" class="nav-link text-primary" style="margin-top: 1rem;"><i class="ph ph-arrow-left"></i> Exit Admin</a>
             `;
@@ -70,6 +70,8 @@ export class AppSidebar extends HTMLElement {
             </aside>
         `;
 
+        this.querySelector('.sidebar-header').insertAdjacentHTML('beforeend', '<button type="button" class="btn btn-outline menu-toggle" aria-label="Close navigation">Close</button>');
+        this.querySelector('.menu-toggle').addEventListener('click', () => { this.classList.remove('open'); document.querySelector('app-topbar .menu-toggle')?.setAttribute('aria-expanded', 'false'); });
         this.fetchBalance();
     }
     
@@ -79,7 +81,7 @@ export class AppSidebar extends HTMLElement {
             const data = await ApiClient.get('/me');
             const el = document.getElementById('sidebarBalance');
             if (el) el.textContent = data.points;
-        } catch(e) {}
+        } catch(e) { const el = this.querySelector('#sidebarBalance'); if (el) el.textContent = 'Unavailable'; }
     }
 }
 customElements.define('app-sidebar', AppSidebar);

@@ -30,7 +30,7 @@
                         <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Manage your account profile, security, and preferences.</p>
                     </div>
 
-                    <div class="dashboard-grid">
+                    <div class="dashboard-grid" style="grid-template-columns: minmax(0, 1fr);">
                         
                         <!-- Left Col: Profile & Security -->
                         <div style="display: flex; flex-direction: column; gap: var(--spacing-6);">
@@ -39,15 +39,15 @@
                             <div class="card" style="border: 1px solid var(--border-subtle);">
                                 <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Profile Details</h3>
                                 <div class="input-group" style="margin-bottom: var(--spacing-4);">
-                                    <label>Username</label>
+                                    <label for="sUsername">Username</label>
                                     <input type="text" id="sUsername" class="input-control" value="Loading..." readonly style="background: var(--bg-surface);">
                                 </div>
                                 <div class="input-group" style="margin-bottom: var(--spacing-4);">
-                                    <label>Email Address</label>
+                                    <label for="sEmail">Email Address</label>
                                     <input type="email" id="sEmail" class="input-control" value="Loading..." readonly style="background: var(--bg-surface);">
                                 </div>
                                 <div class="input-group" style="margin-bottom: var(--spacing-4);">
-                                    <label>Account Tier</label>
+                                    <label for="sTier">Account Tier</label>
                                     <input type="text" id="sTier" class="input-control font-bold text-gold" value="Loading..." readonly style="background: var(--bg-surface);">
                                 </div>
                                 <div style="margin-top: var(--spacing-4);">
@@ -102,7 +102,7 @@
                                         <div class="font-bold">Email Alerts</div>
                                         <div class="text-xs text-muted">Receive updates via email.</div>
                                     </div>
-                                    <input type="checkbox" disabled checked>
+                                    <input type="checkbox" aria-label="Email alerts (coming soon)" disabled checked>
                                 </div>
                                 
                                 <div class="flex justify-between items-center">
@@ -110,7 +110,7 @@
                                         <div class="font-bold">Push Notifications</div>
                                         <div class="text-xs text-muted">Receive updates in browser.</div>
                                     </div>
-                                    <input type="checkbox" disabled checked>
+                                    <input type="checkbox" aria-label="Push notifications (coming soon)" disabled checked>
                                 </div>
                             </div>
 

@@ -3,11 +3,12 @@
  * Handles HTTP requests, JWT injection, and error catching.
  */
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const API_URL = document.querySelector('meta[name="api-base"]')?.content || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8080/api'
-    : 'https://profhit.onrender.com/api';
+    : 'https://profhit.onrender.com/api');
 
 class ApiClient {
+    static profileRequest = null;
     static getToken() {
         return localStorage.getItem('token');
     }
@@ -53,10 +54,10 @@ class ApiClient {
             clearTimeout(timeoutId);
             
             // Handle 401 Unauthorized globally (but not for login itself to prevent loops)
-            if (response.status === 401 && !endpoint.includes('/auth/login')) {
+            if (response.status === 401 && !endpoint.startsWith('/auth/')) {
                 this.removeToken();
                 window.location.href = '/login.html';
-                return null;
+                throw new Error('Session expired. Please log in again.');
             }
 
             let data;
@@ -66,13 +67,17 @@ class ApiClient {
             } catch (parseError) {
                 // If it's not JSON, throw a standard HTTP error instead of a JSON SyntaxError
                 if (!response.ok) {
-                    throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+                    const error = new Error(`Server Error: ${response.status} ${response.statusText}`);
+                    error.status = response.status;
+                    throw error;
                 }
                 data = { message: textResponse };
             }
             
             if (!response.ok) {
-                throw new Error(data.error || data.message || `Request failed (${response.status})`);
+                const error = new Error(data.error || data.message || `Request failed (${response.status})`);
+                error.status = response.status;
+                throw error;
             }
             
             return data;
@@ -82,12 +87,24 @@ class ApiClient {
                 console.error(`[API Timeout] ${endpoint}`);
                 throw new Error('Server connection timed out. The server may be waking up, please try again in a few seconds.');
             }
-            console.error(`[API Error] ${endpoint}:`, error);
+            // Expected HTTP failures are rendered by each page. Log only
+            // transport/runtime failures so handled validation does not pollute
+            // the browser console.
+            if (!error.status) console.error(`[API Error] ${endpoint}:`, error);
             throw error;
         }
     }
 
     static get(endpoint, options = {}) {
+        // Sidebar, topbar and page mount together; share only an in-flight read.
+        // Never retain the balance after the request completes.
+        if (endpoint === '/me') {
+            if (!this.profileRequest) {
+                this.profileRequest = this.request(endpoint, { ...options, method: 'GET' })
+                    .finally(() => { this.profileRequest = null; });
+            }
+            return this.profileRequest;
+        }
         return this.request(endpoint, { ...options, method: 'GET' });
     }
 

@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"errors"
+	"gorm.io/gorm"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,19 +30,30 @@ func DailyLogin(c *gin.Context) {
 	userIDVal, _ := c.Get("userID")
 	userID, _ := userIDVal.(uint)
 
-	today := truncateToDay(time.Now())
+	today := truncateToDay(time.Now().UTC())
 
 	tx := config.DB.Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
-	// Upsert the streak row with FOR UPDATE lock
+	if err := services.LockWalletTx(tx, userID); err != nil {
+		tx.Rollback()
+		c.JSON(500, gin.H{"error": "Could not lock wallet"})
+		return
+	}
+	// Upsert the streak row under the user lock
 	var streak models.UserStreak
-	result := tx.Set("gorm:query_option", "FOR UPDATE").Where("user_id = ?", userID).First(&streak)
+	result := tx.Where("user_id = ?", userID).First(&streak)
 
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		tx.Rollback()
+		c.JSON(500, gin.H{"error": "Could not load streak"})
+		return
+	}
 	if result.Error != nil {
 		// First-ever login — create a fresh streak record
 		streak = models.UserStreak{
@@ -108,16 +121,24 @@ func DailyLogin(c *gin.Context) {
 	}
 
 	// Base daily login coins
-	_ = services.CreditWalletTx(tx, userID, models.DailyLoginBaseCoins,
+	if err := services.CreditWalletTx(tx, userID, models.DailyLoginBaseCoins,
 		models.TxTypeDailyLogin, 0,
-		"Daily login reward", nil)
+		"Daily login reward", nil); err != nil {
+		tx.Rollback()
+		c.JSON(500, gin.H{"error": "Could not award daily reward"})
+		return
+	}
 
 	// Streak bonus coins
 	if streakBonus > 0 {
 		totalCoins += streakBonus
-		_ = services.CreditWalletTx(tx, userID, streakBonus,
+		if err := services.CreditWalletTx(tx, userID, streakBonus,
 			models.TxTypeStreakBonus, 0,
-			"Streak bonus – day "+itoa(streak.CurrentStreak), nil)
+			"Streak bonus – day "+itoa(streak.CurrentStreak), nil); err != nil {
+			tx.Rollback()
+			c.JSON(500, gin.H{"error": "Could not award streak bonus"})
+			return
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
@@ -146,6 +167,10 @@ func GetStreakInfo(c *gin.Context) {
 
 	var streak models.UserStreak
 	if err := config.DB.Where("user_id = ?", userID).First(&streak).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(500, gin.H{"error": "Could not load streak"})
+			return
+		}
 		// No streak record yet
 		c.JSON(http.StatusOK, gin.H{
 			"current_streak":  0,
@@ -172,6 +197,8 @@ func truncateToDay(t time.Time) time.Time {
 }
 
 func sameDay(a, b time.Time) bool {
+	a = a.UTC()
+	b = b.UTC()
 	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
 }
 

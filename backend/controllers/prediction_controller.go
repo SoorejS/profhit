@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"encoding/json"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"profhit-backend/config"
@@ -10,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SubmitPrediction handles POST /api/predictions
@@ -21,32 +25,47 @@ func SubmitPrediction(c *gin.Context) {
 	var req struct {
 		MarketID uint   `json:"market_id" binding:"required"`
 		Choice   string `json:"choice" binding:"required"`
-		Amount   int    `json:"amount" binding:"required,gt=0"`
+		Amount   int    `json:"amount" binding:"required,gte=10,lte=1000000"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	tx := config.DB.Begin()
+	defer tx.Rollback()
 	var market models.Market
-	if err := config.DB.First(&market, req.MarketID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&market, req.MarketID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
 
-	acceptableStatuses := map[string]bool{"Open": true, "Live": true, "Scheduled": true}
+	acceptableStatuses := map[string]bool{"Open": true, "Live": true}
 	if !acceptableStatuses[market.ResolutionStatus] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "This market is no longer accepting predictions"})
 		return
 	}
 
+	now := time.Now().UTC()
+	if (market.LockTime != nil && !now.Before(*market.LockTime)) || (!market.EndDate.IsZero() && !now.Before(market.EndDate)) || (market.StartTime != nil && now.Before(*market.StartTime)) {
+		c.JSON(400, gin.H{"error": "Market is outside its prediction window"})
+		return
+	}
+	if market.Payout <= 0 {
+		c.JSON(400, gin.H{"error": "Market payout is not configured"})
+		return
+	}
+	if err := services.LockReferralWalletsTx(tx, userID); err != nil {
+		c.JSON(500, gin.H{"error": "Could not lock wallet"})
+		return
+	}
 	// ── PDF §4.3: One prediction per topic/category per day ─────────────────
 	// A user may only predict on one market per category per calendar day.
-	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+	todayStart := now.Truncate(24 * time.Hour)
 	tomorrowStart := todayStart.Add(24 * time.Hour)
 
 	var topicCount int64
-	config.DB.Raw(`
+	result := tx.Raw(`
 		SELECT COUNT(ps.id)
 		FROM prediction_submissions ps
 		INNER JOIN markets m ON m.id = ps.market_id
@@ -57,6 +76,10 @@ func SubmitPrediction(c *gin.Context) {
 		  AND ps.deleted_at IS NULL
 		  AND m.deleted_at IS NULL
 	`, userID, market.Category, todayStart, tomorrowStart).Scan(&topicCount)
+	if result.Error != nil {
+		c.JSON(500, gin.H{"error": "Could not check prediction limit"})
+		return
+	}
 
 	if topicCount > 0 {
 		c.JSON(http.StatusTooManyRequests, gin.H{
@@ -77,14 +100,8 @@ func SubmitPrediction(c *gin.Context) {
 		Choice:    req.Choice,
 		Amount:    req.Amount,
 		Potential: market.Payout,
+		CreatedAt: now,
 	}
-
-	tx := config.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
 
 	// 1. Deduct coins from wallet first (safe from race conditions due to row lock)
 	if err := services.DebitWalletTx(tx, userID, req.Amount, models.TxTypePredictionStake, market.ID, "Staked on market: "+market.Title, nil); err != nil {
@@ -109,19 +126,24 @@ func SubmitPrediction(c *gin.Context) {
 		return
 	}
 
+	if err := services.TriggerReferralEventTx(tx, userID, models.ReferralStatusFirstBet, 50); err != nil {
+		c.JSON(500, gin.H{"error": "Could not record prediction reward"})
+		return
+	}
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
 		return
 	}
 
 	// Trigger Referral Event for First Prediction
-	go services.TriggerReferralEvent(userID, models.ReferralStatusFirstBet, 50)
 
 	// Trigger Gamification Hooks
-	go services.CheckPredictionAchievements(userID)
+	services.CheckPredictionAchievements(userID)
 
 	// Broadcast to live clients
-	services.BroadcastToAll("trade_placed", gin.H{"market_id": market.ID})
+	if market.Visibility == "Public" {
+		services.BroadcastToAll("trade_placed", gin.H{"market_id": market.ID})
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Prediction locked! Good luck 🎯",
@@ -137,16 +159,43 @@ func SubmitPrediction(c *gin.Context) {
 func GetUserPredictions(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", c.DefaultQuery("limit", "20")))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	query := config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ?", userID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count predictions"})
+		return
+	}
+
 	var predictions []models.PredictionSubmission
-	if err := config.DB.
-		Where("user_id = ?", userID).
-		Order("created_at desc").
+	if err := query.
+		Order("created_at desc, id desc").
+		Limit(pageSize).
+		Offset(offset).
 		Find(&predictions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load predictions"})
 		return
 	}
 
-	c.JSON(http.StatusOK, predictions)
+	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+
+	c.JSON(http.StatusOK, gin.H{
+		"items":       predictions,
+		"page":        page,
+		"page_size":   pageSize,
+		"total":       total,
+		"total_pages": totalPages,
+	})
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -156,10 +205,13 @@ func isValidOption(choice, optionsJSON string) bool {
 	return len(choice) > 0 && containsOption(optionsJSON, choice)
 }
 
-func containsOption(json, opt string) bool {
-	needle := `"` + opt + `"`
-	for i := 0; i <= len(json)-len(needle); i++ {
-		if json[i:i+len(needle)] == needle {
+func containsOption(raw, opt string) bool {
+	var options []string
+	if json.Unmarshal([]byte(raw), &options) != nil {
+		return false
+	}
+	for _, choice := range options {
+		if choice == opt {
 			return true
 		}
 	}

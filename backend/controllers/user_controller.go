@@ -2,9 +2,11 @@ package controllers
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"profhit-backend/config"
@@ -19,6 +21,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func GenerateToken(user models.User) (string, error) {
@@ -34,12 +38,18 @@ func GenerateToken(user models.User) (string, error) {
 		}
 	}
 
+	tokenID := make([]byte, 16)
+	if _, err := rand.Read(tokenID); err != nil {
+		return "", err
+	}
 	claims := middleware.Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Tier:     user.Tier,
-		Role:     user.Role,
+		TokenVersion: user.TokenVersion,
+		UserID:       user.ID,
+		Username:     user.Username,
+		Tier:         user.Tier,
+		Role:         user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        hex.EncodeToString(tokenID),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryMinutes) * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -56,9 +66,9 @@ func generateToken(user models.User) (string, error) {
 // RegisterUser creates a new user with hashed password
 func RegisterUser(c *gin.Context) {
 	var input struct {
-		Username     string `json:"username" binding:"required"`
+		Username     string `json:"username" binding:"required,min=3,max=64"`
 		Email        string `json:"email" binding:"required,email"`
-		Password     string `json:"password" binding:"required,min=8"`
+		Password     string `json:"password" binding:"required,min=8,max=72"`
 		ReferralCode string `json:"referral_code"`
 		// PDF §2.1 — Demographic fields (all optional at registration)
 		Phone       string `json:"phone"`
@@ -123,6 +133,7 @@ func RegisterUser(c *gin.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
@@ -215,7 +226,7 @@ func LoginUser(c *gin.Context) {
 	}
 
 	// Block banned users BEFORE generating the token
-	if !user.IsActive {
+	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now())) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended. Contact support."})
 		return
 	}
@@ -251,7 +262,10 @@ func LogoutUser(c *gin.Context) {
 	}
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) == 2 && parts[0] == "Bearer" {
-		middleware.InvalidateToken(parts[1])
+		if err := middleware.InvalidateToken(parts[1]); err != nil {
+			c.JSON(500, gin.H{"error": "Could not revoke session"})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
@@ -269,10 +283,10 @@ func GetUserStats(c *gin.Context) {
 	config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ? AND is_correct = ?", id, true).Count(&wonPredictions)
 
 	// Coins earned via predictions, referral bonuses, or admin adjustments
-	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionWin), string(models.TxTypeAdminAdjustment), string(models.TxTypeReferralBonus)}).Select("COALESCE(SUM(credit), 0)").Scan(&coinsEarned)
+	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND type IN ?", id, []string{string(models.TxTypePredictionWin), string(models.TxTypeAdminAdjustment), string(models.TxTypeReferralBonus)}).Select("COALESCE(SUM(credit), 0)").Scan(&coinsEarned)
 
 	// Coins spent via predictions and withdrawals
-	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND tx_type IN ?", id, []string{string(models.TxTypePredictionStake), string(models.TxTypeRedemption)}).Select("COALESCE(SUM(debit), 0)").Scan(&coinsSpent)
+	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND type IN ?", id, []string{string(models.TxTypePredictionStake), string(models.TxTypeRedemption)}).Select("COALESCE(SUM(debit), 0)").Scan(&coinsSpent)
 
 	var longestStreak int
 	var current models.UserStreak
@@ -308,8 +322,12 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	// Trigger async profile completion check
-	go services.CheckProfileCompletion(userID)
+	// Refresh the balance after a possible achievement award.
+	services.CheckProfileCompletion(userID)
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not refresh profile"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"id":            user.ID,
@@ -337,7 +355,7 @@ func GetUser(c *gin.Context) {
 	id := c.Param("id")
 	var user models.User
 
-	if err := config.DB.First(&user, id).Error; err != nil {
+	if err := config.DB.Where("id = ?", id).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -358,10 +376,14 @@ func ForgotPassword(c *gin.Context) {
 		return
 	}
 
+	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_USERNAME") == "" || os.Getenv("SMTP_PASSWORD") == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Password reset email is temporarily unavailable"})
+		return
+	}
 	var user models.User
 	if err := config.DB.Where("email = ?", req["email"]).First(&user).Error; err != nil {
 		// Don't leak user existence — always return the same message
-		c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent."})
+		c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link will be emailed shortly."})
 		return
 	}
 
@@ -374,29 +396,41 @@ func ForgotPassword(c *gin.Context) {
 	token := hex.EncodeToString(rawBytes)
 
 	// Invalidate any existing tokens for this user
-	config.DB.Where("user_id = ?", user.ID).Delete(&models.PasswordResetToken{})
 
 	resetRecord := models.PasswordResetToken{
 		UserID:    user.ID,
-		Token:     token,
+		Token:     fmt.Sprintf("%x", sha256.Sum256([]byte(token))),
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
-	if err := config.DB.Create(&resetRecord).Error; err != nil {
+	if err := config.DB.Transaction(func(tx *gorm.DB) error {
+		var locked models.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, user.ID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", user.ID).Delete(&models.PasswordResetToken{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&resetRecord).Error
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist reset token"})
 		return
 	}
 
 	// Send formatted HTML reset email asynchronously
-	go services.SendPasswordResetEmail(user.Email, user.Username, token)
+	go func() {
+		if err := services.SendPasswordResetEmail(user.Email, user.Username, token); err != nil {
+			log.Printf("Password reset delivery failed for user %d: %v", user.ID, err)
+		}
+	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent."})
+	c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link will be emailed shortly."})
 }
 
 // ResetPassword validates the token and updates the user's password.
 func ResetPassword(c *gin.Context) {
 	var req struct {
 		Token       string `json:"token" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required,min=8"`
+		NewPassword string `json:"new_password" binding:"required,min=8,max=72"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -404,7 +438,7 @@ func ResetPassword(c *gin.Context) {
 	}
 
 	var record models.PasswordResetToken
-	if err := config.DB.Where("token = ?", req.Token).First(&record).Error; err != nil {
+	if err := config.DB.Where("token = ? OR token = ?", fmt.Sprintf("%x", sha256.Sum256([]byte(req.Token))), req.Token).First(&record).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired reset token"})
 		return
 	}
@@ -422,11 +456,17 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Update password and consume the token atomically
+	// Claim the one-time token before changing the password.
 	tx := config.DB.Begin()
+	defer tx.Rollback()
+	claim := tx.Where("id = ? AND expires_at > ?", record.ID, time.Now()).Delete(&models.PasswordResetToken{})
+	if claim.Error != nil || claim.RowsAffected != 1 {
+		c.JSON(400, gin.H{"error": "Invalid or expired reset token"})
+		return
+	}
 
 	if err := tx.Model(&models.User{}).Where("id = ?", record.UserID).
-		Update("password", string(hashed)).Error; err != nil {
+		Updates(map[string]interface{}{"password": string(hashed), "token_version": gorm.Expr("token_version + 1")}).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return

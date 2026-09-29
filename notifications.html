@@ -28,29 +28,21 @@
                     <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
                         <div>
                             <h1 style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary);"><i class="ph-fill ph-bell"></i> Notifications</h1>
-                            <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Real-time market updates and account alerts.</p>
+                            <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Coin expiry reminders saved to your account.</p>
                         </div>
-                        <button class="btn btn-outline" disabled title="Not available in Beta">Mark all as read</button>
+                        <button class="btn btn-outline" id="markRead">Mark all as read</button>
                     </div>
 
                     <div class="card" style="border: 1px solid var(--border-subtle); padding: 0;">
                         <!-- Tabs -->
                         <div style="display: flex; gap: var(--spacing-4); padding: var(--spacing-4); border-bottom: 1px solid var(--border-subtle);">
-                            <button class="btn btn-primary" style="padding: 0.5rem 1rem;">All</button>
-                            <button class="btn btn-outline" style="padding: 0.5rem 1rem;" disabled>Unread <span class="badge badge-primary" style="margin-left: 4px;">0</span></button>
+                            <button id="showAll" class="btn btn-primary" style="padding: 0.5rem 1rem;">All</button>
+                            <button class="btn btn-outline" style="padding: 0.5rem 1rem;" id="showUnread">Unread <span class="badge badge-primary" id="unreadCount" style="margin-left: 4px;">0</span></button>
                         </div>
 
                         <!-- Content List -->
                         <div id="notificationList" style="padding: var(--spacing-6);">
-                            <div class="empty-state text-center" style="padding: var(--spacing-8) 0;">
-                                <i class="ph-fill ph-bell-slash text-muted" style="font-size: 3rem; margin-bottom: var(--spacing-4);"></i>
-                                <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 8px;">No Recent Notifications</h3>
-                                <p class="text-muted text-sm" style="max-width: 300px; margin: 0 auto;">
-                                    You have no new alerts for this active session. 
-                                    <br><br>
-                                    <span class="badge badge-warning">Note</span> Notification history persistence is disabled in this Beta version.
-                                </p>
-                            </div>
+                            <p role="status">Loading notifications...</p>
                         </div>
                     </div>
 

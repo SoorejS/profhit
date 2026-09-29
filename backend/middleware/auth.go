@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"profhit-backend/config"
@@ -15,18 +17,51 @@ import (
 )
 
 type Claims struct {
-	UserID   uint   `json:"user_id"`
-	Username string `json:"username"`
-	Tier     string `json:"tier"`
-	Role     string `json:"role"` // RBAC role embedded in token
+	TokenVersion uint   `json:"token_version"`
+	UserID       uint   `json:"user_id"`
+	Username     string `json:"username"`
+	Tier         string `json:"tier"`
+	Role         string `json:"role"` // RBAC role embedded in token
 	jwt.RegisteredClaims
 }
 
-var jwtBlacklist sync.Map
-
-// InvalidateToken adds a JWT string to the blacklist
-func InvalidateToken(token string) {
-	jwtBlacklist.Store(token, time.Now())
+func tokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+func InvalidateToken(token string) error {
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) { return []byte(os.Getenv("JWT_SECRET")), nil }, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+	if err != nil {
+		return err
+	}
+	return config.DB.Create(&models.RevokedToken{Hash: tokenHash(token), ExpiresAt: claims.ExpiresAt.Time}).Error
+}
+func ValidateToken(tokenString string) (*Claims, models.User, error) {
+	var user models.User
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return nil, user, errors.New("authentication unavailable")
+	}
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil }, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+	if err != nil || !token.Valid || claims.UserID == 0 {
+		return nil, user, errors.New("invalid or expired token")
+	}
+	var count int64
+	if err := config.DB.Model(&models.RevokedToken{}).Where("hash = ?", tokenHash(tokenString)).Count(&count).Error; err != nil {
+		return nil, user, err
+	}
+	if count > 0 {
+		return nil, user, errors.New("token revoked")
+	}
+	if err := config.DB.First(&user, claims.UserID).Error; err != nil {
+		return nil, user, err
+	}
+	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now())) || claims.TokenVersion != user.TokenVersion {
+		return nil, user, errors.New("session no longer valid")
+	}
+	return claims, user, nil
 }
 
 // AuthRequired validates JWT and sets user context values
@@ -46,65 +81,15 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server misconfiguration: JWT_SECRET not set"})
-			c.Abort()
+		claims, user, err := ValidateToken(parts[1])
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired session"})
 			return
 		}
-
-		token, err := jwt.ParseWithClaims(parts[1], &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(secret), nil
-		})
-
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			c.Abort()
-			return
-		}
-
-		// Check if token is blacklisted
-		if _, blacklisted := jwtBlacklist.Load(parts[1]); blacklisted {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has been invalidated"})
-			c.Abort()
-			return
-		}
-
-		claims, ok := token.Claims.(*Claims)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
-			c.Abort()
-			return
-		}
-
 		c.Set("userID", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("tier", claims.Tier)
-		c.Set("role", claims.Role)
-
-		// DB Check for active/suspended status to ensure real-time bans apply
-		var user models.User
-		if err := config.DB.First(&user, claims.UserID).Error; err != nil {
-			if err.Error() == "record not found" {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "User no longer exists"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error while validating user session"})
-			}
-			c.Abort()
-			return
-		}
-
-		if !user.IsActive {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Account is banned"})
-			c.Abort()
-			return
-		}
-
-		if user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now()) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Account is temporarily suspended until " + user.SuspendedUntil.Format(time.RFC3339)})
-			c.Abort()
-			return
-		}
+		c.Set("username", user.Username)
+		c.Set("tier", user.Tier)
+		c.Set("role", user.Role)
 
 		c.Next()
 	}

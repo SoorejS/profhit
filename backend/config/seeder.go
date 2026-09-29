@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"gorm.io/gorm"
 	"log"
+	"os"
 	"profhit-backend/models"
 	"time"
 
@@ -9,6 +12,9 @@ import (
 )
 
 func SeedDatabase() {
+	if os.Getenv("SEED_DEMO_DATA") != "true" || os.Getenv("GIN_MODE") == "release" {
+		return
+	}
 	var count int64
 	DB.Model(&models.User{}).Count(&count)
 
@@ -29,7 +35,19 @@ func SeedDatabase() {
 			{Username: "WhaleTrader99", Email: "w@w.com", Password: hashedP, Tier: "Diamond", Role: models.RoleUser, IsActive: true, Points: 8540, KycStatus: true},
 		}
 		for _, u := range users {
-			DB.Create(&u)
+			u.ReferralCode = fmt.Sprintf("DEMO%d", len(u.Username))
+			amount := u.Points
+			if err := DB.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Create(&u).Error; err != nil {
+					return err
+				}
+				if err := tx.Create(&models.WalletLedger{UserID: u.ID, Type: models.TxTypeAdminAdjustment, Credit: amount, BalanceAfter: amount, Description: "Development seed balance", Status: "completed"}).Error; err != nil {
+					return err
+				}
+				return tx.Create(&models.CoinBatch{UserID: u.ID, Amount: amount, Balance: amount, ExpiresAt: time.Now().AddDate(1, 0, 0), Source: "development_seed"}).Error
+			}); err != nil {
+				log.Printf("Demo seed failed: %v", err)
+			}
 		}
 		log.Println("Seeded admin and regular users.")
 	}
@@ -69,7 +87,7 @@ func SeedDatabase() {
 		{
 			Title:            "Will Nifty 50 close up or down today?",
 			Description:      "Predict the closing direction of Nifty 50.",
-			Category:         "Markets",
+			Category:         "Financial Markets",
 			Difficulty:       "Easy",
 			Payout:           20,
 			Options:          `["Up", "Down"]`,
@@ -77,12 +95,12 @@ func SeedDatabase() {
 			EndDate:          soon,
 		},
 		{
-			Title:            "Predict exact seat count for NDA alliance.",
-			Description:      "Enter the exact number of seats NDA will win.",
+			Title:            "Will NDA win a majority of seats?",
+			Description:      "Predict whether the NDA alliance will win more than half of the seats.",
 			Category:         "Politics",
 			Difficulty:       "Hard",
 			Payout:           250,
-			Options:          `[]`,
+			Options:          `["Yes", "No"]`,
 			ResolutionStatus: "Open",
 			EndDate:          time.Now().AddDate(0, 1, 0),
 		},

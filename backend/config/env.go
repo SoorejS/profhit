@@ -1,35 +1,33 @@
 package config
 
 import (
+	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
-
-	"github.com/joho/godotenv"
+	"strings"
 )
 
-// ValidateEnv loads .env and provides fallback defaults for required variables
+// ValidateEnv fails closed; optional integrations remain unavailable without credentials.
 func ValidateEnv() {
-	godotenv.Load() // silently ignore if no .env
-
-	if os.Getenv("JWT_SECRET") == "" {
-		os.Setenv("JWT_SECRET", "eda29bf0185763c4")
-		log.Println("[Env] JWT_SECRET not set in environment, using default secret.")
+	_ = godotenv.Load()
+	if err := CheckEnv(); err != nil {
+		log.Fatal(err)
 	}
-
-	defaults := map[string]string{
-		"RAZORPAY_KEY_ID":           "dummy_rzp_key",
-		"RAZORPAY_KEY_SECRET":       "dummy_rzp_secret",
-		"RAZORPAY_WEBHOOK_SECRET":   "dummy_rzp_webhook_secret",
-		"HYPERVERGE_API_KEY":        "dummy_key_for_testing",
-		"HYPERVERGE_API_SECRET":     "dummy_secret_for_testing",
-		"HYPERVERGE_WORKFLOW_ID":    "dummy_workflow_id",
-		"HYPERVERGE_WEBHOOK_SECRET": "dummy_webhook_secret",
+}
+func CheckEnv() error {
+	if os.Getenv("GIN_MODE") == "release" && os.Getenv("USE_SQLITE") == "true" && os.Getenv("DATABASE_URL") == "" {
+		return fmt.Errorf("production requires PostgreSQL; SQLite is development-only")
 	}
-
-	for k, v := range defaults {
-		if os.Getenv(k) == "" {
-			os.Setenv(k, v)
-			log.Printf("[Env] %s not set, using fallback dummy testing value.\n", k)
+	secret := os.Getenv("JWT_SECRET")
+	if len(secret) < 32 || strings.Contains(strings.ToLower(secret), "replace_this") || strings.Contains(strings.ToLower(secret), "change-before") || secret == "super_secret_jwt_key_for_production" {
+		return fmt.Errorf("JWT_SECRET must be a unique random secret of at least 32 characters")
+	}
+	for _, key := range []string{"RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET", "HYPERVERGE_API_SECRET", "HYPERVERGE_WEBHOOK_SECRET"} {
+		value := strings.ToLower(os.Getenv(key))
+		if strings.HasPrefix(value, "dummy") || strings.HasPrefix(value, "your_") {
+			return fmt.Errorf("%s contains placeholder credentials", key)
 		}
 	}
+	return nil
 }

@@ -93,7 +93,6 @@ async function loadLeaderboard() {
         }
         
     } catch (err) {
-        console.error(err);
         listEl.innerHTML = `
             <div class="text-center text-danger" style="padding: var(--spacing-8);">
                 <i class="ph ph-warning-circle" style="font-size: 3rem; margin-bottom: 1rem;"></i>

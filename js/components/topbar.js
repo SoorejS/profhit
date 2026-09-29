@@ -1,17 +1,25 @@
 import ApiClient from '../api/client.js';
 
-export function logout() {
-    ApiClient.removeToken();
-    window.location.href = '/login.html';
+export async function logout() {
+    try {
+        await ApiClient.post('/auth/logout');
+    } catch {
+        // The local credential must still be removed when the API is down.
+        // Server-side revocation is best-effort until connectivity returns.
+    } finally {
+        ApiClient.removeToken();
+        window.location.href = '/login.html';
+    }
 }
 
 export class AppTopbar extends HTMLElement {
     connectedCallback() {
         this.innerHTML = `
             <header class="topbar flex justify-between items-center" style="padding: var(--spacing-4) var(--spacing-6); border-bottom: 1px solid var(--border-subtle); background: var(--bg-base);">
+                <button class="btn btn-outline menu-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false">Menu</button>
                 <div class="search-container" style="flex: 1; max-width: 400px; position: relative;">
                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                    <input type="text" class="input-control" placeholder="Search markets, categories..." style="padding-left: 40px; border-radius: var(--radius-full); background: var(--bg-surface);">
+                    <input type="text" class="input-control" aria-label="Search markets" placeholder="Search markets..." style="padding-left: 40px; border-radius: var(--radius-full); background: var(--bg-surface);">
                 </div>
                 
                 <div class="topbar-actions flex items-center gap-4">
@@ -20,25 +28,30 @@ export class AppTopbar extends HTMLElement {
                     </button>
                     
                     <div class="profile-menu" style="position: relative; cursor: pointer;">
-                        <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border-subtle);" onclick="document.getElementById('profileDropdown').classList.toggle('hidden')">
+                        <button type="button" class="btn btn-outline" id="profileToggle" aria-label="Open profile menu" aria-expanded="false"><i class="ph ph-user"></i></button>
                         
                         <div id="profileDropdown" class="hidden" style="position: absolute; top: 50px; right: 0; background: var(--bg-surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-md); width: 200px; box-shadow: var(--shadow-lg); z-index: 100;">
                             <a href="/profile.html" class="nav-link" style="padding: 10px 15px; display: block; color: var(--text-primary);"><i class="ph ph-user"></i> Profile</a>
                             <a href="/wallet.html" class="nav-link" style="padding: 10px 15px; display: block; color: var(--text-primary);"><i class="ph ph-wallet"></i> Wallet & KYC</a>
                             <div style="height: 1px; background: var(--border-strong); margin: 5px 0;"></div>
-                            <a href="javascript:void(0)" id="logoutBtn" class="nav-link text-danger" style="padding: 10px 15px; display: block;"><i class="ph ph-sign-out"></i> Logout</a>
+                            <button type="button" id="logoutBtn" class="nav-link text-danger" style="padding: 10px 15px; display: block;"><i class="ph ph-sign-out"></i> Logout</button>
                         </div>
                     </div>
                 </div>
             </header>
         `;
         
-        document.addEventListener('click', (e) => {
+        this.querySelector('#profileToggle').addEventListener('click', e => { const hidden = this.querySelector('#profileDropdown').classList.toggle('hidden'); e.currentTarget.setAttribute('aria-expanded', String(!hidden)); });
+        this.onOutsideClick = (e) => {
             if (!this.contains(e.target)) {
                 const drop = document.getElementById('profileDropdown');
                 if(drop) drop.classList.add('hidden');
+                this.querySelector('#profileToggle').setAttribute('aria-expanded', 'false');
             }
-        });
+        };
+        document.addEventListener('click', this.onOutsideClick);
+        this.querySelector('.menu-toggle').addEventListener('click', e => { const sidebar = document.querySelector('app-sidebar'); const open = sidebar.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', String(open)); });
+        this.querySelector('input').addEventListener('keydown', e => { if (e.key === 'Enter') window.location.href = '/dashboard.html?search=' + encodeURIComponent(e.target.value); });
         
         const logoutBtn = this.querySelector('#logoutBtn');
         if(logoutBtn) {
@@ -51,6 +64,7 @@ export class AppTopbar extends HTMLElement {
         this.fetchBalance();
     }
     
+    disconnectedCallback() { document.removeEventListener('click', this.onOutsideClick); }
     async fetchBalance() {
         if (!ApiClient.isAuthenticated()) return;
         try {

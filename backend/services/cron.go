@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"log"
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -36,6 +38,9 @@ func runEveryMinute() {
 }
 
 func runEveryHour() {
+	if err := config.DB.Where("expires_at < ?", time.Now()).Delete(&models.RevokedToken{}).Error; err != nil {
+		log.Printf("Session cleanup failed: %v", err)
+	}
 	processCoinExpiries()
 	sendExpiryReminders()
 	processPendingReferrals()
@@ -48,28 +53,46 @@ func transitionMarkets() {
 
 	// 1. Scheduled -> Live
 	var scheduledMarkets []models.Market
-	config.DB.Where("resolution_status = ? AND start_time <= ?", "Scheduled", now).Find(&scheduledMarkets)
+	if err := config.DB.Where("resolution_status = ? AND start_time <= ?", "Scheduled", now).Find(&scheduledMarkets).Error; err != nil {
+		log.Printf("Market transition scan failed: %v", err)
+		return
+	}
 	for _, m := range scheduledMarkets {
-		m.ResolutionStatus = "Live"
-		config.DB.Save(&m)
-		BroadcastToAll("market_live", fmt.Sprintf("Market '%s' is now LIVE!", m.Title))
+		result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", m.ID, "Scheduled").Update("resolution_status", "Live")
+		if result.Error != nil || result.RowsAffected != 1 {
+			continue
+		}
+		if m.Visibility == "Public" {
+			BroadcastToAll("market_live", fmt.Sprintf("Market '%s' is now LIVE!", m.Title))
+		}
 	}
 
 	// 2. Live -> Locked
 	var liveMarkets []models.Market
-	config.DB.Where("resolution_status = ? AND lock_time <= ?", "Live", now).Find(&liveMarkets)
+	if err := config.DB.Where("resolution_status IN ? AND (lock_time <= ? OR end_date <= ?)", []string{"Live", "Open"}, now, now).Find(&liveMarkets).Error; err != nil {
+		log.Printf("Market transition scan failed: %v", err)
+		return
+	}
 	for _, m := range liveMarkets {
-		m.ResolutionStatus = "Locked"
-		config.DB.Save(&m)
-		BroadcastToAll("market_locked", fmt.Sprintf("Market '%s' is now LOCKED. No more predictions accepted.", m.Title))
+		result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status IN ?", m.ID, []string{"Live", "Open"}).Update("resolution_status", "Locked")
+		if result.Error != nil || result.RowsAffected != 1 {
+			continue
+		}
+		if m.Visibility == "Public" {
+			BroadcastToAll("market_locked", fmt.Sprintf("Market '%s' is now LOCKED. No more predictions accepted.", m.Title))
+		}
 	}
 
 	// 3. Locked -> Awaiting Resolution
 	var lockedMarkets []models.Market
-	config.DB.Where("resolution_status = ? AND resolution_time <= ?", "Locked", now).Find(&lockedMarkets)
+	if err := config.DB.Where("resolution_status = ? AND resolution_time <= ?", "Locked", now).Find(&lockedMarkets).Error; err != nil {
+		log.Printf("Market transition scan failed: %v", err)
+		return
+	}
 	for _, m := range lockedMarkets {
-		m.ResolutionStatus = "Awaiting Resolution"
-		config.DB.Save(&m)
+		if err := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", m.ID, "Locked").Update("resolution_status", "Awaiting Resolution").Error; err != nil {
+			log.Printf("Market transition failed: %v", err)
+		}
 		// Optionally notify admins
 	}
 }
@@ -80,22 +103,17 @@ func processCoinExpiries() {
 	var expiredBatches []models.CoinBatch
 
 	// Find batches that have expired but still have a balance > 0
-	config.DB.Where("expires_at <= ? AND balance > 0", now).Find(&expiredBatches)
+	if err := config.DB.Where("expires_at <= ? AND balance > 0", now).Find(&expiredBatches).Error; err != nil {
+		log.Printf("Expiry scan failed: %v", err)
+		return
+	}
 
 	for _, batch := range expiredBatches {
-		// Deduct via ledger
-		tx := config.DB.Begin()
-
-		err := DebitWalletTx(tx, batch.UserID, batch.Balance, models.TxTypeExpired, 0, "Coin Expiry", nil)
-		if err == nil {
-			batch.Balance = 0
-			tx.Save(&batch)
-			tx.Commit()
-		} else {
-			tx.Rollback()
-			log.Println("Failed to process coin expiry for batch:", batch.ID, err)
+		if err := ExpireCoinBatch(batch.ID); err != nil {
+			log.Printf("[Cron] Expiry failed for batch %d: %v", batch.ID, err)
 		}
 	}
+
 }
 
 // processPendingReferrals finds all ReferralEvent records whose 48-hour pending
@@ -106,34 +124,17 @@ func processPendingReferrals() {
 	now := time.Now()
 	var pendingEvents []models.ReferralEvent
 
-	config.DB.Where("is_paid = ? AND pending_until <= ? AND deleted_at IS NULL", false, now).
-		Find(&pendingEvents)
+	if err := config.DB.Where("is_paid = ? AND pending_until <= ? AND deleted_at IS NULL", false, now).Find(&pendingEvents).Error; err != nil {
+		log.Printf("Referral scan failed: %v", err)
+		return
+	}
 
 	for _, event := range pendingEvents {
-		tx := config.DB.Begin()
-
-		// Credit coins to referrer via immutable ledger
-		err := CreditWalletTx(tx, event.ReferrerID, event.Earnings,
-			models.TxTypeReferralBonus, event.ReferredID,
-			fmt.Sprintf("Referral bonus: milestone '%s' (User %d)", event.Status, event.ReferredID),
-			nil,
-		)
-		if err != nil {
-			tx.Rollback()
-			log.Printf("[Cron] Failed to pay referral event %d: %v", event.ID, err)
-			continue
+		if err := PayReferralEvent(event.ID); err != nil {
+			log.Printf("[Cron] Referral %d failed: %v", event.ID, err)
 		}
-
-		// Mark as paid so it is never processed again
-		if err := tx.Model(&event).Update("is_paid", true).Error; err != nil {
-			tx.Rollback()
-			log.Printf("[Cron] Failed to mark referral event %d as paid: %v", event.ID, err)
-			continue
-		}
-
-		tx.Commit()
-		log.Printf("[Cron] Paid referral event %d: %d coins to user %d", event.ID, event.Earnings, event.ReferrerID)
 	}
+
 }
 
 // publishDailyWildCard generates a Daily Wild Card market if one doesn't exist for the day
@@ -146,10 +147,15 @@ func publishDailyWildCard() {
 	if count == 0 {
 		// Fetch top news for the Wild Card
 		articles, err := GetTrendingNews()
-		
-		title := "Will it rain in London tomorrow?"
-		desc := "Daily Wild Card. Predict the weather in London."
-		
+
+		if err != nil || len(articles) == 0 {
+			log.Printf("Wild card awaiting news: %v", err)
+			return
+		}
+		day := time.Now().UTC().Format("2006-01-02")
+		title := ""
+		desc := ""
+
 		if err == nil && len(articles) > 0 {
 			// Use the top headline for the market
 			title = fmt.Sprintf("News follow-up: %s", articles[0].Title)
@@ -168,9 +174,10 @@ func publishDailyWildCard() {
 			Description:      desc,
 			Category:         "Wild Card",
 			Difficulty:       "Easy",
-			Payout:           50,
+			Payout:           20,
 			Options:          `["Yes", "No"]`,
-			ResolutionStatus: "Live",
+			ResolutionStatus: "Draft",
+			DailyKey:         &day,
 			Visibility:       "Public",
 			StartTime:        &start,
 			LockTime:         &lock,
@@ -178,8 +185,8 @@ func publishDailyWildCard() {
 			EndDate:          lock,
 		}
 
-		if err := config.DB.Create(&m).Error; err == nil {
-			BroadcastToAll("market_live", "The Daily Wild Card market is now LIVE!")
+		if err := config.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&m).Error; err == nil {
+			log.Println("Daily wild card draft prepared for editorial review")
 		}
 	}
 }
@@ -187,18 +194,49 @@ func publishDailyWildCard() {
 // sendExpiryReminders finds coin batches expiring within 30 days that haven't received a reminder
 func sendExpiryReminders() {
 	now := time.Now()
-	thirtyDaysFromNow := now.AddDate(0, 0, 30)
-
-	var expiringBatches []models.CoinBatch
-	config.DB.Where("expires_at <= ? AND balance > 0 AND reminder_sent_at IS NULL", thirtyDaysFromNow).Find(&expiringBatches)
-
-	for _, batch := range expiringBatches {
-		// In a real application, we would use an email service or push notification service here.
-		// For now, we simulate sending the reminder.
-		log.Printf("[Cron] Sending 30-day expiry reminder to UserID: %d for %d coins (Batch %d)", batch.UserID, batch.Balance, batch.ID)
-
-		// Mark as sent
-		batch.ReminderSentAt = &now
-		config.DB.Save(&batch)
+	var batches []models.CoinBatch
+	if err := config.DB.Where("expires_at > ? AND expires_at <= ? AND balance > 0 AND reminder_sent_at IS NULL", now, now.AddDate(0, 0, 30)).Find(&batches).Error; err != nil {
+		log.Printf("Reminder query failed: %v", err)
+		return
 	}
+	for _, batch := range batches {
+		if err := SendExpiryReminder(batch.ID); err != nil {
+			log.Printf("Reminder failed: %v", err)
+		}
+	}
+}
+func SendExpiryReminder(batchID uint) error {
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		var batch models.CoinBatch
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&batch, batchID).Error; err != nil {
+			return err
+		}
+		now := time.Now()
+		if batch.ReminderSentAt != nil || batch.Balance <= 0 || !batch.ExpiresAt.After(now) || batch.ExpiresAt.After(now.AddDate(0, 0, 30)) {
+			return nil
+		}
+		notification := models.Notification{UserID: batch.UserID, Key: fmt.Sprintf("expiry:%d", batch.ID), Message: fmt.Sprintf("%d coins expire on %s. Use them before that date.", batch.Balance, batch.ExpiresAt.UTC().Format("2006-01-02"))}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notification).Error; err != nil {
+			return err
+		}
+		return tx.Model(&batch).Update("reminder_sent_at", now).Error
+	})
+}
+
+func PayReferralEvent(eventID uint) error {
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		var event models.ReferralEvent
+		if err := tx.First(&event, eventID).Error; err != nil {
+			return err
+		}
+		// Conditional claim makes repeated and concurrent cron executions idempotent.
+		claimed := tx.Model(&models.ReferralEvent{}).Where("id = ? AND is_paid = ? AND pending_until <= ?", eventID, false, time.Now()).Update("is_paid", true)
+		if claimed.Error != nil {
+			return claimed.Error
+		}
+		if claimed.RowsAffected == 0 {
+			return nil
+		}
+		return CreditWalletTx(tx, event.ReferrerID, event.Earnings, models.TxTypeReferralBonus, event.ID, "Referral bonus: "+string(event.Status), nil)
+	})
 }

@@ -9,7 +9,6 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <!-- Lightweight Charts for Probability Graph -->
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
@@ -99,7 +98,7 @@
                             <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-chats-circle text-primary"></i> Discussion</h3>
                             <div class="input-group" style="flex-direction: row; gap: var(--spacing-3);">
                                 <div style="flex: 1; position: relative;">
-                                    <input type="text" id="commentInput" class="input-control" placeholder="Share your analysis..." style="border-radius: var(--radius-full); padding-left: var(--spacing-4);">
+                                    <input type="text" id="commentInput" aria-label="Market comment" maxlength="2000" class="input-control" placeholder="Share your analysis..." style="border-radius: var(--radius-full); padding-left: var(--spacing-4);">
                                 </div>
                                 <button class="btn btn-primary" onclick="postComment()" style="border-radius: var(--radius-full); padding: 0.5rem 1.5rem;">Post</button>
                             </div>
@@ -115,11 +114,8 @@
                             <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Place Prediction</h3>
                             
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-3); padding: var(--spacing-3); background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                                <span style="color: var(--text-secondary); font-weight: 500;">Current Odds</span>
-                                <div class="flex gap-4 font-bold">
-                                    <span class="text-yes" style="font-size: 1.1rem;">Yes 55%</span>
-                                    <span class="text-no" style="font-size: 1.1rem;">No 45%</span>
-                                </div>
+                                <span style="color: var(--text-secondary); font-weight: 500;">Fixed payout</span>
+                                <strong id="marketFixedPayout" class="text-success">-- PTS</strong>
                             </div>
                             
                             <div class="prediction-buttons">
@@ -132,7 +128,7 @@
                                     <label style="font-weight: 500;">Amount (PTS)</label>
                                     <div style="position: relative;">
                                         <i class="ph ph-coins" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                                        <input type="number" id="tradeAmount" class="input-control" placeholder="10" min="10" style="padding-left: 2.5rem; font-size: 1.1rem; font-weight: 600;">
+                                        <input type="number" id="tradeAmount" aria-label="Prediction stake in points" max="1000000" step="1" class="input-control" placeholder="10" min="10" style="padding-left: 2.5rem; font-size: 1.1rem; font-weight: 600;">
                                     </div>
                                 </div>
                                 
@@ -148,12 +144,8 @@
                         <div class="card" style="margin-top: var(--spacing-4); border: 1px solid var(--border-subtle);">
                             <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4); font-weight: 600;">Market Stats</h3>
                             <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
-                                <span>Volume</span>
-                                <span class="text-primary font-bold">142,500 PTS</span>
-                            </div>
-                            <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
-                                <span>Participants</span>
-                                <span class="font-bold text-primary-light">1,204</span>
+                                <span>Predictions</span>
+                                <span id="marketPredictionCount" class="text-primary font-bold">--</span>
                             </div>
                             <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem;">
                                 <span>Closes</span>

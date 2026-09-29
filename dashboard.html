@@ -32,9 +32,9 @@
                         <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-6);">
                             <h2 id="categoryTitle" style="font-weight: 700; font-size: 1.5rem; letter-spacing: -0.02em;">Live Markets</h2>
                             <div class="flex gap-2">
-                                <button class="btn btn-secondary" style="border-radius: var(--radius-full);"><i class="ph-fill ph-fire text-gold"></i> Trending</button>
-                                <button class="btn btn-outline" style="border-radius: var(--radius-full);">New</button>
-                                <button class="btn btn-outline" style="border-radius: var(--radius-full);">Closing Soon</button>
+                                <button data-sort="trending" aria-pressed="true" class="btn btn-secondary" style="border-radius: var(--radius-full);"><i class="ph-fill ph-fire text-gold"></i> Trending</button>
+                                <button class="btn btn-outline" style="border-radius: var(--radius-full);" data-sort="newest" aria-pressed="false">New</button>
+                                <button class="btn btn-outline" style="border-radius: var(--radius-full);" data-sort="ending_soon" aria-pressed="false">Closing Soon</button>
                             </div>
                         </div>
 
@@ -43,19 +43,7 @@
                             <div class="card skeleton" style="height: 200px;"></div>
                             <div class="card skeleton" style="height: 200px;"></div>
                             
-                            <!-- Sponsored Prediction Placeholder -->
-                            <div class="card" style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(30,30,30,0) 100%); border: 1px solid rgba(212,175,55,0.2); opacity: 0.6; pointer-events: none;">
-                                <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
-                                    <h3 class="text-gold font-bold"><i class="ph-fill ph-star"></i> Featured Prediction</h3>
-                                    <span class="badge badge-warning">Coming Soon</span>
-                                </div>
-                                <h4 style="font-size: 1.1rem; margin-bottom: 8px;">Will OpenAI release GPT-5 before December 2026?</h4>
-                                <div class="flex gap-2" style="margin-top: var(--spacing-4);">
-                                    <button class="btn btn-outline" style="flex:1;">Yes 75%</button>
-                                    <button class="btn btn-outline" style="flex:1;">No 25%</button>
-                                </div>
-                            </div>
-
+                            <!-- Sponsored predictions are planned; live cards come from the API. -->
                         </div>
                     </div>
 
@@ -92,7 +80,7 @@
                         <div class="card" style="background: var(--color-primary-light); border: 1px solid var(--color-primary);">
                             <h3 style="font-size: 1.1rem; color: #c4b5fd; font-weight: 600; margin-bottom: var(--spacing-2);">Join the Community</h3>
                             <p style="font-size: 0.9rem; color: #a78bfa; margin-bottom: var(--spacing-5); line-height: 1.5;">Discuss strategies, propose markets, and chat with top forecasters.</p>
-                            <button class="btn btn-primary w-full" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);"><i class="ph-fill ph-discord-logo"></i> Join Discord</button>
+                            <p class="text-sm">Discord community: coming soon. Discuss each market in its comments.</p>
                         </div>
                     </aside>
                 </div>

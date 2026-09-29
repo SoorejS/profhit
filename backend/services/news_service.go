@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"time"
 )
+
+var ErrNewsNotConfigured = errors.New("news provider is not configured")
 
 // Article represents a news article from GNews
 type Article struct {
@@ -45,20 +48,13 @@ func GetTrendingNews() ([]Article, error) {
 
 	apiKey := os.Getenv("NEWS_API_KEY")
 	if apiKey == "" {
-		// Fallback mock data if API key isn't provided yet
-		return []Article{
-			{
-				Title:       "Setup Required: Add NEWS_API_KEY",
-				Description: "To view real live news, add your GNews API key to the environment variables.",
-				URL:         "#",
-			},
-		}, nil
+		return nil, ErrNewsNotConfigured
 	}
 
 	// Fetch top headlines (general/world)
 	url := fmt.Sprintf("https://gnews.io/api/v4/top-headlines?category=general&lang=en&max=5&apikey=%s", apiKey)
-	
-	resp, err := http.Get(url)
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch news: %v", err)
 	}

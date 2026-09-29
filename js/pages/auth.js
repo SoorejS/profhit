@@ -12,7 +12,7 @@ window.handleGoogleCredentialResponse = async (response) => {
         return;
     }
     try {
-        const res = await ApiClient.post('/auth/google', { credential: response.credential });
+        const res = await ApiClient.post('/auth/google', { credential: response.credential, two_factor_code: document.getElementById('twoFactorCode')?.value || '' });
         if (res && res.token) {
             ApiClient.setToken(res.token);
             showToast('Google Sign-In successful! Welcome to PROPHIT.', 'success');
@@ -24,17 +24,27 @@ window.handleGoogleCredentialResponse = async (response) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    const googleHost = document.getElementById('googleSignIn');
+    if (googleHost) {
+        ApiClient.get('/auth/config').then(config => {
+            if (!config.google_client_id) { googleHost.textContent = 'Google Sign-In is not configured. Use email to continue.'; return; }
+            const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
+            script.onload = () => { googleHost.replaceChildren(); window.google.accounts.id.initialize({client_id: config.google_client_id, callback: window.handleGoogleCredentialResponse}); window.google.accounts.id.renderButton(googleHost, {type:'standard', theme:'outline', size:'large'}); };
+            script.onerror = () => { googleHost.textContent = 'Google Sign-In could not load. Use email or retry.'; };
+            document.head.append(script);
+        }).catch(() => { googleHost.textContent = 'Could not check Google Sign-In. Try email or refresh.'; });
+    }
     // Password toggle visibility
     const toggles = document.querySelectorAll('.password-toggle');
     toggles.forEach(toggle => {
         toggle.addEventListener('click', (e) => {
-            const input = e.target.previousElementSibling;
+            const input = e.currentTarget.previousElementSibling;
             if (input.type === 'password') {
                 input.type = 'text';
-                e.target.classList.replace('ph-eye', 'ph-eye-slash');
+                e.currentTarget.classList.replace('ph-eye', 'ph-eye-slash');
             } else {
                 input.type = 'password';
-                e.target.classList.replace('ph-eye-slash', 'ph-eye');
+                e.currentTarget.classList.replace('ph-eye-slash', 'ph-eye');
             }
         });
     });
@@ -75,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password').value;
 
             try {
-                const res = await ApiClient.post('/auth/login', { email, password });
+                const res = await ApiClient.post('/auth/login', { email, password, two_factor_code: document.getElementById('twoFactorCode')?.value || '' });
                 ApiClient.setToken(res.token);
                 window.location.href = 'dashboard.html';
             } catch (err) {

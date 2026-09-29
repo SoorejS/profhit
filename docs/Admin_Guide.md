@@ -1,23 +1,11 @@
-# PROPHIT Admin Guide
+# PROPHIT administration
 
-The Admin Dashboard provides comprehensive tools for managing the PROPHIT ecosystem during the closed beta.
+Sign in as an authorized admin or super-admin and open /admin.html. Never use local seeded credentials publicly. Production does not seed administrators; provision the first administrator through a controlled database administration process.
 
-## Accessing the Admin Panel
-1. Navigate to `/admin.html`.
-2. Login with an account that has the `RoleAdmin` or `RoleSuperAdmin` role. (During seeding, the default admin is usually `admin@prophit.app` / `password123` depending on configuration).
+- Markets: review proposals and active markets; resolve Locked or Awaiting Resolution markets using an exact declared option. Fixed payouts and statistics update in one transaction. Repeated resolution is rejected. Draft creation and state transitions are available through authorized APIs.
+- KYC: inspect provider attempts and failures. This screen does not manually forge approvals. Signed HyperVerge callbacks update identity.
+- Withdrawals: coins are deducted at request time. Rejection refunds once; approval does not debit again. Actual voucher fulfillment remains an operator responsibility. Catalog requests use the separate /api/admin/redemptions API.
+- Analytics: totals and health come from /api/admin/stats and /api/health.
+- Moderation: search users, ban/unban eligible accounts, and review reports. Self-ban and super-admin bans are rejected. Only super-admins can assign roles.
 
-## Key Workflows
-
-### User Management
-- **View Users**: The dashboard lists all registered users along with their wallet balance and tier status.
-- **Adjust Wallet Balance**: Admins can issue promotional coins or penalize bad actors directly from the user table. This utilizes the `TxTypeAdminAdjustment` ledger entry type.
-
-### Market Management
-- **Create Market**: Markets (Prediction questions) can be created via API or directly from backend seed scripts. Future UI iterations will support direct creation.
-- **Settle Market**: Once an event occurs, an Admin must settle the market with the correct outcome. The system will automatically trigger payout calculations, notifying winners via WebSocket, and updating their Wallet Ledgers.
-
-### KYC & Verification
-- **Approve KYC**: In Beta mode, users perform dummy KYC. Admins can view pending requests and manually approve or reject them. Approving KYC will unlock the `100% Profile` achievement (awarding 250 coins).
-
-### Withdrawals
-- **Process Withdrawals**: Users who reach the minimum threshold can request a withdrawal. Admins review pending requests in the dashboard. Once marked "Approved," the platform deducts the internal coins, but the actual real-world transfer must be done manually by the Admin (until Phase 2 Payment Gateways are implemented).
+There is no public wallet-adjustment endpoint, Grafana integration, advertiser portal, or sponsored-prediction workflow. Roadmap labels do not indicate completed functionality.

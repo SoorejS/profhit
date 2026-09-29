@@ -1,27 +1,13 @@
-# PROPHIT User Guide
+# PROPHIT user guide
 
-Welcome to the PROPHIT closed beta!
+Register or log in with email/password. Accounts with two-factor authentication need their authenticator code. Google Sign-In requires deployment configuration. Password reset uses an expiring email link.
 
-## Getting Started
-1. **Registration**: Head to `/register.html` to create your account.
-2. **KYC Verification**: For beta testers, you can visit the simulator to "auto-approve" your KYC profile. Once approved, you will unlock the "100% Profile" achievement and receive a 250 coin bonus.
+Browse Markets, read the cutoff and fixed payout, choose an option, and submit a whole-number stake of at least 10 PTS. You may predict once per market and once per category per UTC day. Correct predictions receive the displayed fixed payout, independent of stake size, without an additional stake refund. Portfolio retains outcomes after market archival.
 
-## The Economy
-- **Coins**: PROPHIT uses an internal virtual currency for predicting. You cannot deposit real money in this beta phase.
-- **Earning Coins**: 
-  - Logging in daily increases your streak and rewards you with daily bonuses.
-  - Correctly predicting markets yields payouts based on odds.
-  - Referring friends using your unique referral code grants both of you bonus coins.
+Wallet shows balance and ledger history. Deposits require configured Razorpay. Catalog rewards and vouchers require verified identity and sufficient unexpired coins. Coins normally expire one year after credit. Expiry reminders are stored once per batch. Expired coins cannot be spent before the hourly expiry job records removal.
 
-## Making Predictions
-1. Navigate to the **Markets** page (`/market.html`).
-2. Select a market of interest (e.g., "Will Bitcoin hit $100k?").
-3. Choose your outcome (YES or NO) and stake a specific amount of coins.
-4. If you win, your wallet will automatically be credited upon market settlement. 
-5. You will receive a real-time notification via the application when a market you participated in is settled.
+Daily check-in grants 10 PTS, with bonuses at days 3, 7, and 30. Profile lists earned achievements. Eligible referral rewards remain pending 48 hours and are paid by the hourly job; referrers are capped at 20 milestone rewards. Referral welcome rewards are separate from the base 100 PTS registration bonus.
 
-## Gamification & Achievements
-PROPHIT includes a rich gamification engine. View your profile (`/profile.html`) to see your current badges and achievements. Earning achievements grants coin bonuses. Examples include:
-- First Prediction Placed
-- 7-Day Login Streak
-- Profile 100% Completed
+Start KYC from Wallet. Pending attempts expose status checks. The simulator is only a local super-admin development tool, never real user verification.
+
+Support opens your email application; it does not create a server-side ticket. Profile editing, avatar uploads, notification preferences, and two-factor enrollment are explicitly unfinished. Login supports accounts whose two-factor configuration is already provisioned.

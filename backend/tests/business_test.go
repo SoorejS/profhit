@@ -11,62 +11,17 @@ import (
 )
 
 func setupTestDB() {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:?_pragma=foreign_keys(1)"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
 	config.DB = db
 
-	// Drop tables first to prevent shared memory cache contamination between tests
-	config.DB.Migrator().DropTable(
-		&models.User{},
-		&models.Market{},
-		&models.PredictionSubmission{},
-		&models.Comment{},
-		&models.HyperVergeKYC{},
-		&models.WithdrawalRequest{},
-		&models.WalletLedger{},
-		&models.UserStreak{},
-		&models.PasswordResetToken{},
-		&models.ReferralEvent{},
-		&models.AuditLog{},
-		&models.Report{},
-		&models.WeeklyChallenge{},
-		&models.ChallengeParticipant{},
-		&models.Achievement{},
-		&models.UserAchievement{},
-		&models.Badge{},
-		&models.UserBadge{},
-		&models.RewardItem{},
-		&models.Redemption{},
-		&models.CoinBatch{},
-		&models.PaymentTransaction{},
-	)
-
-	config.DB.AutoMigrate(
-		&models.User{},
-		&models.Market{},
-		&models.PredictionSubmission{},
-		&models.Comment{},
-		&models.HyperVergeKYC{},
-		&models.WithdrawalRequest{},
-		&models.WalletLedger{},
-		&models.UserStreak{},
-		&models.PasswordResetToken{},
-		&models.ReferralEvent{},
-		&models.AuditLog{},
-		&models.Report{},
-		&models.WeeklyChallenge{},
-		&models.ChallengeParticipant{},
-		&models.Achievement{},
-		&models.UserAchievement{},
-		&models.Badge{},
-		&models.UserBadge{},
-		&models.RewardItem{},
-		&models.Redemption{},
-		&models.CoinBatch{},
-		&models.PaymentTransaction{},
-	)
+	if err := config.Migrate(db); err != nil {
+		panic(err)
+	}
 }
 
 func TestProfileCompletionAchievement(t *testing.T) {
@@ -74,11 +29,12 @@ func TestProfileCompletionAchievement(t *testing.T) {
 
 	// Create user
 	user := models.User{
-		Username:        "achieve_test",
-		Email:           "achieve@test.com",
-		Points:          0,
-		KycStatus:       true,
-		TwoFactorSecret: "SECRET",
+		Username:         "achieve_test",
+		Email:            "achieve@test.com",
+		Points:           0,
+		KycStatus:        true,
+		TwoFactorSecret:  "SECRET",
+		TwoFactorEnabled: true,
 	}
 	config.DB.Create(&user)
 

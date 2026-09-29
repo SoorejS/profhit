@@ -6,6 +6,7 @@ import (
 )
 
 type Market struct {
+	DailyKey         *string        `gorm:"uniqueIndex" json:"-"`
 	ID               uint           `gorm:"primaryKey" json:"id"`
 	Title            string         `gorm:"not null" json:"title"`
 	Description      string         `json:"description"`

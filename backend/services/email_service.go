@@ -3,10 +3,15 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
+	"html"
 	"log"
+	"net"
 	"net/smtp"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // SendEmail sends an HTML email via SMTP (e.g. Gmail SMTP)
@@ -49,55 +54,59 @@ func SendEmail(toEmail, subject, htmlBody string) error {
 	message += "\r\n" + htmlBody
 
 	auth := smtp.PlainAuth("", username, password, smtpHost)
-	addr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
+	addr := net.JoinHostPort(smtpHost, strconv.Itoa(smtpPort))
 
-	// Send via TLS (Port 465) or STARTTLS (Port 587)
+	// Bound connection setup and the complete SMTP conversation.
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	var conn net.Conn
+	var err error
+	tlsConfig := &tls.Config{ServerName: smtpHost, MinVersion: tls.VersionTLS12}
 	if smtpPort == 465 {
-		tlsconfig := &tls.Config{
-			InsecureSkipVerify: false,
-			ServerName:         smtpHost,
-		}
-		conn, err := tls.Dial("tcp", addr, tlsconfig)
-		if err != nil {
-			return fmt.Errorf("failed TLS dial: %v", err)
-		}
-		defer conn.Close()
-
-		client, err := smtp.NewClient(conn, smtpHost)
-		if err != nil {
-			return fmt.Errorf("failed SMTP client: %v", err)
-		}
-		defer client.Quit()
-
-		if err = client.Auth(auth); err != nil {
-			return fmt.Errorf("failed SMTP auth: %v", err)
-		}
-		if err = client.Mail(senderEmail); err != nil {
-			return fmt.Errorf("failed MAIL command: %v", err)
-		}
-		if err = client.Rcpt(toEmail); err != nil {
-			return fmt.Errorf("failed RCPT command: %v", err)
-		}
-
-		w, err := client.Data()
-		if err != nil {
-			return fmt.Errorf("failed DATA command: %v", err)
-		}
-		_, err = w.Write([]byte(message))
-		if err != nil {
-			return fmt.Errorf("failed writing body: %v", err)
-		}
-		err = w.Close()
-		if err != nil {
-			return fmt.Errorf("failed closing data writer: %v", err)
-		}
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
 	} else {
-		// Port 587 STARTTLS standard flow
-		err := smtp.SendMail(addr, auth, senderEmail, []string{toEmail}, []byte(message))
-		if err != nil {
-			log.Printf("[EmailService] Failed to send email to %s: %v\n", toEmail, err)
+		conn, err = dialer.Dial("tcp", addr)
+	}
+	if err != nil {
+		return fmt.Errorf("SMTP connection failed: %w", err)
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return err
+	}
+	client, err := smtp.NewClient(conn, smtpHost)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	if smtpPort != 465 {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			return fmt.Errorf("SMTP server must support STARTTLS")
+		}
+		if err := client.StartTLS(tlsConfig); err != nil {
 			return err
 		}
+	}
+	if err := client.Auth(auth); err != nil {
+		return err
+	}
+	if err := client.Mail(senderEmail); err != nil {
+		return err
+	}
+	if err := client.Rcpt(toEmail); err != nil {
+		return err
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write([]byte(message)); err != nil {
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	if err := client.Quit(); err != nil {
+		return err
 	}
 
 	log.Printf("[EmailService] Successfully sent email to %s (Subject: %s)\n", toEmail, subject)
@@ -106,7 +115,11 @@ func SendEmail(toEmail, subject, htmlBody string) error {
 
 // SendPasswordResetEmail sends a formatted password reset link email
 func SendPasswordResetEmail(toEmail, username, resetToken string) error {
-	resetURL := fmt.Sprintf("https://profhit.vercel.app/reset-password.html?token=%s", resetToken)
+	appURL := strings.TrimRight(os.Getenv("APP_URL"), "/")
+	if appURL == "" {
+		appURL = "https://profhit.vercel.app"
+	}
+	resetURL := appURL + "/reset-password.html?token=" + url.QueryEscape(resetToken)
 	subject := "Reset Your PROPHIT Password"
 	htmlBody := fmt.Sprintf(`
 	<!DOCTYPE html>
@@ -129,7 +142,7 @@ func SendPasswordResetEmail(toEmail, username, resetToken string) error {
 		</div>
 	</body>
 	</html>
-	`, username, resetURL)
+	`, html.EscapeString(username), html.EscapeString(resetURL))
 
 	return SendEmail(toEmail, subject, htmlBody)
 }

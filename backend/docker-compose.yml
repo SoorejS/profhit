@@ -1,55 +1,38 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: profhit
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set a unique DB_PASSWORD}
       POSTGRES_DB: profhit
-    ports:
-      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - profhit_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U profhit -d profhit"]
       interval: 5s
       timeout: 5s
       retries: 10
-
   api:
     build: .
-    ports:
-      - "8080:8080"
+    env_file: .env
     environment:
-      - DB_HOST=db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=profhit
-      - DB_PORT=5432
-      - PORT=8080
-      # REQUIRED: Override this with a strong random secret (>=32 chars) before ANY public deployment.
-      # Generate one with: openssl rand -hex 32
-      - JWT_SECRET=prophit-docker-dev-secret-CHANGE-BEFORE-PRODUCTION-2026
-      # Set to false in production to enforce real KYC verification.
-      - BETA_MODE=true
-
-      - HYPERVERGE_API_KEY=dummy_key_for_testing
-      - HYPERVERGE_API_SECRET=dummy_secret_for_testing
-      - HYPERVERGE_WORKFLOW_ID=dummy_workflow_id
-      - HYPERVERGE_WEBHOOK_SECRET=dummy_webhook_secret
-
-      - RAZORPAY_KEY_ID=dummy_key
-      - RAZORPAY_KEY_SECRET=dummy_secret
-      - RAZORPAY_WEBHOOK_SECRET=dummy_webhook_secret
-
-      # Optional: set to your deployed frontend URL for password reset links
-      # - APP_URL=https://prophit.app
+      USE_SQLITE: "false"
+      DB_HOST: db
+      DB_USER: profhit
+      DB_PASSWORD: ${DB_PASSWORD:?Set a unique DB_PASSWORD}
+      DB_NAME: profhit
+      DB_PORT: "5432"
+      DB_SSLMODE: disable # Private Compose network; use TLS for remote databases.
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 characters}
+      GIN_MODE: release
+      BETA_MODE: "false"
+      SEED_DEMO_DATA: "false"
+    ports:
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
-
 volumes:
-  postgres_data:
+  profhit_pgdata:

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"gorm.io/gorm/clause"
 	"net/http"
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -13,6 +14,7 @@ import (
 
 // GetReports fetches all reports (admin/super_admin)
 func GetReports(c *gin.Context) {
+	limit, offset := getPagination(c)
 	var reports []models.Report
 	status := c.Query("status")
 
@@ -21,7 +23,7 @@ func GetReports(c *gin.Context) {
 		query = query.Where("status = ?", status)
 	}
 
-	if err := query.Find(&reports).Error; err != nil {
+	if err := query.Limit(limit).Offset(offset).Find(&reports).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
 		return
 	}
@@ -43,8 +45,10 @@ func ResolveReport(c *gin.Context) {
 		return
 	}
 
+	tx := config.DB.Begin()
+	defer tx.Rollback()
 	var report models.Report
-	if err := config.DB.First(&report, reportID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", reportID).First(&report).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Report not found"})
 		return
 	}
@@ -56,13 +60,26 @@ func ResolveReport(c *gin.Context) {
 
 	adminID := c.MustGet("userID").(uint)
 
-	tx := config.DB.Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
+	if report.TargetType == "User" && req.Action != "Dismiss" {
+		var target models.User
+		if err := tx.First(&target, report.TargetID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+		if target.ID == adminID || target.Role == models.RoleSuperAdmin || (target.Role == models.RoleAdmin && c.GetString("role") != models.RoleSuperAdmin) {
+			tx.Rollback()
+			c.JSON(403, gin.H{"error": "Cannot moderate this account"})
+			return
+		}
+	}
 	switch req.Action {
 	case "Dismiss":
 		report.Status = "Dismissed"

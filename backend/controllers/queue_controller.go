@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"gorm.io/gorm/clause"
 	"net/http"
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -37,7 +38,7 @@ func ApproveWithdrawal(c *gin.Context) {
 	adminID := c.MustGet("userID").(uint)
 
 	var wReq models.WithdrawalRequest
-	if err := config.DB.First(&wReq, reqID).Error; err != nil {
+	if err := config.DB.Where("id = ?", reqID).First(&wReq).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Request not found"})
 		return
 	}
@@ -49,7 +50,11 @@ func ApproveWithdrawal(c *gin.Context) {
 
 	wReq.Status = "Approved"
 	wReq.AdminID = &adminID
-	config.DB.Save(&wReq)
+	result := config.DB.Model(&models.WithdrawalRequest{}).Where("id = ? AND status = ?", wReq.ID, "Pending").Updates(map[string]interface{}{"status": "Approved", "admin_id": adminID})
+	if result.Error != nil || result.RowsAffected != 1 {
+		c.JSON(409, gin.H{"error": "Request changed; refresh and retry"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Withdrawal Approved"})
 }
@@ -59,8 +64,10 @@ func RejectWithdrawal(c *gin.Context) {
 	reqID := c.Param("id")
 	adminID := c.MustGet("userID").(uint)
 
+	tx := config.DB.Begin()
+	defer tx.Rollback()
 	var wReq models.WithdrawalRequest
-	if err := config.DB.First(&wReq, reqID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", reqID).First(&wReq).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Request not found"})
 		return
 	}
@@ -69,13 +76,6 @@ func RejectWithdrawal(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Request is not pending"})
 		return
 	}
-
-	tx := config.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
 
 	wReq.Status = "Rejected"
 	wReq.AdminID = &adminID
@@ -96,7 +96,7 @@ func RejectWithdrawal(c *gin.Context) {
 		&adminID,
 	); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund coins: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund coins"})
 		return
 	}
 

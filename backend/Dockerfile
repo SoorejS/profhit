@@ -1,20 +1,14 @@
-FROM golang:alpine AS builder
-
+FROM golang:1.26.8-alpine AS builder
 WORKDIR /app
-
 COPY go.mod go.sum ./
 RUN go mod download
-
-COPY . .
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /profhit-backend .
-
-FROM alpine:latest
-
-WORKDIR /
-
-COPY --from=builder /profhit-backend /profhit-backend
-
+COPY . ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /profhit-server .
+FROM alpine:3.23
+RUN apk --no-cache add ca-certificates tzdata && adduser -D -u 10001 app
+WORKDIR /app
+COPY --from=builder /profhit-server /app/profhit-server
+USER app
 EXPOSE 8080
-
-CMD ["/profhit-backend"]
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -q -O /dev/null http://127.0.0.1:8080/api/health || exit 1
+CMD ["/app/profhit-server"]

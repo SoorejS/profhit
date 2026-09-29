@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('sTier').value = data.tier || 'Standard';
         }
     } catch (err) {
-        console.error("Failed to load profile data", err);
         document.getElementById('sUsername').value = 'Error loading data';
         document.getElementById('sEmail').value = 'Error loading data';
         document.getElementById('sTier').value = 'Error loading data';

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"profhit-backend/services"
 
@@ -11,7 +12,11 @@ import (
 func GetTrendingNews(c *gin.Context) {
 	articles, err := services.GetTrendingNews()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trending news"})
+		if errors.Is(err, services.ErrNewsNotConfigured) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "News is not configured"})
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": "News provider is unavailable"})
 		return
 	}
 

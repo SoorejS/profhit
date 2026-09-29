@@ -13,6 +13,7 @@ const MaxReferralRewards = 20
 type ReferralStatus string
 
 const (
+	ReferralStatusWelcome      ReferralStatus = "welcome"
 	ReferralStatusSignedUp     ReferralStatus = "signed_up"
 	ReferralStatusKYCCompleted ReferralStatus = "kyc_completed"
 	ReferralStatusFirstDeposit ReferralStatus = "first_deposit"
@@ -25,11 +26,11 @@ const (
 // delay has elapsed. This ensures rewards survive server restarts.
 type ReferralEvent struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
-	ReferrerID   uint           `gorm:"not null;index" json:"referrer_id"`
-	ReferredID   uint           `gorm:"not null;index" json:"referred_id"`
+	ReferrerID   uint           `gorm:"not null;index;uniqueIndex:idx_referral_milestone" json:"referrer_id"`
+	ReferredID   uint           `gorm:"not null;index;uniqueIndex:idx_referral_milestone" json:"referred_id"`
 	Referrer     User           `gorm:"foreignKey:ReferrerID;constraint:OnDelete:CASCADE" json:"-"`
 	Referred     User           `gorm:"foreignKey:ReferredID;constraint:OnDelete:CASCADE" json:"-"`
-	Status       ReferralStatus `gorm:"not null;index" json:"status"`
+	Status       ReferralStatus `gorm:"not null;index;uniqueIndex:idx_referral_milestone" json:"status"`
 	Earnings     int            `gorm:"default:0" json:"earnings"`          // Points to be awarded
 	PendingUntil time.Time      `gorm:"index" json:"pending_until"`         // Award not before this time (48h delay)
 	IsPaid       bool           `gorm:"default:false;index" json:"is_paid"` // Flipped by cron after delay elapses

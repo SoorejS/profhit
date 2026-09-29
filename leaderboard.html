@@ -147,14 +147,14 @@
                         
                         <div style="display: flex; flex-direction: column; gap: var(--spacing-4); align-items: flex-end;">
                             <div class="leaderboard-tabs">
-                                <div class="leaderboard-tab active" onclick="switchTab('points')" id="tab-points" role="button" aria-label="Sort by Top Points">Top Points</div>
-                                <div class="leaderboard-tab" onclick="switchTab('streak')" id="tab-streak" role="button" aria-label="Sort by Hot Streaks">Hot Streaks</div>
-                                <div class="leaderboard-tab" onclick="switchTab('winrate')" id="tab-winrate" role="button" aria-label="Sort by Win Rate">Win Rate</div>
+                                <button type="button" class="leaderboard-tab active" onclick="switchTab('points')" id="tab-points" role="button" aria-label="Sort by Top Points">Top Points</button>
+                                <button type="button" class="leaderboard-tab" onclick="switchTab('streak')" id="tab-streak" role="button" aria-label="Sort by Hot Streaks">Hot Streaks</button>
+                                <button type="button" class="leaderboard-tab" onclick="switchTab('winrate')" id="tab-winrate" role="button" aria-label="Sort by Win Rate">Win Rate</button>
                             </div>
                             
                             <div class="search-box" style="position: relative; width: 100%; max-width: 300px;">
                                 <i class="ph ph-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                                <input type="text" id="searchInput" placeholder="Search users..." style="width: 100%; padding: 8px 12px 8px 36px; border-radius: var(--radius-full); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); outline: none;">
+                                <input type="text" id="searchInput" aria-label="Search leaderboard" placeholder="Search users..." style="width: 100%; padding: 8px 12px 8px 36px; border-radius: var(--radius-full); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); outline: none;">
                             </div>
                         </div>
                     </div>

@@ -23,14 +23,18 @@ func GetReferralAnalytics(c *gin.Context) {
 
 	// Get total earnings
 	var totalEarnings int64
-	config.DB.Model(&models.ReferralEvent{}).Where("referrer_id = ?", userID).Select("COALESCE(SUM(earnings), 0)").Row().Scan(&totalEarnings)
+	if err := config.DB.Model(&models.ReferralEvent{}).Where("referrer_id = ? AND is_paid = ?", userID, true).Select("COALESCE(SUM(earnings), 0)").Row().Scan(&totalEarnings); err != nil {
+		c.JSON(500, gin.H{"error": "Could not load referral earnings"})
+		return
+	}
 
 	// Get detailed events history
 	var history []models.ReferralEvent
 	if err := config.DB.Preload("Referred", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id, username")
 	}).Where("referrer_id = ?", userID).Order("created_at desc").Limit(50).Find(&history).Error; err != nil {
-		// Just log and continue, we can return empty history
+		c.JSON(500, gin.H{"error": "Could not load referral history"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
