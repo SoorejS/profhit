@@ -12,11 +12,14 @@ The PROPHIT application has reached commit `785d7a0` on `main` at repository `ht
 
 | Gate | Status | Evidence |
 | --- | --- | --- |
-| Historical credential rotation | BLOCKED | Legacy commits contain historical values (`JWT_SECRET`, `DB_PASSWORD`, `NEWS_API_KEY`, `GEMINI_API_KEY`, `SMTP_PASSWORD`). Environment contains unrotated legacy keys/placeholder configs. Operator external revocation & rotation required. |
+| Current secret files removed | PASS | `git ls-files '*.env' '*.db' '*.sqlite' '*.exe' '*.pem' '*.key'` verified 0 sensitive tracked files in git index and tree. |
+| Historical credentials rotated | BLOCKED | Historical git commits contain legacy values (`JWT_SECRET`, `DB_PASSWORD`, `NEWS_API_KEY`, `GEMINI_API_KEY`, `SMTP_PASSWORD`). Untracked environment retains unrotated legacy keys/placeholders. Operator external revocation & rotation required. |
 | Razorpay sandbox | BLOCKED | `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` contain placeholder values in configuration. Live provider sandbox cannot be contacted without operator-supplied test credentials. Unit mock and HMAC tests pass. |
 | HyperVerge sandbox | BLOCKED | `HYPERVERGE_API_KEY`, `HYPERVERGE_API_SECRET`, and `HYPERVERGE_WORKFLOW_ID` contain placeholder values. Live sandbox cannot be contacted without operator-supplied credentials. Unit retry backoff tests pass. |
-| SMTP staging | BLOCKED | Unrotated Gmail app password in configuration; dedicated staging mailbox not configured. Explicit HTTP 503 emitted when unconfigured. Unit connection tests pass. |
-| Google OAuth staging | BLOCKED | Google Client ID unverified against live staging origin; no authorized test ID token provided for live browser handshake. Unit token parsing tests pass. |
+| SMTP staging | BLOCKED | Staging requires dedicated test mailbox; current configuration retains legacy personal credentials without external rotation. Safe degradation (HTTP 503) verified. |
+| Google OAuth staging | BLOCKED | Google Client ID unverified against live staging origin; no authorized staging ID token provided for live browser handshake. Unit token parsing tests pass. |
+| Production data rehearsal | BLOCKED / N/A | Operator has not supplied a sanitized production database backup. Disposable PostgreSQL 15 auto-migration and pg_dump/restore drills passed. |
+| Final staging smoke test | BLOCKED | Full end-to-end journey smoke test requires active staging deployment with the rotated provider credentials listed above. |
 | PostgreSQL | PASS | PostgreSQL 15 container verified. 24 tables auto-migrated with indices and foreign keys. 4/4 concurrent money-path tests passed using `clause.Locking{Strength: "UPDATE"}`. |
 | Race detector | PASS | `go test -race ./...` executed in Linux container (`golang:1.26.8-alpine` with `gcc` and `musl-dev`). Zero data races detected. |
 | Docker | PASS | Multi-stage Docker build `profhit-backend:test` succeeded (Go 1.26.8 builder, Alpine 3.23 runner, unprivileged app user `10001`). Compose stack verified healthy. |
@@ -96,6 +99,7 @@ To transition PROPHIT from **CONDITIONAL GO** to **GO**:
 ## 6. Git Tracking Status
 
 * **Branch**: `main`
-* **Commit Hash**: `785d7a0` (`fix: complete production release stabilization`)
+* **Release Stabilization Baseline**: `785d7a0` (`fix: complete production release stabilization`)
+* **HEAD**: `96fa1d4` (`docs: align release gate matrix with external certification gates`)
 * **Remote**: `https://github.com/SoorejS/profhit` (pushed to origin/main)
 * **Working Tree**: Clean (`nothing to commit, working tree clean`)
