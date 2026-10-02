@@ -10,27 +10,21 @@ The PROPHIT application has reached commit `785d7a0` on `main` at repository `ht
 
 ## 2. Release Gate Classification Matrix
 
-| Release Gate | Classification | Evidence & Runtime Details | Blocker Status |
-| --- | --- | --- | --- |
-| **Current Secrets Removed** | **PASS** | `git ls-files` returned 0 tracked `.env`, `.db`, `.exe`, or `.key` files. All secret exclusions verified in `.gitignore`, `.dockerignore`, `backend/.dockerignore`, and `.vercelignore`. | Non-Blocking |
-| **Historical Credentials Rotated** | **BLOCKED** | Historical Git commits contain legacy secrets (`JWT_SECRET`, `DB_PASSWORD`, `NEWS_API_KEY`, `GEMINI_API_KEY`, `SMTP_PASSWORD`). Operator rotation required. | **Production Blocker** |
-| **Go Code Compilation** | **PASS** | `go build ./...` compiled cleanly with 0 errors or warnings. | Non-Blocking |
-| **Go Test Suite** | **PASS** | `go test ./...` passed cleanly (16.048s) with 0 failures across unit & integration tests. | Non-Blocking |
-| **Race Detector** | **PASS** | `go test -race ./...` executed in Linux container (`golang:1.26.8-alpine` + `gcc` + `musl-dev`) with 0 data races detected. | Non-Blocking |
-| **Frontend Verification** | **PASS** | `node scripts/check-frontend.mjs` passed (25 HTML pages, 21 ES modules, 0 syntax/XSS/broken link errors). | Non-Blocking |
-| **Vulnerability Scanner** | **PASS** | `govulncheck ./...` reported 0 reachable vulnerabilities in application code. | Non-Blocking |
-| **Docker Build** | **PASS** | Multi-stage build `docker build -t profhit-backend:test .` succeeded (Go 1.26.8 builder, Alpine 3.23 runner, unprivileged app user `10001`). | Non-Blocking |
-| **PostgreSQL Migration** | **PASS** | `docker compose up -d` auto-migrated 24 PostgreSQL schema tables with foreign keys, unique indices, and check constraints. | Non-Blocking |
-| **PostgreSQL Concurrency** | **PASS** | Real PostgreSQL concurrency suite (`TestPostgresWalletConcurrency`, `TestPostgresPaymentSettlementConcurrency`, `TestPostgresRedemptionStockConcurrency`, `TestPostgresMarketResolutionConcurrency`) passed using row locks (`clause.Locking{Strength: "UPDATE"}`). | Non-Blocking |
-| **Wallet Accounting Invariants** | **PASS** | Enforced $\text{User.Points} = \text{Ledger Balance Sum} = \text{Unexpired CoinBatch Sum}$ across all concurrent operations with zero negative balances or double-spends. | Non-Blocking |
-| **Razorpay Staging** | **BLOCKED** | Unit HMAC & replay verification tests pass. Live sandbox API credentials required for end-to-end provider staging certification. | **Feature Blocker** |
-| **HyperVerge Staging** | **BLOCKED** | Session backoff & webhook signature tests pass. Live sandbox API credentials required for staging session certification. | **Feature Blocker** |
-| **SMTP Staging** | **BLOCKED** | Explicit 503 response emitted when unconfigured. Production SMTP credentials required for password reset delivery certification. | **Feature Blocker** |
-| **Google OAuth Staging** | **BLOCKED** | ID token validation unit tests pass. Authorized Google Client ID & Secret required for live origin testing. | **Feature Blocker** |
-| **Production Data Rehearsal** | **BLOCKED** | Requires operator-supplied sanitized production database dump. | **Operational Blocker** |
-| **Disaster Recovery Backup/Restore** | **PASS** | Verified `pg_dump` backup, `DROP DATABASE`, `CREATE DATABASE`, and `psql` restore drill with 100% schema & data integrity. | Non-Blocking |
-| **Standardized Pagination** | **PASS** | Bounded pagination contract (`items`, `page`, `page_size`, `total`, `total_pages`) implemented on 7 list endpoints; frontend aggregates queried via `/api/me/stats`. | Non-Blocking |
-| **Static Host Security & CSP** | **PASS** | `vercel.json` configured with strict CSP, HSTS, X-Frame-Options, and Referrer-Policy security headers. Bearer token storage documented. | Non-Blocking |
+| Gate | Status | Evidence |
+| --- | --- | --- |
+| Historical credential rotation | BLOCKED | Legacy commits contain historical values (`JWT_SECRET`, `DB_PASSWORD`, `NEWS_API_KEY`, `GEMINI_API_KEY`, `SMTP_PASSWORD`). Environment contains unrotated legacy keys/placeholder configs. Operator external revocation & rotation required. |
+| Razorpay sandbox | BLOCKED | `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` contain placeholder values in configuration. Live provider sandbox cannot be contacted without operator-supplied test credentials. Unit mock and HMAC tests pass. |
+| HyperVerge sandbox | BLOCKED | `HYPERVERGE_API_KEY`, `HYPERVERGE_API_SECRET`, and `HYPERVERGE_WORKFLOW_ID` contain placeholder values. Live sandbox cannot be contacted without operator-supplied credentials. Unit retry backoff tests pass. |
+| SMTP staging | BLOCKED | Unrotated Gmail app password in configuration; dedicated staging mailbox not configured. Explicit HTTP 503 emitted when unconfigured. Unit connection tests pass. |
+| Google OAuth staging | BLOCKED | Google Client ID unverified against live staging origin; no authorized test ID token provided for live browser handshake. Unit token parsing tests pass. |
+| PostgreSQL | PASS | PostgreSQL 15 container verified. 24 tables auto-migrated with indices and foreign keys. 4/4 concurrent money-path tests passed using `clause.Locking{Strength: "UPDATE"}`. |
+| Race detector | PASS | `go test -race ./...` executed in Linux container (`golang:1.26.8-alpine` with `gcc` and `musl-dev`). Zero data races detected. |
+| Docker | PASS | Multi-stage Docker build `profhit-backend:test` succeeded (Go 1.26.8 builder, Alpine 3.23 runner, unprivileged app user `10001`). Compose stack verified healthy. |
+| Wallet invariant | PASS | Invariant verified: $\text{User.Points} = \text{ledger balance sum} = \text{unexpired batch balance sum}$. Zero negative balances, double-spends, or duplicate credits. |
+| Backup/restore | PASS | Verified `pg_dump` backup (209 KB), `DROP DATABASE`, `CREATE DATABASE`, and `psql` restore drill with 100% schema, sequence, and data integrity. |
+| Pagination | PASS | Bounded pagination contract (`items`, `page`, `page_size`, `total`, `total_pages`) implemented on 7 list endpoints; frontend aggregates queried via `/api/me/stats`. |
+| Frontend | PASS | `node scripts/check-frontend.mjs` passed (25 HTML pages, 21 ES modules, 0 syntax/XSS/broken link errors). |
+| Vulnerability scan | PASS | `govulncheck ./...` passed with zero reachable vulnerabilities in application code. |
 
 ---
 
