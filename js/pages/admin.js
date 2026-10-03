@@ -82,13 +82,19 @@ async function fetchProposedMarkets() {
     }
 }
 
-async function fetchActiveMarkets() {
+let activeOffset=0, activeRequestVersion=0;
+async function fetchActiveMarkets(append=false) {
     const tbody = document.querySelector('#activeMarketsTable tbody');
     if (!tbody) return;
+    const more=document.getElementById('activeMarketsMore'), version=++activeRequestVersion;
+    if(!append)activeOffset=0;more.disabled=true;
     try {
-        const markets = await ApiClient.get('/markets');
+        const markets = await ApiClient.get(`/markets?limit=100&offset=${activeOffset}`);
+        if(version!==activeRequestVersion)return;
+        more.hidden=markets.length<100;
+        activeOffset+=markets.length;
         if (!markets || markets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
+            if(!append)tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
             return;
         }
 
@@ -96,11 +102,11 @@ async function fetchActiveMarkets() {
         const activeOrClosed = markets.filter(m => m.resolution_status !== 'Proposed');
 
         if (activeOrClosed.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
+            if(!append)tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No active markets.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = activeOrClosed.map(m => {
+        const rows = activeOrClosed.map(m => {
             let statusBadge = m.resolution_status === 'Open' ? `<span class="badge badge-primary">Open</span>` : `<span class="badge badge-success">${escapeHTML(m.resolution_status)}</span>`;
             
             // If the market is open or closed but not resolved, we can resolve it
@@ -120,9 +126,12 @@ async function fetchActiveMarkets() {
             </tr>
             `;
         }).join('');
+        if(append)tbody.insertAdjacentHTML('beforeend',rows);else tbody.innerHTML=rows;
     } catch (err) {
+        if(version!==activeRequestVersion)return;
+        if(append){showToast('Could not load more markets. Retry.','error');return;}
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load active markets.</td></tr>';
-    }
+    } finally { if(version===activeRequestVersion)more.disabled=false; }
 }
 
 async function approveMarket(id) {
