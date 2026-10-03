@@ -54,6 +54,12 @@ window.submitProposal = async (e) => {
         }, 2000);
     } catch (err) {
         showToast(err.message, "error");
+        if (err.status === 409 && Number.isSafeInteger(Number(err.data?.existing_market_id))) {
+            const existing = document.createElement(err.data.existing_can_view ? 'a' : 'p');
+            if (err.data.existing_can_view) { existing.className='btn btn-outline'; existing.href=`market.html?id=${Number(err.data.existing_market_id)}`; }
+            existing.textContent=`${err.data.existing_can_view ? 'View existing prediction' : 'Existing prediction awaiting review'}: ${err.data.existing_title}`;
+            document.getElementById('predictionFormat').replaceChildren(existing);
+        }
         btn.disabled = false;
         btn.innerHTML = 'Submit Proposal for Review';
     }

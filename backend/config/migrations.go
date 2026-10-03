@@ -25,5 +25,6 @@ func Migrate(db *gorm.DB) error {
 		&models.PaymentTransaction{}, &models.RevokedToken{}, &models.Notification{},
 		&models.PredictionStreak{}, &models.EconomyMigration{},
 		&models.CoinConsumption{},
+		&models.NewsEvent{}, &models.NewsSource{}, &models.NewsIngestionState{},
 	)
 }

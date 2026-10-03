@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -13,6 +14,16 @@ import (
 // StartCronJobs initializes background workers for the application
 func StartCronJobs() {
 	log.Println("Starting Cron Jobs...")
+	go func() {
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			if err := RefreshLiveNews(ctx, ConfiguredNewsProviders(), time.Now().UTC()); err != nil {
+				log.Printf("News refresh: %v", err)
+			}
+			cancel()
+			time.Sleep(time.Minute)
+		}
+	}()
 
 	// Tick every minute
 	ticker := time.NewTicker(1 * time.Minute)
@@ -35,6 +46,7 @@ func StartCronJobs() {
 
 func runEveryMinute() {
 	transitionMarkets()
+	resolveProviderMarkets()
 }
 
 func runEveryHour() {
@@ -44,7 +56,6 @@ func runEveryHour() {
 	processCoinExpiries()
 	sendExpiryReminders()
 	processPendingReferrals()
-	publishDailyWildCard()
 }
 
 // transitionMarkets moves markets between states based on their lifecycle timestamps
@@ -142,17 +153,9 @@ func processPendingReferrals() {
 
 // publishDailyWildCard generates a Daily Wild Card market if one doesn't exist for the day
 func publishDailyWildCard() {
-	articles, err := GetTrendingNews()
-	if err != nil {
-		log.Printf("News candidates unavailable: %v", err)
-		return
-	}
-	for _, a := range articles {
-		if _, err := PrepareNewsCandidate(a, time.Now().UTC()); err == nil {
-			log.Println("News draft prepared for editorial review")
-			break
-		}
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	_ = RefreshLiveNews(ctx, ConfiguredNewsProviders(), time.Now().UTC())
 }
 
 // sendExpiryReminders finds coin batches expiring within 30 days that haven't received a reminder

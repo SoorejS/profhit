@@ -2,7 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
-import { escapeHTML } from '../utils/escape.js';
+import { escapeHTML, safeURL } from '../utils/escape.js';
 
 /**
  * PROPHIT - Market Detail Logic
@@ -15,10 +15,6 @@ let currentMarket;
 const tradeMarkup=document.querySelector(".trade-card").innerHTML;
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!ApiClient || !ApiClient.isAuthenticated()) {
-        window.location.href = 'login.html';
-        return;
-    }
 
     const urlParams = new URLSearchParams(window.location.search);
     currentMarketId = urlParams.get('id');
@@ -49,6 +45,12 @@ async function loadMarketDetails() {
         
         document.getElementById('marketTitle').textContent = market.title;
         document.getElementById('marketDesc').textContent = market.description;
+        document.getElementById('newsProvenance')?.remove();
+        if (market.news_event_id) {
+            const provenance=document.createElement('section');provenance.id='newsProvenance';provenance.className='card';
+            provenance.innerHTML=`<h3>Source event</h3><p>${escapeHTML(market.news_event_title)}</p><a href="${escapeHTML(safeURL(market.news_url))}" target="_blank" rel="noopener noreferrer">${escapeHTML(market.news_source_name)}</a><p>Published ${escapeHTML(new Date(market.news_published_at).toLocaleString())}; discovered ${escapeHTML(new Date(market.news_discovered_at).toLocaleString())}</p>`;
+            document.getElementById('marketDesc').after(provenance);
+        }
         document.getElementById('resolutionRules').textContent = market.resolution_source
             ? `Type: ${market.prediction_type}. Rule: ${market.resolution_rule}. Maximum range width: ${market.range_width || "not applicable"}. Result source: ${market.resolution_source}${market.evidence_url ? `. Settlement evidence: ${market.evidence_url}; observed ${market.observed_at}` : ""}`
             : 'An authorized reviewer will resolve this market from documented, verifiable evidence.';
@@ -101,6 +103,7 @@ function selectPrediction(outcome) {
 }
 
 async function executeTrade() {
+    if (!ApiClient.isAuthenticated()) { window.location.href='login.html'; return; }
     if(!currentMarket) return;
     const choice=readTypedAnswer();
     if(!choice){showToast('Enter your prediction.','error');return;}
@@ -162,6 +165,7 @@ async function loadComments() {
 }
 
 async function postComment() {
+    if (!ApiClient.isAuthenticated()) { window.location.href='login.html'; return; }
     const input = document.getElementById('commentInput');
     const content = input.value.trim();
     if (!content) return;

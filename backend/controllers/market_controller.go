@@ -3,7 +3,6 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"gorm.io/gorm/clause"
 	"math"
 	"net/http"
 	"strconv"
@@ -37,6 +36,14 @@ func GetAllMarkets(c *gin.Context) {
 
 	if category != "" {
 		query = query.Where("category = ?", category)
+	}
+	if search := strings.TrimSpace(c.Query("search")); search != "" {
+		if len(search) > 200 {
+			c.JSON(400, gin.H{"error": "Search is too long"})
+			return
+		}
+		term := "%" + strings.ToLower(search) + "%"
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(news_event_title) LIKE ? OR LOWER(category) LIKE ? OR LOWER(news_source_name) LIKE ?", term, term, term, term)
 	}
 
 	limitStr := c.Query("limit")
@@ -82,9 +89,7 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 	market.CreatorID = c.MustGet("userID").(uint)
-
-	if err := config.DB.Create(&market).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create market"})
+	if !createUniqueMarket(c, &market) {
 		return
 	}
 
@@ -96,7 +101,7 @@ func GetMarketByID(c *gin.Context) {
 	id := c.Param("id")
 	var market models.Market
 
-	if err := config.DB.Where("id = ? AND resolution_status NOT IN ?", id, []string{"Draft", "Proposed"}).First(&market).Error; err != nil {
+	if err := config.DB.Where("id = ? AND visibility = ? AND resolution_status NOT IN ?", id, "Public", []string{"Draft", "Proposed"}).First(&market).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
 		return
 	}
@@ -108,209 +113,23 @@ func GetMarketByID(c *gin.Context) {
 // correct predictors via the immutable CoinTransaction ledger.
 // Admin/SuperAdmin only (enforced by route middleware).
 func ResolveMarket(c *gin.Context) {
-	id := c.Param("id")
-
-	tx := config.DB.Begin()
-	defer tx.Rollback()
-	var market models.Market
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&market).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
-		return
-	}
-
-	// Allow resolution from Locked or Awaiting Resolution states.
-	// "Open" was a legacy value that never existed in the real lifecycle.
-	resolvableStatuses := map[string]bool{"Locked": true, "Awaiting Resolution": true}
-	if !resolvableStatuses[market.ResolutionStatus] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Market must be Locked or Awaiting Resolution before it can be resolved. Current status: " + market.ResolutionStatus})
-		return
-	}
-
-	var req struct {
-		// Accept both 'winner' (internal API) and 'outcome' (frontend shorthand)
-		Winner      string     `json:"winner"`
-		Outcome     string     `json:"outcome"`
-		EvidenceURL string     `json:"evidence_url"`
-		ObservedAt  *time.Time `json:"observed_at"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	// Normalise: prefer 'winner', fallback to 'outcome'
-	correctOption := req.Winner
-	if correctOption == "" {
-		correctOption = req.Outcome
-	}
-	if correctOption == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "'winner' or 'outcome' field is required"})
-		return
-	}
-
-	// Validate that correct option is one of the market's actual options
-	if !services.EvidenceMatchesSource(market, req.EvidenceURL) || req.ObservedAt == nil || req.ObservedAt.After(time.Now().UTC()) || (market.LockTime != nil && req.ObservedAt.Before(*market.LockTime)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Settlement requires approved-source evidence and an observation at or after the cutoff"})
-		return
-	}
-	canonical, err := services.ValidatePredictionValue(market, correctOption, true)
-	if err != nil {
+	var input services.ResolutionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	correctOption = canonical
-	market.EvidenceURL = req.EvidenceURL
-	market.ObservedAt = req.ObservedAt
-
-	// Capture the resolving admin's ID
-	adminIDVal, _ := c.Get("userID")
-	adminID, _ := adminIDVal.(uint)
-
-	// ── Load all predictions for this market ────────────────────────────────
-	var predictions []models.PredictionSubmission
-	if err := tx.Where("market_id = ?", market.ID).Order("user_id ASC").Find(&predictions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load predictions"})
-		return
-	}
-	if len(predictions) > 0 {
-		ids := []uint{}
-		for _, p := range predictions {
-			ids = append(ids, p.UserID)
-		}
-		var users []models.User
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", ids).Order("id asc").Find(&users).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Could not lock settlement accounts"})
-			return
-		}
-	}
-	winners, err := services.PredictionWinners(market, correctOption, predictions)
+	input.AdminID = c.MustGet("userID").(uint)
+	input.ClientIP = c.ClientIP()
+	result, err := services.SettleMarket(c.Param("id"), input)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		status := 500
+		if typed, ok := err.(*services.SettlementError); ok {
+			status = typed.Status
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
-
-	// ── Process everything inside ONE atomic transaction ─────────────────────
-	// CRITICAL FIX: CreditCoinsTx is called with the same tx object, ensuring
-	// that if any payout fails, ALL changes (predictions + coins + market) roll back.
-
-	winnerCount := 0
-	loserCount := 0
-
-	for i := range predictions {
-		pred := &predictions[i]
-		isCorrect := winners[pred.ID]
-		pred.IsCorrect = &isCorrect
-
-		if err := tx.Save(pred).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update prediction record"})
-			return
-		}
-
-		if isCorrect {
-			winnerCount++
-			// CreditWalletTx runs INSIDE the same tx — rolls back if market save fails
-			if err := services.CreditWalletTx(
-				tx,
-				pred.UserID,
-				pred.Potential,
-				models.TxTypePredictionWin,
-				market.ID,
-				"Won prediction on: "+market.Title,
-				&adminID,
-			); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": "Payout failed; no changes were committed",
-				})
-				return
-			}
-			if err := tx.Create(&models.Notification{UserID: pred.UserID, Key: fmt.Sprintf("prediction:%d", pred.ID), Message: fmt.Sprintf("Correct prediction: +%d coins for %s", pred.Potential, market.Title)}).Error; err != nil {
-				c.JSON(500, gin.H{"error": "Could not record reward notification"})
-				return
-			}
-		} else {
-			loserCount++
-		}
-		if market.WeeklyChallengeID != nil {
-			reward := 0
-			score := 0
-			if isCorrect {
-				reward = pred.Potential
-				score = 1
-			}
-			if err := tx.Model(&models.ChallengeParticipant{}).Where("challenge_id = ? AND user_id = ?", *market.WeeklyChallengeID, pred.UserID).Updates(map[string]interface{}{"score": score, "reward_won": reward}).Error; err != nil {
-				c.JSON(500, gin.H{"error": "Could not settle challenge participation"})
-				return
-			}
-		}
-	}
-	if market.WeeklyChallengeID != nil {
-		if err := tx.Model(&models.WeeklyChallenge{}).Where("id = ?", *market.WeeklyChallengeID).Update("status", "Completed").Error; err != nil {
-			c.JSON(500, gin.H{"error": "Could not finish challenge"})
-			return
-		}
-	}
-
-	// ── Finalise the market ─────────────────────────────────────────────────
-	now := time.Now().UTC()
-	market.ResolutionStatus = "Resolved"
-	market.CorrectOption = correctOption
-	market.ResolvedAt = &now
-	market.ResolvedByID = adminID
-
-	if err := tx.Save(&market).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resolved market"})
-		return
-	}
-
-	// Recalculate WinRate and TotalPredictions for all users involved in this market
-	if len(predictions) > 0 {
-		var userIDs []uint
-		for _, p := range predictions {
-			userIDs = append(userIDs, p.UserID)
-		}
-
-		if err := tx.Exec(`
-			UPDATE users
-			SET total_predictions = (
-				SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
-			),
-			win_rate = COALESCE((
-				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(is_correct), 0)
-				FROM prediction_submissions 
-				WHERE user_id = users.id AND deleted_at IS NULL
-			), 0)
-			WHERE id IN ?
-		`, userIDs).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user stats"})
-			return
-		}
-	}
-
-	_ = services.LogAction(tx, adminID, "RESOLVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Resolved market with winner: "+correctOption, c.ClientIP())
-
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
-		return
-	}
-	services.BroadcastToAll("market_resolved", gin.H{"market_id": market.ID})
-	services.BroadcastToAll("leaderboard_updated", gin.H{"market_id": market.ID})
-	for _, p := range predictions {
-		services.BroadcastToUser(p.UserID, "wallet_updated", gin.H{"market_id": market.ID})
-		services.BroadcastToUser(p.UserID, "notification_created", gin.H{"market_id": market.ID})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "Market resolved successfully!",
-		"market_id":    market.ID,
-		"winner":       correctOption,
-		"resolved_at":  now,
-		"total_preds":  len(predictions),
-		"winners_paid": winnerCount,
-		"losers":       loserCount,
-	})
+	c.JSON(200, result)
 }
 
 // ProposeMarket allows a regular user to suggest a new market topic
@@ -328,9 +147,7 @@ func ProposeMarket(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 	market.CreatorID = userID
 	market.ResolutionStatus = "Proposed"
-
-	if err := config.DB.Create(&market).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to propose market"})
+	if !createUniqueMarket(c, &market) {
 		return
 	}
 
@@ -360,6 +177,13 @@ func ApproveMarket(c *gin.Context) {
 		return
 	}
 	checked := market
+	if market.NewsEventID != nil {
+		var event models.NewsEvent
+		if config.DB.First(&event, *market.NewsEventID).Error != nil || services.ValidateNewsPrediction(event, &checked, time.Now().UTC()) != nil {
+			c.JSON(400, gin.H{"error": "News event is stale or rules need source-linked editorial review"})
+			return
+		}
+	}
 	if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
 		c.JSON(400, gin.H{"error": "Review the typed rules and approved result source before publishing"})
 		return
@@ -374,6 +198,7 @@ func ApproveMarket(c *gin.Context) {
 
 	callerID := c.MustGet("userID").(uint)
 	_ = services.LogAction(nil, callerID, "APPROVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Approved proposed market: "+market.Title, c.ClientIP())
+	services.BroadcastToAll("market_live", gin.H{"market_id": market.ID})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Market approved and is now live!", "market": market})
 }
@@ -650,5 +475,31 @@ func validateNewMarket(m *models.Market) error {
 	m.UpdatedAt = time.Time{}
 	m.DeletedAt.Valid = false
 	m.WeeklyChallengeID = nil
+	m.NewsEventID = nil
+	m.NewsURL = ""
+	m.NewsSourceName = ""
+	m.NewsEventTitle = ""
+	m.NewsPublishedAt = nil
+	m.NewsDiscoveredAt = nil
+	m.IsDemo = false
+	m.ResultSpec = ""
+	m.ResultApprovedBy = 0
+	m.ResultEvidence = ""
+	m.ResolutionFailure = ""
+	m.NextResolutionAttemptAt = nil
 	return services.ConfigurePrediction(m)
+}
+
+func createUniqueMarket(c *gin.Context, market *models.Market) bool {
+	err := services.CreateUniqueMarket(config.DB, market)
+	if duplicate, ok := err.(*services.DuplicateMarketError); ok {
+		visible := duplicate.Existing.Visibility == "Public" && duplicate.Existing.ResolutionStatus != "Draft" && duplicate.Existing.ResolutionStatus != "Proposed"
+		c.JSON(409, gin.H{"error": duplicate.Error(), "existing_market_id": duplicate.Existing.ID, "existing_title": duplicate.Existing.Title, "existing_can_view": visible})
+		return false
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Could not create or check prediction"})
+		return false
+	}
+	return true
 }

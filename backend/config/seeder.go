@@ -80,6 +80,7 @@ func SeedDatabase() {
 		m.EndDate = soon
 		m.ResolutionStatus = "Live"
 		m.Visibility = "Public"
+		m.IsDemo = true
 		DB.Create(&m)
 	}
 	log.Println("Seeding complete! Fixed-odds markets loaded.")

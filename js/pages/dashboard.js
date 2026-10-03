@@ -3,6 +3,7 @@ import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
 import { escapeHTML, safeURL } from '../utils/escape.js';
+import { initLiveFeed } from '../components/live-feed.js';
 
 /**
  * PROPHIT - Dashboard Logic
@@ -32,10 +33,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.querySelectorAll('[data-sort]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-sort]').forEach(b => b.setAttribute('aria-pressed', String(b === button))); fetchMarkets(category, button.dataset.sort); }));
-    fetchMarkets(category);
+    if (view === 'markets') { document.getElementById('liveFeed').hidden = true; fetchMarkets(category); }
+    else { document.getElementById('legacyFeedControls').style.display = 'none'; document.getElementById('marketsContainer').hidden = true; initLiveFeed(document.getElementById('liveFeed')); }
     fetchStreak();
     fetchNews();
+    fetchTrendingMarkets();
 });
+
+async function fetchTrendingMarkets() {
+    const container = document.getElementById('trendingContainer');
+    if (!container) return;
+    try {
+        const data = await ApiClient.get('/live-feed?section=trending&limit=3');
+        container.replaceChildren();
+        if (!data.items.length) container.textContent = 'No current playable predictions yet.';
+        for (const market of data.items) {
+            const link = document.createElement('a');
+            link.href = `market.html?id=${Number(market.id)}`;
+            link.textContent = `${market.title} · ${Number(market.volume)} players`;
+            const row = document.createElement('p'); row.append(link); container.append(row);
+        }
+    } catch (error) { container.textContent = 'Current activity unavailable.'; }
+}
 
 async function fetchNews() {
     const container = document.getElementById('newsContainer');
@@ -115,15 +134,13 @@ async function fetchMarkets(category, sort = "trending") {
     const trendingContainer = document.getElementById('trendingContainer');
     
     try {
-        const markets = await ApiClient.get('/markets?' + new URLSearchParams({sort, ...(category ? {category} : {})}));
+        const markets = await ApiClient.get('/markets?' + new URLSearchParams({sort, search:new URLSearchParams(location.search).get('search') || '', ...(category ? {category} : {})}));
         
         let filtered = markets;
         if (category) {
             filtered = markets.filter(m => m.category && m.category.toLowerCase() === category.toLowerCase());
         }
 
-        const search = new URLSearchParams(window.location.search).get('search')?.toLowerCase();
-        if (search) filtered = filtered.filter(m => `${m.title} ${m.category} ${m.description}`.toLowerCase().includes(search));
         if (filtered.length === 0) {
             container.innerHTML = `
                 <div class="card" style="grid-column: 1 / -1; text-align: center; padding: var(--spacing-12);">

@@ -47,6 +47,7 @@ function switchTab(tabName, element) {
 
     // Data Fetching
     if (tabName === 'markets') {
+        fetchNewsControl();
         fetchProposedMarkets();
         fetchActiveMarkets();
     }
@@ -71,7 +72,7 @@ async function fetchProposedMarkets() {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>ID: ${m.creator_id}</td>
                 <td>
-                    <button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button><button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
+                    <button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button>${m.category==='Weather'&&m.difficulty==='Easy'?`<button class="btn btn-outline" onclick="configureWeatherResult(${m.id})">Configure weather result</button>`:''}<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
                 </td>
             </tr>
         `).join('');
@@ -304,6 +305,15 @@ async function fetchReports() {
 }
 window.fetchAdminUsers = fetchAdminUsers;
 
-window.reviewRules=async id=>{try{const rows=await ApiClient.get('/markets/proposed');const market=rows.find(m=>Number(m.id)===Number(id));const edited=await askText('Review title, category, difficulty, options, measurable resolution_rule, approved resolution_source, range_width and future lock_time:',JSON.stringify(market,null,2));if(!edited)return;await ApiClient.put(`/markets/${Number(id)}/rules`,JSON.parse(edited));showToast('Rules saved for publication review.','success');fetchProposedMarkets();}catch(err){showToast(err.message,'error');}};
+window.reviewRules=async id=>{try{const rows=await ApiClient.get('/markets/proposed');const market=rows.find(m=>Number(m.id)===Number(id));const edited=await askText('Review source event, title, category, difficulty, options, measurable resolution_rule, approved resolution_source, range_width and future lock_time:',JSON.stringify(market,null,2));if(!edited)return;await ApiClient.put(`/markets/${Number(id)}/rules`,JSON.parse(edited));showToast('Rules saved for publication review.','success');fetchProposedMarkets();}catch(err){showToast(err.message,'error');}};
+
+async function fetchNewsControl(){
+ const status=document.getElementById('newsControlStatus'),events=document.getElementById('newsControlEvents');
+ try{const data=await ApiClient.get('/admin/news'),state=data.ingestion;status.textContent=`Provider: ${state.status} · Last success: ${state.last_success_at?new Date(state.last_success_at).toLocaleString():'None'} · Fetched: ${state.articles_fetched} · Duplicates: ${state.duplicates_removed} · Events: ${state.events_detected} · Rejected: ${state.articles_rejected} · Drafts: ${data.markets.Draft} · Live: ${data.markets.Live} · Resolved: ${data.markets.Resolved}${state.error?' · '+state.error:''}`;events.replaceChildren();for(const event of data.events){const entry=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`${event.title} · ${event.category} · ${event.status}`;entry.append(summary);for(const source of event.sources||[]){const line=document.createElement('p'),link=document.createElement('a');link.href=source.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=`${source.name||source.provider} · ${new Date(source.published_at).toLocaleString()}`;line.append(link);entry.append(line);}const generate=document.createElement('button');generate.type='button';generate.className='btn btn-outline';generate.textContent='Generate draft question';generate.addEventListener('click',async()=>{generate.disabled=true;try{await ApiClient.post(`/admin/news/${Number(event.id)}/generate`);await fetchNewsControl();fetchProposedMarkets();}catch(err){showToast(err.message,'error');}finally{generate.disabled=false;}});entry.append(generate);if(event.rejection_reason){const reason=document.createElement('p');reason.textContent=event.rejection_reason;entry.append(reason);}events.append(entry);}}
+ catch(err){status.textContent=`News control unavailable: ${err.message}`;events.replaceChildren();}
+}
+document.getElementById('refreshNews')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;try{await ApiClient.post('/admin/news/refresh');await fetchNewsControl();fetchProposedMarkets();}catch(err){showToast(err.message,'error');}finally{e.target.disabled=false;}});
+
+window.configureWeatherResult=async id=>{try{const text=await askText('Enter the actual location, metric and threshold from the reviewed question. Observation must start after the cutoff and last exactly 15 minutes. All fields must be reviewed:',JSON.stringify({provider:'openweather',latitude:null,longitude:null,metric:'temperature_c',threshold:null,observation_from:'',observation_until:''},null,2));if(!text)return;const spec=JSON.parse(text);if(![spec.latitude,spec.longitude,spec.threshold].every(Number.isFinite))throw new Error('Fill in actual coordinates and threshold.');await ApiClient.put(`/markets/${Number(id)}/result-provider`,spec);showToast('Result rule saved. Review the question and rule before publication.','success');fetchProposedMarkets();}catch(err){showToast(err.message,'error');}};
 window.fulfillVoucher=async id=>{const voucher_code=await askText('Actual officially sourced voucher code:');if(!voucher_code)return;const source_reference=await askText('Official supplier and invoice/order reference:');if(!source_reference)return;try{await ApiClient.post(`/admin/withdrawals/${Number(id)}/fulfill`,{voucher_code,source_reference});showToast('Voucher fulfilled. Email delivery is separate.','success');fetchWithdrawals();}catch(err){showToast(err.message,'error');}};
 window.deliverVoucher=async id=>{if(!await confirmAction('Send this sourced voucher to the account email now?'))return;try{const result=await ApiClient.post(`/admin/withdrawals/${Number(id)}/deliver`);showToast(result.message,'success');}catch(err){showToast(err.message,'error');}finally{fetchWithdrawals();}};

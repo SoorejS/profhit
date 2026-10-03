@@ -7,6 +7,7 @@ import (
 	"profhit-backend/config"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"time"
 )
 
 // Editorial review cannot rewrite promises after any participation.
@@ -37,9 +38,28 @@ func UpdateMarketRules(c *gin.Context) {
 		if err := validateNewMarket(&input); err != nil {
 			return err
 		}
+		if m.NewsEventID != nil {
+			var event models.NewsEvent
+			if err := tx.First(&event, *m.NewsEventID).Error; err != nil {
+				return err
+			}
+			if err := services.ValidateNewsPrediction(event, &input, time.Now().UTC()); err != nil {
+				return err
+			}
+		}
 		input.ID = originalID
 		input.NewsURL = newsURL
 		input.NewsPublishedAt = published
+		input.NewsEventID = m.NewsEventID
+		input.NewsSourceName = m.NewsSourceName
+		input.NewsEventTitle = m.NewsEventTitle
+		input.NewsDiscoveredAt = m.NewsDiscoveredAt
+		input.IsDemo = m.IsDemo
+		input.ResultSpec = m.ResultSpec
+		input.ResultApprovedBy = m.ResultApprovedBy
+		if err := services.ConfigurePrediction(&input); err != nil {
+			return err
+		}
 		input.CreatorID = creator
 		input.DailyKey = key
 		input.CreatedAt = m.CreatedAt

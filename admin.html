@@ -88,6 +88,13 @@
 
                     <!-- Tab: Markets -->
                     <div id="tab-markets" class="admin-tab-content">
+                        <section class="card" style="margin-bottom:24px;" aria-label="Live news control center">
+                            <h2>Live news control center</h2>
+                            <p>Review source events, measurable questions and cutoffs before publication.</p>
+                            <button class="btn btn-outline" type="button" id="refreshNews">Refresh news</button>
+                            <div id="newsControlStatus" role="status">Loading provider status…</div>
+                            <div id="newsControlEvents"></div>
+                        </section>
                         <div class="card" style="border: 1px solid var(--border-subtle); margin-bottom: var(--spacing-6);">
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-4);">
                                 <h3 style="margin: 0; font-size: 1.25rem;">Proposed Markets</h3>

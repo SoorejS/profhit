@@ -54,6 +54,12 @@ func EvidenceMatchesSource(m models.Market, raw string) bool {
 }
 
 func ConfigurePrediction(m *models.Market) error {
+	if m.ResultSpec != "" {
+		var spec WeatherResultSpec
+		if json.Unmarshal([]byte(m.ResultSpec), &spec) != nil || spec.Validate(*m) != nil || m.ResolutionRule != spec.Rule() || m.ResolutionSource != spec.EvidenceURL() || m.ResultApprovedBy == 0 || m.ResolutionTime == nil || !m.ResolutionTime.Equal(spec.ObservationFrom) {
+			return errors.New("provider result settings do not match the published rule, source or time")
+		}
+	}
 	tier := map[string]int{"Easy": 0, "Medium": 1, "Hard": 2}
 	idx, ok := tier[m.Difficulty]
 	if !ok {

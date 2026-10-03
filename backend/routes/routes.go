@@ -98,6 +98,11 @@ func SetupRouter() *gin.Engine {
 
 		// Public news endpoint
 		api.GET("/news", controllers.GetTrendingNews)
+		api.GET("/live-feed", func(c *gin.Context) {
+			if c.GetHeader("Authorization") != "" {
+				middleware.AuthRequired()(c)
+			}
+		}, controllers.LiveNewsFeed)
 
 		// Public market browsing
 		api.GET("/markets", controllers.GetAllMarkets)
@@ -133,6 +138,10 @@ func SetupRouter() *gin.Engine {
 		protected := api.Group("/")
 		protected.Use(middleware.AuthRequired())
 		{
+			protected.GET("/admin/news", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), controllers.AdminNewsStatus)
+			protected.POST("/admin/news/refresh", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), controllers.RefreshNews)
+			protected.POST("/admin/news/:id/generate", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), securityLimit, controllers.GenerateNewsQuestion)
+			protected.PUT("/markets/:id/result-provider", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), controllers.ConfigureWeatherResolution)
 			// Auth
 			protected.POST("/auth/logout", controllers.LogoutUser)
 			protected.POST("/admin/challenges", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), controllers.CreateWeeklyChallenge)

@@ -1,0 +1,23 @@
+.live-feed-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.live-feed-heading h2 { font-size:1.7rem; margin-bottom:8px; }
+.live-feed-heading p, .live-feed-status, .live-card-meta { color:var(--text-secondary); }
+.live-feed-status { margin:16px 0; padding:12px; border:1px solid var(--border-subtle); border-radius:12px; }
+.live-feed-controls { display:flex; flex-direction:column; gap:16px; margin-bottom:20px; }
+.live-feed-tabs, .live-card-meta { display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; }
+.live-feed-tabs { justify-content:flex-start; }
+.live-feed-search { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+.live-feed-search label { flex:1; min-width:min(220px,100%); font-size:0.85rem; }
+.live-feed-search input, .live-feed-search select { margin-top:8px; width:100%; }
+.live-opportunity { display:flex; flex-direction:column; gap:12px; min-width:0; overflow-wrap:anywhere; }
+.live-opportunity h3 { font-size:1.2rem; line-height:1.45; }
+.live-opportunity h3 a { color:var(--text-primary); }
+.live-event-title { font-size:0.85rem; color:var(--text-secondary); }
+.live-opportunity details { font-size:0.85rem; }
+.live-opportunity details p { margin-top:8px; }
+.live-opportunity > .btn { margin-top:auto; }
+.live-feed-more { margin-top:20px; }
+.live-feed-more[hidden] { display:none; }
+.live-feed-empty { grid-column:1 / -1; }
+.markets-grid[hidden] { display:none; }
+.public-live-feed { padding:24px; max-width:1400px; margin:0 auto 48px; }
+@media(max-width:768px) { .public-live-feed { padding:12px; } .live-feed-heading h2 { font-size:1.35rem; } .live-feed-search { align-items:stretch; } .live-feed-tabs .btn { padding:8px 12px; } }

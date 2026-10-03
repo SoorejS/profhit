@@ -6,7 +6,7 @@
 const localAPIHost = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
 const API_URL = document.querySelector('meta[name="api-base"]')?.content || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? `http://${localAPIHost}:8080/api`
-    : 'https://profhit.onrender.com/api');
+    : 'https://profhit-1.onrender.com/api');
 
 class ApiClient {
     static profileRequest = null;
@@ -80,6 +80,7 @@ class ApiClient {
             if (!response.ok) {
                 const error = new Error(data.error || data.message || `Request failed (${response.status})`);
                 error.status = response.status;
+                error.data = data;
                 throw error;
             }
             

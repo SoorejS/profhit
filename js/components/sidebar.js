@@ -43,7 +43,7 @@ export class AppSidebar extends HTMLElement {
                 <a href="/support.html" class="nav-link ${activePage === 'support' ? 'active' : ''}"><i class="ph ph-headset"></i> Support</a>
                 
                 <a href="/propose-market.html" class="btn btn-outline w-full ${activePage === 'propose' ? 'active' : ''}" style="margin-top: 1rem; color: var(--color-gold); border-color: var(--color-gold); text-align: center; display: block; text-decoration: none;">
-                    <i class="ph ph-plus-circle"></i> Propose Market
+                    <i class="ph ph-plus-circle"></i> Create Prediction
                 </a>
             `;
         }

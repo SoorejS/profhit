@@ -13,6 +13,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 
 	"profhit-backend/config"
 	"profhit-backend/models"
@@ -25,9 +26,12 @@ func getPostgresDB(t *testing.T) *gorm.Config {
 	if dsn == "" {
 		dsn = "postgres://profhit:test_db_password_12345@127.0.0.1:15432/profhit?sslmode=disable"
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
-		t.Skipf("Skipping PostgreSQL test: could not connect to PostgreSQL at %s: %v", dsn, err)
+		if os.Getenv("REQUIRE_POSTGRES_TESTS") == "true" {
+			t.Fatal("Required disposable PostgreSQL database is unavailable")
+		}
+		t.Skip("Skipping PostgreSQL test: disposable PostgreSQL database is unavailable")
 		return nil
 	}
 	config.DB = db
