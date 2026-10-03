@@ -34,6 +34,7 @@ async function loadMarketDetails() {
         currentMarket=market;
         document.querySelector(".trade-card").innerHTML=tradeMarkup;
         currentPayout = Number(market.payout) * (market.weekly_challenge_id ? 2 : 1);
+        document.getElementById('entryCost').textContent = `${Number(market.entry_coins)||0} virtual coins to enter. No cash payments.`;
         document.getElementById('marketFixedPayout').textContent = `${currentPayout} PTS`;
         document.getElementById('marketPredictionCount').textContent = String(Number(market.volume) || 0);
         const options = JSON.parse(market.options);
@@ -109,8 +110,8 @@ async function executeTrade() {
     if(!choice){showToast('Enter your prediction.','error');return;}
     const button=document.getElementById('confirmPrediction');button.disabled=true;
     try {
-        const result=await ApiClient.post('/predictions',{market_id:Number(currentMarketId),choice});
-        showToast(`Prediction recorded. Correct-answer reward: ${result.potential_payout} coins.`,'success');
+        const result=await ApiClient.post('/predictions',{market_id:Number(currentMarketId),choice,amount:Number(currentMarket.entry_coins)||0});
+        showToast(`Prediction recorded. ${result.staked} virtual coins spent. Correct-answer reward: ${result.potential_payout} coins.`,'success');
         document.getElementById('tradeForm').classList.add('hidden');currentSelection=null;
         document.querySelector('app-topbar')?.fetchBalance();document.querySelector('app-sidebar')?.fetchBalance();
         await refreshActivity();
@@ -135,8 +136,8 @@ function readTypedAnswer(){
  if(currentMarket.prediction_type==='top3')return JSON.stringify([...document.querySelectorAll('[name="nominee"]:checked')].map(el=>el.value));
  return document.getElementById('numericAnswer')?.value.trim() || currentSelection;
 }
-async function refreshActivity(){try{const m=await ApiClient.get(`/markets/${encodeURIComponent(currentMarketId)}`);document.getElementById('marketPredictionCount').textContent=String(m.volume);}catch{}}
-window.addEventListener('prophit-live',e=>{const {event,payload}=e.detail;if(payload?.market_id && Number(payload.market_id)!==Number(currentMarketId))return;if(['prediction_count_changed','market_activity_changed'].includes(event))refreshActivity();if(['market_locked','market_resolved'].includes(event))loadMarketDetails();});
+async function refreshActivity(){try{const m=await ApiClient.get(`/markets/${encodeURIComponent(currentMarketId)}`);document.getElementById('marketPredictionCount').textContent=String(m.volume);if(currentMarket&&m.resolution_status!==currentMarket.resolution_status)await loadMarketDetails();}catch{}}
+window.addEventListener('prophit-live',e=>{const {event,payload}=e.detail;if(payload?.market_id && Number(payload.market_id)!==Number(currentMarketId))return;if(['prediction_count_changed','market_activity_changed','market_state_changed'].includes(event))refreshActivity();if(['market_locked','market_resolved'].includes(event))loadMarketDetails();});
 
 async function loadComments() {
     try {

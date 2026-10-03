@@ -3,10 +3,7 @@
  * Handles HTTP requests, JWT injection, and error catching.
  */
 
-const localAPIHost = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
-const API_URL = document.querySelector('meta[name="api-base"]')?.content || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? `http://${localAPIHost}:8080/api`
-    : 'https://profhit-1.onrender.com/api');
+const API_URL = document.querySelector('meta[name="api-base"]')?.content || '/api';
 
 class ApiClient {
     static profileRequest = null;
@@ -38,7 +35,7 @@ class ApiClient {
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout for Render cold-starts
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // Bounded request timeout
 
         const config = {
             ...options,

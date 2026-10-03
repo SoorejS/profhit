@@ -36,7 +36,7 @@ func SetupRouter() *gin.Engine {
 		c.Writer.Header().Set("X-Content-Type-Options", "nosniff")
 		c.Writer.Header().Set("X-Frame-Options", "DENY")
 		c.Writer.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://checkout.razorpay.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://profhit.onrender.com http://localhost:8080 https://api.razorpay.com; frame-src https://checkout.razorpay.com;")
+		c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://accounts.google.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com wss://profhit.vercel.app http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; frame-src https://accounts.google.com https://checkout.razorpay.com;")
 		c.Writer.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
 		// ── CORS ─────────────────────────────────────────────────────────────
@@ -73,6 +73,15 @@ func SetupRouter() *gin.Engine {
 	})
 
 	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		if c.Request.Method == "GET" && (strings.HasPrefix(c.Request.URL.Path, "/api/markets") || c.Request.URL.Path == "/api/live-feed" || c.Request.URL.Path == "/api/live-state") {
+			if services.AdvanceMarketLifecycle() != nil {
+				c.AbortWithStatusJSON(503, gin.H{"error": "Market lifecycle temporarily unavailable"})
+				return
+			}
+		}
+		c.Next()
+	})
 	{
 		// ── PUBLIC AUTH ROUTES (rate-limited) ─────────────────────────────────
 		// 5 requests per IP per 5 minutes protects against brute-force and enumeration
@@ -98,6 +107,11 @@ func SetupRouter() *gin.Engine {
 
 		// Public news endpoint
 		api.GET("/news", controllers.GetTrendingNews)
+		api.GET("/live-state", func(c *gin.Context) {
+			if c.GetHeader("Authorization") != "" {
+				middleware.AuthRequired()(c)
+			}
+		}, controllers.LiveState)
 		api.GET("/live-feed", func(c *gin.Context) {
 			if c.GetHeader("Authorization") != "" {
 				middleware.AuthRequired()(c)
@@ -272,5 +286,6 @@ func SetupRouter() *gin.Engine {
 		}
 	}
 
+	servePublicFiles(r)
 	return r
 }

@@ -17,9 +17,9 @@ import (
 )
 
 func compliantTestMarket(category, difficulty string, cutoff time.Time) models.Market {
-	sources := map[string]string{"Weather": "https://openweathermap.org/results", "Sports": "https://www.espn.com/results", "Politics": "https://eci.gov.in/results", "Entertainment": "https://oscars.org/results", "Financial Markets": "https://nseindia.com/results", "Wild Card": "https://nasa.gov/results"}
+	sources := map[string]string{"Weather": "https://openweathermap.org/results", "Sports": "https://www.espn.com/results", "Politics": "https://eci.gov.in/results", "Entertainment": "https://oscars.org/results", "Financial Markets": "https://nseindia.com/results", "Wild Card": "https://nasa.gov/results", "Technology": "https://apple.com/results", "Geopolitics": "https://un.org/results"}
 	m := models.Market{Title: "Measurable audit prediction", Category: category, Difficulty: difficulty, Options: `["Yes","No"]`, ResolutionStatus: "Live", Visibility: "Public", LockTime: &cutoff, EndDate: cutoff, ResolutionSource: sources[category], ResolutionRule: "Published observation in the declared units at cutoff", RangeWidth: 2}
-	if category == "Wild Card" && difficulty == "Medium" {
+	if (category == "Wild Card" || category == "Technology" || category == "Geopolitics") && difficulty == "Medium" {
 		m.Options = `["A","B","C","D"]`
 	}
 	if category == "Entertainment" && difficulty == "Medium" {

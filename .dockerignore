@@ -13,6 +13,13 @@
 node_modules
 **/node_modules
 __pycache__
+.tmp
+**/.tmp*
+**/audit-artifacts
+backend/backend
+docs
+scripts
+.github
 
 .env.*
 **/.env.*

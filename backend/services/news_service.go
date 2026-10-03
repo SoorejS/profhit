@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"profhit-backend/config"
+	"profhit-backend/models"
 	"sync"
 	"time"
 )
@@ -48,9 +50,15 @@ func GetTrendingNews() ([]Article, error) {
 	if len(ConfiguredNewsProviders()) == 0 {
 		return nil, ErrNewsNotConfigured
 	}
-	if time.Since(newsCacheTime) < NewsRefreshInterval() && len(newsCache) > 0 {
-		return append([]Article(nil), newsCache...), nil
+	// Persisted articles remain visible across stateless Vercel instances.
+	var events []models.NewsEvent
+	now := time.Now().UTC()
+	if err := config.DB.Where("published_at BETWEEN ? AND ?", now.Add(-24*time.Hour), now).Order("published_at DESC, id DESC").Limit(40).Find(&events).Error; err != nil {
+		return nil, errors.New("news storage unavailable")
 	}
-	// Only the leased background worker consumes provider quota.
-	return nil, errors.New("news refresh pending or provider cache expired")
+	articles := make([]Article, 0, len(events))
+	for _, event := range events {
+		articles = append(articles, Article{Title: event.Title, Description: event.Summary, URL: event.SourceURL, PublishedAt: event.PublishedAt.Format(time.RFC3339), Source: ArticleSource{Name: event.SourceName}})
+	}
+	return articles, nil
 }

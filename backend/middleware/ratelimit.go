@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
+	"profhit-backend/config"
 	"sync"
 	"time"
 
@@ -63,7 +66,24 @@ func RateLimit(rate int, window time.Duration) gin.HandlerFunc {
 	limiter := newRateLimiter(rate, window)
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		if !limiter.allow(ip) {
+		allowed := false
+		if config.DB != nil && config.DB.Dialector.Name() == "postgres" {
+			now := time.Now().UTC()
+			key := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%s", rate, window, ip))))
+			claim := config.DB.Exec(`INSERT INTO rate_limit_buckets (key, requests, expires_at) VALUES (?,1,?)
+			 ON CONFLICT (key) DO UPDATE SET
+			 requests = CASE WHEN rate_limit_buckets.expires_at <= ? THEN 1 ELSE rate_limit_buckets.requests + 1 END,
+			 expires_at = CASE WHEN rate_limit_buckets.expires_at <= ? THEN EXCLUDED.expires_at ELSE rate_limit_buckets.expires_at END
+			 WHERE rate_limit_buckets.expires_at <= ? OR rate_limit_buckets.requests < ?`, key, now.Add(window), now, now, now, rate)
+			if claim.Error != nil {
+				c.AbortWithStatusJSON(503, gin.H{"error": "Request protection temporarily unavailable"})
+				return
+			}
+			allowed = claim.RowsAffected == 1
+		} else {
+			allowed = limiter.allow(ip)
+		}
+		if !allowed {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "Too many requests. Please slow down.",
 			})

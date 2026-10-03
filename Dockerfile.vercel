@@ -1,0 +1,21 @@
+FROM golang:1.26.8-alpine AS builder
+WORKDIR /app
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /profhit-server .
+
+FROM alpine:3.23
+RUN apk --no-cache add ca-certificates tzdata && adduser -D -u 10001 app
+WORKDIR /app
+COPY --from=builder /profhit-server /app/profhit-server
+# Only public assets enter the static directory. Repository files and secrets
+# are never reachable through the file server.
+COPY *.html /app/public/
+COPY css/ /app/public/css/
+COPY js/ /app/public/js/
+COPY assets/ /app/public/assets/
+ENV PORT=80 STATIC_ROOT=/app/public
+USER app
+EXPOSE 80
+CMD ["/app/profhit-server"]

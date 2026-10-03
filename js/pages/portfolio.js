@@ -97,3 +97,5 @@ async function loadPortfolio() {
         list.innerHTML = `<div class="text-danger text-center" style="padding: var(--spacing-6);">Failed to load portfolio.</div>`;
     }
 }
+
+window.addEventListener('prophit-live',e=>{if(['wallet_updated','market_resolved','market_locked','prediction_count_changed'].includes(e.detail.event))loadPortfolio();});

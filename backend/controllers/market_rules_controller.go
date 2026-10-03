@@ -55,6 +55,8 @@ func UpdateMarketRules(c *gin.Context) {
 		input.NewsEventTitle = m.NewsEventTitle
 		input.NewsDiscoveredAt = m.NewsDiscoveredAt
 		input.IsDemo = m.IsDemo
+		input.IsCurated = m.IsCurated
+		input.SourceKind = m.SourceKind
 		input.ResultSpec = m.ResultSpec
 		input.ResultApprovedBy = m.ResultApprovedBy
 		if err := services.ConfigurePrediction(&input); err != nil {

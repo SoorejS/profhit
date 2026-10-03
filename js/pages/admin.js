@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    setupMarketEditor();
     // Initial load is routed through the selected hash tab so each endpoint is
     // requested once.
     const openHash = () => { const name = window.location.hash.slice(1) || 'markets'; const button = document.querySelector('[data-tab="' + (['markets','kyc','withdrawals','analytics','moderation'].includes(name) ? name : 'markets') + '"]'); switchTab(button.dataset.tab, button); };
@@ -72,7 +73,7 @@ async function fetchProposedMarkets() {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>ID: ${m.creator_id}</td>
                 <td>
-                    <button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button>${m.category==='Weather'&&m.difficulty==='Easy'?`<button class="btn btn-outline" onclick="configureWeatherResult(${m.id})">Configure weather result</button>`:''}<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
+                    <button class="btn btn-outline" onclick="editMarket(${m.id})">Edit draft</button><button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button>${m.category==='Weather'&&m.difficulty==='Easy'?`<button class="btn btn-outline" onclick="configureWeatherResult(${m.id})">Configure weather result</button>`:''}<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
                 </td>
             </tr>
         `).join('');
@@ -114,7 +115,7 @@ async function fetchActiveMarkets() {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>${statusBadge}</td>
                 <td>
-                    ${resolveBtn}
+                    ${['Live','Open'].includes(m.resolution_status)?`<button class="btn btn-outline" onclick="lockMarket(${m.id})">Lock</button>`:''} ${resolveBtn}
                 </td>
             </tr>
             `;
@@ -129,7 +130,7 @@ async function approveMarket(id) {
     try {
         await ApiClient.post(`/markets/${id}/approve`);
         showToast("Market approved successfully", "success");
-        fetchProposedMarkets();
+        fetchProposedMarkets(); fetchActiveMarkets();
     } catch (err) {
         showToast(err.message, "error");
     }
@@ -317,3 +318,38 @@ document.getElementById('refreshNews')?.addEventListener('click',async e=>{e.cur
 window.configureWeatherResult=async id=>{try{const text=await askText('Enter the actual location, metric and threshold from the reviewed question. Observation must start after the cutoff and last exactly 15 minutes. All fields must be reviewed:',JSON.stringify({provider:'openweather',latitude:null,longitude:null,metric:'temperature_c',threshold:null,observation_from:'',observation_until:''},null,2));if(!text)return;const spec=JSON.parse(text);if(![spec.latitude,spec.longitude,spec.threshold].every(Number.isFinite))throw new Error('Fill in actual coordinates and threshold.');await ApiClient.put(`/markets/${Number(id)}/result-provider`,spec);showToast('Result rule saved. Review the question and rule before publication.','success');fetchProposedMarkets();}catch(err){showToast(err.message,'error');}};
 window.fulfillVoucher=async id=>{const voucher_code=await askText('Actual officially sourced voucher code:');if(!voucher_code)return;const source_reference=await askText('Official supplier and invoice/order reference:');if(!source_reference)return;try{await ApiClient.post(`/admin/withdrawals/${Number(id)}/fulfill`,{voucher_code,source_reference});showToast('Voucher fulfilled. Email delivery is separate.','success');fetchWithdrawals();}catch(err){showToast(err.message,'error');}};
 window.deliverVoucher=async id=>{if(!await confirmAction('Send this sourced voucher to the account email now?'))return;try{const result=await ApiClient.post(`/admin/withdrawals/${Number(id)}/deliver`);showToast(result.message,'success');}catch(err){showToast(err.message,'error');}finally{fetchWithdrawals();}};
+
+function setupMarketEditor() {
+    const form=document.getElementById('adminMarketForm');
+    form.addEventListener('submit',async event=>{
+        event.preventDefault();
+        const fields=new FormData(form), button=form.querySelector('[type="submit"]');
+        const market={title:fields.get('title'), description:fields.get('description'), category:fields.get('category'), difficulty:fields.get('difficulty'), options:JSON.stringify(String(fields.get('options')).split('\n').map(s=>s.trim()).filter(Boolean)), entry_coins:Number(fields.get('entry_coins')), resolution_rule:fields.get('resolution_rule'), resolution_source:fields.get('resolution_source'), lock_time:new Date(fields.get('lock_time')).toISOString(), resolution_time:new Date(fields.get('resolution_time')).toISOString(), news_url:fields.get('news_url'), news_source_name:fields.get('news_source_name'), source_kind:fields.get('source_kind'), news_published_at:fields.get('news_published_at')?new Date(fields.get('news_published_at')).toISOString():null, resolution_status:'Draft'};
+        if(fields.get('start_time'))market.start_time=new Date(fields.get('start_time')).toISOString();
+        const id=form.dataset.marketId;
+        button.disabled=true;
+        try { if(id)await ApiClient.put(`/markets/${id}/rules`,market);else await ApiClient.post('/markets',market); form.reset();delete form.dataset.marketId;showToast('Draft saved. Review and publish below.','success');fetchProposedMarkets(); }
+        catch(error){showToast(error.message,'error');}
+        finally {button.disabled=false;}
+    });
+}
+async function editMarket(id) {
+    try {
+        const markets=await ApiClient.get('/markets/proposed'), m=markets.find(item=>Number(item.id)===Number(id));
+        if(!m)throw new Error('This market is no longer editable.');
+        const form=document.getElementById('adminMarketForm');
+        form.dataset.marketId=String(id);
+        for(const name of ['title','description','category','difficulty','entry_coins','resolution_rule','resolution_source','news_url','news_source_name','source_kind'])form.elements[name].value=m[name]??'';
+        form.elements.options.value=JSON.parse(m.options).join('\n');
+        for(const name of ['start_time','lock_time','resolution_time','news_published_at']) {
+            const date=m[name]?new Date(m[name]):null;
+            form.elements[name].value=date?new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16):'';
+        }
+        document.getElementById('adminMarketEditor').open=true;form.scrollIntoView({behavior:'smooth'});
+    }catch(error){showToast(error.message,'error');}
+}
+async function lockMarket(id) {
+    if(!await confirmAction('Lock this market and stop new predictions?'))return;
+    try{await ApiClient.put(`/markets/${id}/transition`,{status:'Locked'});fetchActiveMarkets();showToast('Market locked.','success');}catch(error){showToast(error.message,'error');}
+}
+window.editMarket=editMarket;window.lockMarket=lockMarket;

@@ -88,6 +88,28 @@
 
                     <!-- Tab: Markets -->
                     <div id="tab-markets" class="admin-tab-content">
+                        <details class="card" id="adminMarketEditor" style="margin-bottom:24px;">
+                            <summary>Create or edit a curated prediction</summary>
+                            <form id="adminMarketForm" style="display:grid;gap:12px;margin-top:16px;">
+                                <label>Question<input class="input-control" name="title" minlength="5" maxlength="200" required></label>
+                                <label>Context<textarea class="input-control" name="description" maxlength="5000"></textarea></label>
+                                <label>Category<select class="input-control" name="category"><option>Weather</option><option>Sports</option><option>Politics</option><option>Geopolitics</option><option>Financial Markets</option><option>Technology</option><option>Entertainment</option><option>Wild Card</option></select></label>
+                                <label>Difficulty<select class="input-control" name="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></label>
+                                <label>Answer options (one per line)<textarea class="input-control" name="options" required>Yes
+No</textarea></label>
+                                <label>Virtual coin entry<input class="input-control" name="entry_coins" type="number" min="0" max="399" value="10" required></label>
+                                <label>Measurable resolution rule<textarea class="input-control" name="resolution_rule" required></textarea></label>
+                                <label>Approved result source URL<input class="input-control" name="resolution_source" type="url" required></label>
+                                <label>Source article or official event URL<input class="input-control" name="news_url" type="url" required></label>
+                                <label>Source name<input class="input-control" name="news_source_name" maxlength="100" required></label>
+                                <label>Source type<select class="input-control" name="source_kind"><option value="article">Dated news article</option><option value="official_event">Official upcoming event / live data</option></select></label><label>Actual source publication date (required for articles)<input class="input-control" name="news_published_at" type="datetime-local"></label>
+                                <label>Opening time (optional; future time schedules publication)<input class="input-control" name="start_time" type="datetime-local"></label>
+                                <label>Prediction cutoff<input class="input-control" name="lock_time" type="datetime-local" required></label>
+                                <label>Expected result time<input class="input-control" name="resolution_time" type="datetime-local" required></label>
+                                <p>Only unpublished markets can be edited. Published entry costs, rules and rewards cannot change after participation.</p>
+                                <button class="btn btn-primary" type="submit">Save draft</button>
+                            </form>
+                        </details>
                         <section class="card" style="margin-bottom:24px;" aria-label="Live news control center">
                             <h2>Live news control center</h2>
                             <p>Review source events, measurable questions and cutoffs before publication.</p>

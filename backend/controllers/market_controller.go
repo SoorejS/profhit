@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -84,11 +85,33 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 
+	isAudit := market.IsDemo
+	sourceURL, sourceName, published, sourceKind := market.NewsURL, market.NewsSourceName, market.NewsPublishedAt, market.SourceKind
+	if sourceKind == "" {
+		sourceKind = "article"
+	}
+	if sourceURL != "" && (!services.PublicProviderURL(sourceURL) || (published != nil && published.After(time.Now().UTC())) || len(sourceName) == 0 || len(sourceName) > 100 || (sourceKind != "article" && sourceKind != "official_event")) {
+		c.JSON(400, gin.H{"error": "Curated events need a public HTTPS source, source name and actual publication date"})
+		return
+	}
 	if err := validateNewMarket(&market); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 	market.CreatorID = c.MustGet("userID").(uint)
+	// Only an authenticated operator of the virtual demo can exclude an audit
+	// market from the genuine-opportunity count. Proposals cannot set this flag.
+	market.IsDemo = isAudit && os.Getenv("VIRTUAL_COIN_DEMO") == "true"
+	if sourceURL != "" {
+		if (sourceKind == "article" && (published == nil || published.Before(time.Now().UTC().Add(-24*time.Hour)))) || (sourceKind == "official_event" && !services.ApprovedResultURL(market.Category, sourceURL)) {
+			c.JSON(400, gin.H{"error": "Articles need actual publication dates; official events need an approved official source"})
+			return
+		}
+		now := time.Now().UTC()
+		market.IsCurated = true
+		market.SourceKind = sourceKind
+		market.NewsURL, market.NewsSourceName, market.NewsPublishedAt, market.NewsDiscoveredAt = sourceURL, sourceName, published, &now
+	}
 	if !createUniqueMarket(c, &market) {
 		return
 	}
@@ -190,7 +213,10 @@ func ApproveMarket(c *gin.Context) {
 	}
 	previous := market.ResolutionStatus
 	market.ResolutionStatus = "Live"
-	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, previous).Update("resolution_status", "Live")
+	if market.StartTime != nil && market.StartTime.After(time.Now().UTC()) {
+		market.ResolutionStatus = "Scheduled"
+	}
+	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, previous).Update("resolution_status", market.ResolutionStatus)
 	if result.Error != nil || result.RowsAffected != 1 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve market"})
 		return
@@ -200,7 +226,7 @@ func ApproveMarket(c *gin.Context) {
 	_ = services.LogAction(nil, callerID, "APPROVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Approved proposed market: "+market.Title, c.ClientIP())
 	services.BroadcastToAll("market_live", gin.H{"market_id": market.ID})
 
-	c.JSON(http.StatusOK, gin.H{"message": "Market approved and is now live!", "market": market})
+	c.JSON(http.StatusOK, gin.H{"message": "Market published", "market": market})
 }
 
 // GetProposedMarkets returns all markets awaiting approval (admin only)
@@ -392,7 +418,7 @@ func validateNewMarket(m *models.Market) error {
 	if len(m.Title) < 5 || len(m.Title) > 200 || len(m.Description) > 5000 {
 		return fmt.Errorf("Title must be 5-200 characters and description at most 5000 characters")
 	}
-	categories := map[string]string{"weather": "Weather", "sports": "Sports", "politics": "Politics", "entertainment": "Entertainment", "markets": "Financial Markets", "financial markets": "Financial Markets", "finance": "Financial Markets", "wild card": "Wild Card"}
+	categories := map[string]string{"weather": "Weather", "sports": "Sports", "politics": "Politics", "entertainment": "Entertainment", "markets": "Financial Markets", "financial markets": "Financial Markets", "finance": "Financial Markets", "wild card": "Wild Card", "technology": "Technology", "geopolitics": "Geopolitics"}
 	category, ok := categories[strings.ToLower(strings.TrimSpace(m.Category))]
 	if !ok {
 		return fmt.Errorf("Invalid category")
@@ -482,6 +508,8 @@ func validateNewMarket(m *models.Market) error {
 	m.NewsPublishedAt = nil
 	m.NewsDiscoveredAt = nil
 	m.IsDemo = false
+	m.IsCurated = false
+	m.SourceKind = "article"
 	m.ResultSpec = ""
 	m.ResultApprovedBy = 0
 	m.ResultEvidence = ""

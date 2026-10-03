@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Market Details - PROPHIT</title>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <!-- Lightweight Charts for Probability Graph -->
-    
+
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -71,7 +71,7 @@
             <app-topbar></app-topbar>
 
             <div class="content-wrapper scroll-y">
-                
+
                 <div class="dashboard-grid">
                     <!-- Left: Market Details & Chart -->
                     <div>
@@ -112,20 +112,20 @@
                     <aside class="right-sidebar">
                         <div class="card trade-card">
                             <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Place Prediction</h3>
-                            
+
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-3); padding: var(--spacing-3); background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
                                 <span style="color: var(--text-secondary); font-weight: 500;">Fixed payout</span>
                                 <strong id="marketFixedPayout" class="text-success">-- PTS</strong>
                             </div>
-                            
+
                             <div class="prediction-buttons">
                                 <button class="btn btn-yes" onclick="selectPrediction('Yes')">Yes</button>
                                 <button class="btn btn-no" onclick="selectPrediction('No')">No</button>
                             </div>
 
                             <div id="tradeForm" class="hidden">
-                                <p>Free prediction. No payment or coin stake is required.</p><div id="typedAnswer"></div>
-                                
+                                <p><span id="entryCost">Checking virtual coin entry…</span></p><div id="typedAnswer"></div>
+
                                 <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-5); padding-top: var(--spacing-3); border-top: 1px dashed var(--border-subtle);">
                                     <span style="color: var(--text-secondary); font-weight: 500;">Correct-answer reward</span>
                                     <span id="potentialReturn" class="font-bold text-success" style="font-size: 1.1rem;">--</span>
@@ -134,7 +134,7 @@
                                 <button class="btn btn-primary w-full" id="confirmPrediction" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Confirm Prediction</button>
                             </div>
                         </div>
-                        
+
                         <div class="card" style="margin-top: var(--spacing-4); border: 1px solid var(--border-subtle);">
                             <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4); font-weight: 600;">Market Stats</h3>
                             <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
@@ -148,7 +148,7 @@
                         </div>
                     </aside>
                 </div>
-                
+
             </div>
         </main>
     </div>

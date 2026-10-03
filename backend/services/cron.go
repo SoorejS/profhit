@@ -50,6 +50,9 @@ func runEveryMinute() {
 }
 
 func runEveryHour() {
+	if err := config.DB.Where("expires_at < ?", time.Now().UTC().Add(-24*time.Hour)).Delete(&models.RateLimitBucket{}).Error; err != nil {
+		log.Printf("Request protection cleanup failed")
+	}
 	if err := config.DB.Where("expires_at < ?", time.Now().UTC()).Delete(&models.RevokedToken{}).Error; err != nil {
 		log.Printf("Session cleanup failed: %v", err)
 	}

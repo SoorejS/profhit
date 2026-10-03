@@ -14,7 +14,7 @@ import (
 )
 
 func playableNewsQuery(now time.Time) *gorm.DB {
-	return config.DB.Model(&models.Market{}).Where("visibility = ? AND is_demo = ? AND news_event_id IS NOT NULL AND news_published_at BETWEEN ? AND ? AND news_url <> '' AND news_discovered_at IS NOT NULL AND prediction_type <> '' AND resolution_rule <> '' AND resolution_source <> '' AND resolution_status = ? AND lock_time > ?", "Public", false, now.Add(-24*time.Hour), now, "Live", now).Where("start_time IS NULL OR start_time <= ?", now)
+	return config.DB.Model(&models.Market{}).Where("visibility = ? AND is_demo = ? AND ((news_event_id IS NOT NULL AND news_published_at BETWEEN ? AND ?) OR (is_curated = ? AND (source_kind = 'official_event' OR news_published_at BETWEEN ? AND ?))) AND news_url <> '' AND news_discovered_at IS NOT NULL AND prediction_type <> '' AND resolution_rule <> '' AND resolution_source <> '' AND resolution_status = ? AND lock_time > ?", "Public", false, now.Add(-24*time.Hour), now, true, now.Add(-24*time.Hour), now, "Live", now).Where("start_time IS NULL OR start_time <= ?", now)
 }
 func LiveNewsFeed(c *gin.Context) {
 	now := time.Now().UTC()

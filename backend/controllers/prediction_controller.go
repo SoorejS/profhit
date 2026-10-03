@@ -31,11 +31,6 @@ func SubmitPrediction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Amount != 0 {
-		c.JSON(400, gin.H{"error": "Predictions are free; no stake or payment is accepted"})
-		return
-	}
-
 	tx := config.DB.Begin()
 	defer tx.Rollback()
 	var market models.Market
@@ -57,6 +52,10 @@ func SubmitPrediction(c *gin.Context) {
 	}
 	if market.Payout <= 0 {
 		c.JSON(400, gin.H{"error": "Market payout is not configured"})
+		return
+	}
+	if req.Amount != market.EntryCoins || market.EntryCoins < 0 {
+		c.JSON(400, gin.H{"error": "Confirm the published virtual coin entry cost; cash and arbitrary stakes are not accepted"})
 		return
 	}
 	checked := market
@@ -126,14 +125,20 @@ func SubmitPrediction(c *gin.Context) {
 		}
 	}
 
-	// Participation is free. No balance check, coin debit, or money provider call.
-
 	// 2. Create the prediction record
 	if err := tx.Create(&prediction).Error; err != nil {
 		tx.Rollback()
 		// Unique constraint violation → user already predicted
 		c.JSON(http.StatusConflict, gin.H{"error": "You have already placed a prediction on this market"})
 		return
+	}
+	// The submission, FIFO coin consumption, ledger and volume commit together.
+	// A rejected or duplicate prediction cannot leave a wallet debit behind.
+	if market.EntryCoins > 0 {
+		if err := services.DebitWalletTx(tx, userID, market.EntryCoins, models.TxTypePredictionStake, prediction.ID, "Virtual coin prediction entry", nil); err != nil {
+			c.JSON(400, gin.H{"error": "Not enough unexpired virtual coins for this prediction"})
+			return
+		}
 	}
 
 	// 3. Increment market volume

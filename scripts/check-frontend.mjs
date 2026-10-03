@@ -59,6 +59,13 @@ assert.equal(escapeHTML(`<img src=x onerror="alert('x')">`),'&lt;img src=x onerr
 assert.equal(safeURL('javascript:alert(1)'),'');
 assert.equal(safeURL('data:text/html,test'),'');
 assert.equal(safeURL('https://example.com/path'),'https://example.com/path');
+const {age,remaining}=await import('data:text/javascript;base64,' + fs.readFileSync(path.join(root,'js/utils/time.js')).toString('base64'));
+const clock=Date.parse('2026-10-03T12:00:00Z');
+assert.equal(remaining('2026-10-03T13:00:00Z',clock),'1 hr 0 min left');
+assert.equal(remaining('2026-10-03T12:19:00Z',clock),'19 min left');
+assert.equal(remaining('2026-10-03T11:00:00Z',clock),'Closed');
+assert.equal(age('2026-10-03T11:00:00Z',clock),'1 hr ago');
+assert.equal(age('invalid',clock),'Time unavailable');
 const marketPage = fs.readFileSync(path.join(root,'market.html'),'utf8');
 for (const fabricatedValue of ['55%', '142,500', '1,204']) {
     assert.equal(marketPage.includes(fabricatedValue), false, `market.html: fabricated statistic ${fabricatedValue}`);

@@ -28,7 +28,17 @@ func main() {
 
 	// Auto-Migrate the database models
 	log.Println("Running Auto-Migration...")
-	err := config.Migrate(config.DB)
+	var err error
+	if os.Getenv("AUTO_MIGRATE") == "false" {
+		// Container functions have a short startup budget. The operator runs the
+		// same migration before deployment; a missing schema still fails closed.
+		err = config.DB.Exec("SELECT id, entry_coins, is_curated, source_kind FROM markets LIMIT 0").Error
+		if err == nil {
+			err = config.DB.Exec("SELECT key FROM rate_limit_buckets LIMIT 0").Error
+		}
+	} else {
+		err = config.Migrate(config.DB)
+	}
 	if err != nil {
 		log.Fatal("Failed to migrate database: \n", err)
 	}
@@ -39,8 +49,9 @@ func main() {
 	}
 
 	// Backfill win_rate and total_predictions
-	log.Println("Backfilling user win rates...")
-	if err := config.DB.Exec(`
+	if os.Getenv("BACKFILL_USER_STATS") == "true" {
+		log.Println("Backfilling user win rates...")
+		if err := config.DB.Exec(`
 		UPDATE users
 		SET total_predictions = (
 			SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
@@ -51,7 +62,8 @@ func main() {
 			WHERE user_id = users.id AND deleted_at IS NULL
 		), 0)
 	`).Error; err != nil {
-		log.Fatal("Failed to backfill user statistics")
+			log.Fatal("Failed to backfill user statistics")
+		}
 	}
 
 	// Start Background Jobs

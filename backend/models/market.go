@@ -6,6 +6,9 @@ import (
 )
 
 type Market struct {
+	SourceKind              string         `gorm:"not null;default:article" json:"source_kind"`
+	IsCurated               bool           `gorm:"not null;default:false;index" json:"is_curated"`
+	EntryCoins              int            `gorm:"not null;default:0;check:entry_coins >= 0" json:"entry_coins"`
 	ResultSpec              string         `json:"result_spec"`
 	ResultEvidence          string         `json:"result_evidence"`
 	ResultApprovedBy        uint           `json:"result_approved_by"`

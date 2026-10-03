@@ -8,6 +8,17 @@ import (
 // Migrate is shared by startup and integration tests so fresh deployments use
 // exactly the schema exercised by the tests. Never discard migration errors.
 func Migrate(db *gorm.DB) error {
+	if db.Dialector.Name() == "postgres" {
+		return db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(72831004)").Error; err != nil {
+				return err
+			}
+			return migrateModels(tx)
+		})
+	}
+	return migrateModels(db)
+}
+func migrateModels(db *gorm.DB) error {
 	// Removing the old positive-stake constraint permits free submissions. Rows remain intact.
 	if db.Migrator().HasConstraint(&models.PredictionSubmission{}, "chk_prediction_submissions_amount") {
 		if err := db.Migrator().DropConstraint(&models.PredictionSubmission{}, "chk_prediction_submissions_amount"); err != nil {
@@ -26,5 +37,6 @@ func Migrate(db *gorm.DB) error {
 		&models.PredictionStreak{}, &models.EconomyMigration{},
 		&models.CoinConsumption{},
 		&models.NewsEvent{}, &models.NewsSource{}, &models.NewsIngestionState{},
+		&models.RateLimitBucket{},
 	)
 }

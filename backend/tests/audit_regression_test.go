@@ -92,7 +92,7 @@ func TestEveryProtectedRouteRejectsAnonymousRequests(t *testing.T) {
 	t.Setenv("JWT_SECRET", strings.Repeat("test", 12))
 	router := routes.SetupRouter()
 	public := map[string]bool{
-		"GET /api/live-feed":  true,
+		"GET /api/live-feed": true, "GET /api/live-state": true,
 		"GET /api/challenges": true, "GET /api/challenges/:id": true,
 		"POST /api/auth/register": true, "POST /api/auth/login": true, "POST /api/auth/google": true,
 		"POST /api/auth/forgot-password": true, "POST /api/auth/reset-password": true, "GET /api/auth/config": true,

@@ -13,21 +13,25 @@ import (
 var CategoryPayouts = map[string][3]int{
 	"Weather": {20, 50, 120}, "Sports": {25, 60, 200}, "Politics": {30, 80, 250},
 	"Entertainment": {25, 70, 150}, "Financial Markets": {20, 80, 300}, "Wild Card": {40, 100, 400},
+	"Technology": {40, 100, 400}, "Geopolitics": {40, 100, 400},
 }
 
 var CategoryTypes = map[string][3]string{
 	"Weather": {"binary", "range", "exact"}, "Sports": {"winner", "range", "score"},
 	"Politics": {"winner", "margin", "seat_count"}, "Entertainment": {"winner", "top3", "range"},
 	"Financial Markets": {"direction", "percent_range", "closest_price"}, "Wild Card": {"binary", "multi_choice", "closest_text"},
+	"Technology": {"binary", "multi_choice", "closest_text"}, "Geopolitics": {"binary", "multi_choice", "closest_text"},
 }
 
 var resultDomains = map[string][]string{
-	"Weather":           {"openweathermap.org", "mausam.imd.gov.in"},
+	"Weather":           {"openweathermap.org", "mausam.imd.gov.in", "weather.gov"},
 	"Sports":            {"cricapi.com", "cricketdata.org", "sportmonks.com", "espn.com", "espncricinfo.com"},
 	"Politics":          {"eci.gov.in", "results.eci.gov.in"},
 	"Entertainment":     {"bollywoodhungama.com", "boxofficeindia.com", "oscars.org", "grammy.com"},
 	"Financial Markets": {"nseindia.com", "bseindia.com", "coingecko.com"},
 	"Wild Card":         {"mausam.imd.gov.in", "eci.gov.in", "nseindia.com", "bseindia.com", "oscars.org", "nasa.gov", "isro.gov.in"},
+	"Technology":        {"apple.com", "google.com", "microsoft.com", "github.com", "nasa.gov", "openai.com"},
+	"Geopolitics":       {"un.org", "consilium.europa.eu", "nato.int", "state.gov", "mea.gov.in"},
 }
 
 func ApprovedResultURL(category, raw string) bool {
@@ -70,6 +74,9 @@ func ConfigurePrediction(m *models.Market) error {
 		return errors.New("invalid category")
 	}
 	m.Payout = payouts[idx]
+	if m.EntryCoins < 0 || m.EntryCoins >= m.Payout {
+		return errors.New("virtual coin entry cost must be non-negative and less than the correct-answer reward")
+	}
 	expected := CategoryTypes[m.Category][idx]
 	if m.PredictionType != "" && m.PredictionType != expected {
 		return errors.New("prediction type does not match category and difficulty")
