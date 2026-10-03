@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Weekly challenges — PROPHIT</title>
+<link rel="stylesheet" href="css/tokens.css"><link rel="stylesheet" href="css/base.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/components.css"><link rel="stylesheet" href="css/utilities.css">
+</head>
+<body><div class="app-layout"><app-sidebar active="challenges"></app-sidebar><main class="main-content"><app-topbar></app-topbar><div class="content-wrapper scroll-y">
+<h1>Weekly challenges</h1><p>Join a challenge through its prediction page before the cutoff. A correct answer earns twice the normal category payout. One prediction per category per UTC day applies.</p>
+<p id="liveStatus" role="status">Connecting to live updates…</p><button id="refreshChallenges" class="btn btn-outline">Refresh</button>
+<div id="challengesList">Loading challenges…</div><div id="challengeResults" aria-live="polite"></div>
+<section id="challengeAdmin" class="card hidden"><h2>Create a weekly challenge</h2><p>Choose a reviewed live or scheduled market with no predictions and a cutoff within seven days.</p><form id="createChallenge"><label for="challengeMarket">Market ID</label><input id="challengeMarket" type="number" min="1" required class="input-control"><button class="btn btn-primary">Create challenge</button></form></section>
+</div></main></div><script type="module" src="js/pages/challenges.js"></script></body></html>

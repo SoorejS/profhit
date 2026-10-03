@@ -55,8 +55,9 @@
                     </div>
                 </div>
 
-                <div class="input-group"><label for="twoFactorCode">Authenticator code (if enabled)</label><input id="twoFactorCode" class="input-control" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></div>
+                <div class="input-group hidden" id="twoFactorGroup"><label for="twoFactorCode">Authenticator code</label><input id="twoFactorCode" class="input-control" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" aria-describedby="twoFactorHelp"><p id="twoFactorHelp" class="text-xs text-muted mt-2">Enter the current 6-digit code from your authenticator app.</p></div>
                 <button type="submit" class="btn btn-primary w-full" style="padding:0.85rem; font-size:1.05rem; margin-top:1.5rem; justify-content: center;"><i class="ph-bold ph-sign-in"></i> Log In</button>
+                <button type="button" id="verifyGoogleTwoFactor" class="btn btn-outline w-full hidden" style="margin-top:0.75rem; justify-content:center;">Verify Google sign-in</button>
             </form>
 
             <div class="auth-footer" style="margin-top: 2rem; text-align: center; font-size: 0.95rem; color: var(--text-secondary);">

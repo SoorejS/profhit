@@ -191,3 +191,6 @@ function renderMarketCard(m) {
         </a>
     `;
 }
+
+let liveRefresh;
+window.addEventListener('prophit-live',e=>{if(['prediction_count_changed','market_activity_changed','market_locked','market_resolved','market_live'].includes(e.detail.event)){clearTimeout(liveRefresh);liveRefresh=setTimeout(()=>{fetchMarkets(new URLSearchParams(location.search).get('category'),document.querySelector('[data-sort][aria-pressed="true"]')?.dataset.sort||'trending');fetchStreak();},150);}});

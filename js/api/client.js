@@ -3,8 +3,9 @@
  * Handles HTTP requests, JWT injection, and error catching.
  */
 
+const localAPIHost = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
 const API_URL = document.querySelector('meta[name="api-base"]')?.content || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8080/api'
+    ? `http://${localAPIHost}:8080/api`
     : 'https://profhit.onrender.com/api');
 
 class ApiClient {
@@ -57,7 +58,9 @@ class ApiClient {
             if (response.status === 401 && !endpoint.startsWith('/auth/')) {
                 this.removeToken();
                 window.location.href = '/login.html';
-                throw new Error('Session expired. Please log in again.');
+                const sessionError=new Error('Session expired. Please log in again.');
+                sessionError.status=401;
+                throw sessionError;
             }
 
             let data;

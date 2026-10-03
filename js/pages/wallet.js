@@ -3,6 +3,7 @@ import '../components/topbar.js';
 import { escapeHTML, safeURL } from '../utils/escape.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
+import { askSelect, confirmAction } from '../components/dialog.js';
 
 /**
  * PROPHIT - Wallet & Identity Logic
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadWalletData();
     loadLedger();
+    loadBatchesAndVouchers();
     checkKycStatus();
 });
 
@@ -68,7 +70,7 @@ async function checkKycStatus() {
     try {
         const data = await ApiClient.get('/kyc/status');
         
-        if (data.status === 'Verified') {
+        if (data.status === 'Verified' && data.redemption_eligible) {
             icon.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i>';
             text.textContent = 'Verified Identity';
             text.style.color = 'var(--color-success)';
@@ -86,9 +88,9 @@ async function checkKycStatus() {
             btn.textContent = 'Retry KYC';
             btn.onclick = startKyc;
         } else {
-            // Unverified / No record
+            // Expired or missing contact verification
             icon.innerHTML = '<i class="fa-solid fa-shield-halved text-muted"></i>';
-            text.textContent = 'Unverified'; btn.onclick = startKyc;
+            text.textContent = data.status === 'Verified' ? 'Phone OTP and email confirmation pending' : data.status; btn.onclick = startKyc; if(data.status==='Verified'){btn.disabled=true;btn.textContent='Contact workflow pending';}
         }
     } catch (err) {
         text.textContent = 'Could not load verification status'; btn.textContent = 'Retry status'; btn.onclick = checkKycStatus;
@@ -118,70 +120,29 @@ async function startKyc() {
     }
 }
 
-// Deposit Flow
-function openDeposit() {
-    document.getElementById('depositModal').showModal();
-}
-
-async function processDeposit() {
-    const amt = document.getElementById('depositAmount').value;
-    if (!amt || amt < 10) {
-        showToast('Minimum deposit is 10 INR', 'error');
-        return;
-    }
-
-    try {
-        const order = await ApiClient.post('/payments/order', { amount: parseFloat(amt) });
-        
-        const options = {
-            key: order.key, 
-            amount: order.amount,
-            currency: order.currency,
-            name: "PROPHIT",
-            description: "Deposit to Wallet",
-            order_id: order.order_id,
-            handler: async function (response) {
-                try {
-                    await ApiClient.post('/payments/verify', {
-                        razorpay_order_id: response.razorpay_order_id,
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_signature: response.razorpay_signature
-                    });
-                    showToast("Deposit successful!", "success");
-                    document.getElementById('depositModal').close();
-                    loadWalletData();
-                    loadLedger();
-                    document.querySelector("app-topbar").fetchBalance();
-                    document.querySelector("app-sidebar").fetchBalance();
-                } catch (err) {
-                    showToast("Payment verification pending: " + err.message + ". Check wallet history before paying again.", "error");
-                }
-            },
-            theme: { color: "#8b5cf6" }
-        };
-        if (!window.Razorpay) throw new Error("Payment checkout could not load. Please retry.");
-        const rzp = new window.Razorpay(options);
-        rzp.on("payment.failed", response => showToast(response.error?.description || "Payment failed", "error"));
-        rzp.open();
-        
-    } catch (err) {
-        showToast(err.message, 'error');
-    }
-}
-
-// Withdraw Flow
+// Voucher redemption
 async function openWithdraw() {
  const tiers = {Bronze: [500, 50], Silver: [1200, 150], Gold: [2500, 350], Platinum: [5000, 800], Diamond: [10000, 2000]};
- const entered = prompt('Choose a voucher tier: Bronze (500 PTS / INR 50), Silver (1200 / 150), Gold (2500 / 350), Platinum (5000 / 800), Diamond (10000 / 2000)');
+ const entered = await askSelect('Choose a voucher tier. The wallet lists the coin cost and voucher value.',Object.keys(tiers));
  if (!entered) return;
  const tier = Object.keys(tiers).find(key => key.toLowerCase() === entered.trim().toLowerCase());
  if (!tier) { showToast('Choose one of the listed voucher tiers.', 'error'); return; }
- if (!confirm(`Redeem ${tiers[tier][0]} PTS for an INR ${tiers[tier][1]} ${tier} voucher?`)) return;
- try { const result = await ApiClient.post('/payments/redeem', {tier}); showToast(result.message, 'success'); loadWalletData(); loadLedger(); document.querySelector('app-topbar')?.fetchBalance(); document.querySelector('app-sidebar')?.fetchBalance(); }
+ if (!await confirmAction(`Redeem ${tiers[tier][0]} PTS for an INR ${tiers[tier][1]} ${tier} voucher?`)) return;
+ try { const result = await ApiClient.post('/payments/redeem', {tier}); showToast(result.message, 'success'); loadBatchesAndVouchers(); loadWalletData(); loadLedger(); document.querySelector('app-topbar')?.fetchBalance(); document.querySelector('app-sidebar')?.fetchBalance(); }
  catch (err) { showToast(err.message, 'error'); }
 }
 window.loadLedger = loadLedger;
 window.openWithdraw = openWithdraw;
-window.openDeposit = openDeposit;
-window.processDeposit = processDeposit;
 window.startKyc = startKyc;
+
+async function loadBatchesAndVouchers(){
+ const batchEl=document.getElementById('coinBatches'),voucherEl=document.getElementById('voucherRequests');
+ const [a,b]=await Promise.allSettled([ApiClient.get('/wallet/batches'),ApiClient.get('/wallet/vouchers')]);
+ if(a.status==='fulfilled'){
+  const data=a.value;document.getElementById('walletBalance').textContent=data.spendable;
+  batchEl.innerHTML=data.batches?.length?data.batches.map(row=>`<p>${Number(row.balance)} coins · earned ${new Date(row.created_at).toLocaleDateString()} · expires ${new Date(row.expires_at).toLocaleDateString()}${new Date(row.expires_at)<=new Date()?' (expired, unavailable)':''}</p>`).join(''):'No earned coin batches yet.';
+ }else batchEl.textContent='Coin expiry could not load. Refresh to retry.';
+ if(b.status==='fulfilled')voucherEl.innerHTML=b.value?.length?b.value.map(row=>`<p>Request #${Number(row.id)} · ${escapeHTML(row.tier)} · ₹${Number(row.amount)} · ${escapeHTML(row.status)}${row.delivery_error?' — '+escapeHTML(row.delivery_error):''}</p>`).join(''):'No voucher requests yet.';
+ else voucherEl.textContent='Voucher status could not load. Refresh to retry.';
+}
+window.addEventListener('prophit-live',e=>{if(['wallet_updated','notification_created'].includes(e.detail.event)){loadLedger();loadBatchesAndVouchers();}});

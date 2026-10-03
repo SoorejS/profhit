@@ -5,22 +5,46 @@ import { showToast } from '../components/toast.js';
  * PROPHIT - Authentication Logic
  */
 
+let pendingGoogleCredential = '';
+
+function requestTwoFactor(forGoogle = false) {
+    const group = document.getElementById('twoFactorGroup');
+    const input = document.getElementById('twoFactorCode');
+    if (group) group.classList.remove('hidden');
+    if (input) {
+        input.required = true;
+        input.focus();
+    }
+    document.getElementById('verifyGoogleTwoFactor')?.classList.toggle('hidden', !forGoogle);
+    showToast('Enter the current 6-digit code from your authenticator app.', 'error');
+}
+
+async function completeGoogleLogin(credential) {
+    try {
+        const res = await ApiClient.post('/auth/google', { credential, two_factor_code: document.getElementById('twoFactorCode')?.value || '' });
+        if (res && res.token) {
+            ApiClient.setToken(res.token);
+            pendingGoogleCredential = '';
+            showToast('Google Sign-In successful! Welcome to PROPHIT.', 'success');
+            setTimeout(() => window.location.href = 'dashboard.html', 1000);
+        }
+    } catch (err) {
+        if (err.message === '2fa_required') {
+            pendingGoogleCredential = credential;
+            requestTwoFactor(true);
+            return;
+        }
+        showToast(err.message || 'Google Sign-In failed', 'error');
+    }
+}
+
 // Global Google OAuth callback handler
 window.handleGoogleCredentialResponse = async (response) => {
     if (!response || !response.credential) {
         showToast('Google Sign-In failed', 'error');
         return;
     }
-    try {
-        const res = await ApiClient.post('/auth/google', { credential: response.credential, two_factor_code: document.getElementById('twoFactorCode')?.value || '' });
-        if (res && res.token) {
-            ApiClient.setToken(res.token);
-            showToast('Google Sign-In successful! Welcome to PROPHIT.', 'success');
-            setTimeout(() => window.location.href = 'dashboard.html', 1000);
-        }
-    } catch (err) {
-        showToast(err.message || 'Google Sign-In failed', 'error');
-    }
+    await completeGoogleLogin(response.credential);
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -75,6 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Forms
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
+        document.getElementById('verifyGoogleTwoFactor')?.addEventListener('click', async () => {
+            if (pendingGoogleCredential) await completeGoogleLogin(pendingGoogleCredential);
+        });
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = loginForm.querySelector('button[type="submit"]');
@@ -89,7 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ApiClient.setToken(res.token);
                 window.location.href = 'dashboard.html';
             } catch (err) {
-                showToast(err.message, 'error');
+                if (err.message === '2fa_required') requestTwoFactor(false);
+                else showToast(err.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = 'Log in';
             }
@@ -107,7 +135,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = document.getElementById('username').value;
             const email = document.getElementById('email').value;
             const password = document.getElementById('regPassword').value;
+            const passwordConfirm = document.getElementById('regPasswordConfirm').value;
             const referralCode = document.getElementById('referralCode')?.value || '';
+            if (password !== passwordConfirm) {
+                showToast('Passwords do not match.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Create Account';
+                return;
+            }
 
             // PDF §2.1: Optional demographic fields
             const phone = document.getElementById('phone')?.value || '';

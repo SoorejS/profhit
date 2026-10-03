@@ -9,6 +9,7 @@ import (
 	"profhit-backend/models"
 	"profhit-backend/services"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -56,19 +57,12 @@ func SubmitRedemption(c *gin.Context) {
 	// Verify points
 	var user models.User
 	tx.First(&user, userID)
-	if !user.KycStatus {
-		c.JSON(403, gin.H{"error": "KYC verification is required for redemption"})
+	if !services.RedemptionVerified(tx, userID, time.Now().UTC()) {
+		c.JSON(403, gin.H{"error": "Current annual KYC, phone OTP and email confirmation are required for redemption"})
 		return
 	}
 	if user.Points < item.Cost {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient coins"})
-		return
-	}
-
-	// Deduct points
-	if err := services.DebitWalletTx(tx, userID, item.Cost, models.TxTypeRedemption, 0, "Redemption: "+item.Name, nil); err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient unexpired balance or wallet unavailable"})
 		return
 	}
 
@@ -86,6 +80,10 @@ func SubmitRedemption(c *gin.Context) {
 		return
 	}
 
+	if err := services.DebitRedemptionTx(tx, userID, item.Cost, "catalogue", redemption.ID); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 	// Update inventory if not infinite
 	if item.Inventory > 0 {
 		item.Inventory -= 1
@@ -233,7 +231,7 @@ func AdminProcessRedemption(c *gin.Context) {
 			return
 		}
 		// Refund coins
-		if err := services.CreditWalletTx(tx, redemption.UserID, redemption.CostPaid, models.TxTypeRefund, 0, "Redemption Rejected Refund", &adminID); err != nil {
+		if err := services.RefundRedemptionTx(tx, redemption.UserID, "catalogue", redemption.ID, &adminID); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund coins"})
 			return

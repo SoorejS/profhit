@@ -44,7 +44,8 @@ func SeedDatabase() {
 				if err := tx.Create(&models.WalletLedger{UserID: u.ID, Type: models.TxTypeAdminAdjustment, Credit: amount, BalanceAfter: amount, Description: "Development seed balance", Status: "completed"}).Error; err != nil {
 					return err
 				}
-				return tx.Create(&models.CoinBatch{UserID: u.ID, Amount: amount, Balance: amount, ExpiresAt: time.Now().AddDate(1, 0, 0), Source: "development_seed"}).Error
+				earned := time.Now().UTC()
+				return tx.Create(&models.CoinBatch{UserID: u.ID, Amount: amount, Balance: amount, CreatedAt: earned, ExpiresAt: models.CoinExpiry(earned), Source: "development_seed"}).Error
 			}); err != nil {
 				log.Printf("Demo seed failed: %v", err)
 			}
@@ -61,52 +62,24 @@ func SeedDatabase() {
 	log.Println("Database is empty. Seeding initial fixed-odds markets...")
 
 	// Resolution dates
-	soon := time.Now().AddDate(0, 0, 1)
+	soon := time.Now().UTC().AddDate(0, 0, 1)
 
 	markets := []models.Market{
-		{
-			Title:            "Will it rain today in Mumbai?",
-			Description:      "Predict if Mumbai will experience any rainfall today.",
-			Category:         "Weather",
-			Difficulty:       "Easy",
-			Payout:           20,
-			Options:          `["Yes", "No"]`,
-			ResolutionStatus: "Open",
-			EndDate:          soon,
-		},
-		{
-			Title:            "Which team will win the IPL Finals?",
-			Description:      "Predict the winner of the upcoming IPL Finals.",
-			Category:         "Sports",
-			Difficulty:       "Medium",
-			Payout:           60,
-			Options:          `["CSK", "MI", "RCB", "KKR"]`,
-			ResolutionStatus: "Open",
-			EndDate:          soon,
-		},
-		{
-			Title:            "Will Nifty 50 close up or down today?",
-			Description:      "Predict the closing direction of Nifty 50.",
-			Category:         "Financial Markets",
-			Difficulty:       "Easy",
-			Payout:           20,
-			Options:          `["Up", "Down"]`,
-			ResolutionStatus: "Open",
-			EndDate:          soon,
-		},
-		{
-			Title:            "Will NDA win a majority of seats?",
-			Description:      "Predict whether the NDA alliance will win more than half of the seats.",
-			Category:         "Politics",
-			Difficulty:       "Hard",
-			Payout:           250,
-			Options:          `["Yes", "No"]`,
-			ResolutionStatus: "Open",
-			EndDate:          time.Now().AddDate(0, 1, 0),
-		},
+		{Title: "Development demo: rain observation", Category: "Weather", Difficulty: "Easy", Payout: 20, PredictionType: "binary", Options: `["Yes","No"]`, ResolutionSource: "https://openweathermap.org/"},
+		{Title: "Development demo: sports winner", Category: "Sports", Difficulty: "Easy", Payout: 25, PredictionType: "winner", Options: `["Team A","Team B"]`, ResolutionSource: "https://www.espn.com/"},
+		{Title: "Development demo: neutral election result", Category: "Politics", Difficulty: "Easy", Payout: 30, PredictionType: "winner", Options: `["Candidate A","Candidate B"]`, ResolutionSource: "https://eci.gov.in/"},
+		{Title: "Development demo: entertainment winner", Category: "Entertainment", Difficulty: "Easy", Payout: 25, PredictionType: "winner", Options: `["Nominee A","Nominee B"]`, ResolutionSource: "https://oscars.org/"},
+		{Title: "Development demo: market direction", Category: "Financial Markets", Difficulty: "Easy", Payout: 20, PredictionType: "direction", Options: `["Up","Down"]`, ResolutionSource: "https://nseindia.com/"},
+		{Title: "Development demo: two-option event", Category: "Wild Card", Difficulty: "Easy", Payout: 40, PredictionType: "binary", Options: `["Yes","No"]`, ResolutionSource: "https://nasa.gov/"},
 	}
 
 	for _, m := range markets {
+		m.Description = "Disposable development fixture, not a current event or real forecast."
+		m.ResolutionRule = "Development fixture: select the sourced result at the published cutoff. Editorial review is required for actual events."
+		m.LockTime = &soon
+		m.EndDate = soon
+		m.ResolutionStatus = "Live"
+		m.Visibility = "Public"
 		DB.Create(&m)
 	}
 	log.Println("Seeding complete! Fixed-odds markets loaded.")

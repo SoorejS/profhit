@@ -29,9 +29,10 @@ func TestProfileCompletionAchievement(t *testing.T) {
 
 	// Create user
 	user := models.User{
-		Username:         "achieve_test",
-		Email:            "achieve@test.com",
-		Points:           0,
+		Username: "achieve_test",
+		Email:    "achieve@test.com",
+		Points:   0,
+		FullName: "Test Person", Phone: "+919000000000", City: "Pune", Country: "India", Interests: "Weather",
 		KycStatus:        true,
 		TwoFactorSecret:  "SECRET",
 		TwoFactorEnabled: true,
@@ -46,13 +47,13 @@ func TestProfileCompletionAchievement(t *testing.T) {
 	err := config.DB.Where("user_id = ?", user.ID).First(&ach).Error
 	assert.NoError(t, err)
 
-	// Verify points awarded (default 0 + 250)
+	// Verify points awarded (default 0 + 30)
 	var u models.User
 	config.DB.First(&u, user.ID)
-	assert.Equal(t, 250, u.Points)
+	assert.Equal(t, 30, u.Points)
 
 	// Trigger again, should not double award
 	services.CheckProfileCompletion(user.ID)
 	config.DB.First(&u, user.ID)
-	assert.Equal(t, 250, u.Points) // Still 250
+	assert.Equal(t, 30, u.Points) // Still 30
 }

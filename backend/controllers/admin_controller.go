@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // GetAllUsers returns a paginated list of all users (admin/super_admin/it_support)
@@ -164,7 +165,8 @@ func BanUser(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Model(&target).Update("is_active", false).Error; err != nil {
+	// Restoring an account must never resurrect sessions held before its ban.
+	if err := config.DB.Model(&target).Updates(map[string]interface{}{"is_active": false, "token_version": gorm.Expr("token_version + 1")}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user"})
 		return
 	}

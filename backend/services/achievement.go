@@ -18,14 +18,11 @@ func CheckProfileCompletion(userID uint) {
 		return
 	}
 
-	// Definition of 100% Profile:
-	// - KYC Status is true
-	// - 2FA is enabled (TwoFactorSecret is not empty)
-	if !user.KycStatus || !user.TwoFactorEnabled || user.TwoFactorSecret == "" {
+	if !ProfileComplete(user) {
 		return
 	}
 
-	UnlockAchievement(userID, "PROFILE_100", "100% Profile Completed", "Completed KYC and enabled 2FA.", 250, "fa-solid fa-id-card")
+	UnlockAchievement(userID, "PROFILE_100", "100% Profile Completed", "Completed name, email, phone, city, country and interests.", 30, "fa-solid fa-id-card")
 }
 
 // CheckPredictionAchievements checks and unlocks achievements related to predictions
@@ -35,13 +32,13 @@ func CheckPredictionAchievements(userID uint) {
 	config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ?", userID).Count(&count)
 
 	if count >= 1 {
-		UnlockAchievement(userID, "FIRST_PREDICTION", "First Prediction", "Make your first prediction", 50, "fa-solid fa-seedling")
+		UnlockAchievement(userID, "FIRST_PREDICTION", "First Prediction", "Make your first prediction", 0, "fa-solid fa-seedling")
 	}
 	if count >= 10 {
-		UnlockAchievement(userID, "PREDICTIONS_10", "10 Predictions", "Make 10 predictions", 100, "fa-solid fa-tree")
+		UnlockAchievement(userID, "PREDICTIONS_10", "10 Predictions", "Make 10 predictions", 0, "fa-solid fa-tree")
 	}
 	if count >= 100 {
-		UnlockAchievement(userID, "PREDICTIONS_100", "Centurion", "Make 100 predictions", 500, "fa-solid fa-crown")
+		UnlockAchievement(userID, "PREDICTIONS_100", "Centurion", "Make 100 predictions", 0, "fa-solid fa-crown")
 	}
 }
 
@@ -49,6 +46,9 @@ func CheckPredictionAchievements(userID uint) {
 func UnlockAchievement(userID uint, code, title, desc string, reward int, icon string) {
 	awarded := false
 	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := LockWalletTx(tx, userID); err != nil {
+			return err
+		}
 		ach := models.Achievement{Code: code, Title: title, Description: desc, Reward: reward, Icon: icon}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&ach).Error; err != nil {
 			return err
@@ -56,15 +56,19 @@ func UnlockAchievement(userID uint, code, title, desc string, reward int, icon s
 		if err := tx.Where("code = ?", code).First(&ach).Error; err != nil {
 			return err
 		}
-		claim := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.UserAchievement{UserID: userID, AchievementID: ach.ID, UnlockedAt: time.Now()})
+		// Correct current definitions without rewriting historical wallet awards.
+		if err := tx.Model(&ach).Updates(map[string]interface{}{"title": title, "description": desc, "reward": reward, "icon": icon}).Error; err != nil {
+			return err
+		}
+		claim := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.UserAchievement{UserID: userID, AchievementID: ach.ID, UnlockedAt: time.Now().UTC()})
 		if claim.Error != nil {
 			return claim.Error
 		}
 		if claim.RowsAffected == 0 {
 			return nil
 		}
-		if ach.Reward > 0 {
-			if err := CreditWalletTx(tx, userID, ach.Reward, models.TxTypeAdminAdjustment, ach.ID, "Achievement unlocked: "+ach.Title, nil); err != nil {
+		if reward > 0 {
+			if err := CreditWalletTx(tx, userID, reward, models.TxTypeAdminAdjustment, ach.ID, "Achievement unlocked: "+ach.Title, nil); err != nil {
 				return err
 			}
 		}

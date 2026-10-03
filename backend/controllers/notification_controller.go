@@ -17,7 +17,7 @@ func GetNotifications(c *gin.Context) {
 	c.JSON(200, items)
 }
 func ReadNotifications(c *gin.Context) {
-	if err := config.DB.Model(&models.Notification{}).Where("user_id = ? AND read_at IS NULL", c.MustGet("userID")).Update("read_at", time.Now()).Error; err != nil {
+	if err := config.DB.Model(&models.Notification{}).Where("user_id = ? AND read_at IS NULL", c.MustGet("userID")).Update("read_at", time.Now().UTC()).Error; err != nil {
 		c.JSON(500, gin.H{"error": "Could not mark notifications read"})
 		return
 	}

@@ -24,7 +24,8 @@ async function loadProfileData() {
         document.getElementById('profileJoined').textContent = 'Joined ' + new Date(user.created_at).toLocaleDateString();
         document.getElementById('profileTier').textContent = user.tier + ' Tier';
         document.getElementById('profileUsername').textContent = `@${user.username}`;
-        document.getElementById('profileAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=D4AF37&color=0A1128&size=120`;
+        document.getElementById('profileAvatar').src = 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="60" fill="#D4AF37"/><text x="60" y="78" text-anchor="middle" font-size="60" fill="#0A1128">${escapeHTML(user.username.slice(0,1).toUpperCase())}</text></svg>`);
+        document.getElementById('profileTier').textContent += user.badges?.length ? ` · ${user.badges.join(', ')}` : '';
         
         const refInput = document.getElementById('myReferralCode');
         if (refInput) {
@@ -95,3 +96,5 @@ window.copyReferral = async () => {
         try { await navigator.clipboard.writeText(el.value); showToast("Referral code copied to clipboard!", "success"); } catch { showToast("Could not copy. Select and copy the code manually.", "error"); }
     }
 };
+
+ApiClient.get('/referrals/analytics').then(data=>{const target=document.getElementById('referralStatus');target.innerHTML=`<p>${Number(data.total_referred)} invited · ${Number(data.total_earnings)} coins paid</p>`+(data.history?.length?data.history.map(r=>`<p>Referral #${Number(r.id)} · ${Number(r.earnings)} coins · ${r.is_paid?'Paid':'Pending until '+new Date(r.pending_until).toLocaleString()}</p>`).join(''):'<p>No referral rewards pending.</p>');}).catch(()=>{document.getElementById('referralStatus').textContent='Referral status unavailable.';});

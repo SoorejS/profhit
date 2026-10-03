@@ -37,7 +37,7 @@ func getPostgresDB(t *testing.T) *gorm.Config {
 
 func pgTestUser(t *testing.T, baseName string, coins int) models.User {
 	t.Helper()
-	uniqueID := fmt.Sprintf("%s_%d_%d", baseName, time.Now().UnixNano(), rand.Intn(100000))
+	uniqueID := fmt.Sprintf("%s_%d_%d", baseName, time.Now().UTC().UnixNano(), rand.Intn(100000))
 	u := models.User{
 		Username:     uniqueID,
 		Email:        uniqueID + "@test.invalid",
@@ -65,7 +65,7 @@ func verifyPostgresWalletInvariant(t *testing.T, userID uint) {
 
 	var batchSum int
 	require.NoError(t, config.DB.Model(&models.CoinBatch{}).
-		Where("user_id = ? AND expires_at > ?", userID, time.Now()).
+		Where("user_id = ? AND expires_at > ?", userID, time.Now().UTC()).
 		Select("COALESCE(SUM(balance), 0)").
 		Scan(&batchSum).Error)
 
@@ -126,8 +126,8 @@ func TestPostgresPaymentSettlementConcurrency(t *testing.T) {
 	getPostgresDB(t)
 
 	u := pgTestUser(t, "pg_pay_conc", 100)
-	orderID := fmt.Sprintf("order_pg_conc_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
-	paymentID := fmt.Sprintf("pay_pg_conc_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+	orderID := fmt.Sprintf("order_pg_conc_%d_%d", time.Now().UTC().UnixNano(), rand.Intn(10000))
+	paymentID := fmt.Sprintf("pay_pg_conc_%d_%d", time.Now().UTC().UnixNano(), rand.Intn(10000))
 
 	tx := models.PaymentTransaction{
 		ProviderOrderID: orderID,
@@ -182,7 +182,7 @@ func TestPostgresRedemptionStockConcurrency(t *testing.T) {
 	getPostgresDB(t)
 
 	item := models.RewardItem{
-		Name:      fmt.Sprintf("PG Item %d", time.Now().UnixNano()),
+		Name:      fmt.Sprintf("PG Item %d", time.Now().UTC().UnixNano()),
 		Cost:      100,
 		Inventory: 3,
 		IsActive:  true,
@@ -243,7 +243,7 @@ func TestPostgresMarketResolutionConcurrency(t *testing.T) {
 	getPostgresDB(t)
 
 	market := models.Market{
-		Title:            fmt.Sprintf("PG Resolution Test %d", time.Now().UnixNano()),
+		Title:            fmt.Sprintf("PG Resolution Test %d", time.Now().UTC().UnixNano()),
 		Category:         "Tech",
 		ResolutionStatus: "Live",
 		Options:          `["Yes","No"]`,

@@ -50,7 +50,7 @@ func StartKYCSession(c *gin.Context) {
 		return
 	}
 	if err == nil {
-		if existingKYC.Status == "Verified" {
+		if existingKYC.Status == "Verified" && existingKYC.VerifiedAt != nil && existingKYC.VerifiedAt.AddDate(1, 0, 0).After(time.Now().UTC()) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "User is already verified"})
 			return
 		}
@@ -72,7 +72,7 @@ func StartKYCSession(c *gin.Context) {
 	}
 
 	// 2. Generate a unique transaction/session ID for our side
-	transactionID := fmt.Sprintf("txn_%d_%d", userID, time.Now().UnixNano())
+	transactionID := fmt.Sprintf("txn_%d_%d", userID, time.Now().UTC().UnixNano())
 
 	// 3. Make server-to-server call to HyperVerge to get the token (Simulated or Real)
 	// In a real integration, we'd POST to https://auth.hyperverge.co/login to get a JWT
@@ -194,10 +194,16 @@ func GetKYCStatus(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": kyc.Status,
-		"reason": kyc.FailureReason,
-	})
+	status := kyc.Status
+	var expiresAt *time.Time
+	if kyc.VerifiedAt != nil {
+		expires := kyc.VerifiedAt.AddDate(1, 0, 0)
+		expiresAt = &expires
+		if !expires.After(time.Now().UTC()) && status == "Verified" {
+			status = "Expired"
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status, "reason": kyc.FailureReason, "expires_at": expiresAt, "redemption_eligible": services.RedemptionVerified(config.DB, userID, time.Now().UTC()), "phone_verified": kyc.PhoneVerifiedAt != nil, "email_confirmed": kyc.EmailConfirmedAt != nil, "contact_verification_status": "Provider workflow for phone OTP and email confirmation requires staging verification"})
 }
 
 // HypervergeWebhook handles the asynchronous verification result from HyperVerge
@@ -291,23 +297,15 @@ func HypervergeWebhook(c *gin.Context) {
 
 	if payload.Status == "auto_approved" {
 		kyc.Status = "Verified"
-		now := time.Now()
+		now := time.Now().UTC()
 		kyc.VerifiedAt = &now
 
 		user.KycStatus = true
-		if user.Tier == "Bronze" {
-			user.Tier = "Gold" // Auto upgrade tier upon KYC
-		}
-		if err := tx.Model(&user).Updates(map[string]interface{}{"kyc_status": true, "tier": user.Tier}).Error; err != nil {
+		if err := tx.Model(&user).Update("kyc_status", true).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Could not update verification status"})
 			return
 		}
 
-		// Trigger referral bonus for KYC completion
-		if err := services.TriggerReferralEventTx(tx, user.ID, models.ReferralStatusKYCCompleted, 200); err != nil {
-			c.JSON(500, gin.H{"error": "Could not record verification reward"})
-			return
-		}
 	} else if payload.Status == "rejected" {
 		kyc.Status = "Rejected"
 	} else {

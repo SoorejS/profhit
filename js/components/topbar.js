@@ -1,3 +1,4 @@
+import '../services/live.js';
 import ApiClient from '../api/client.js';
 
 export async function logout() {
@@ -43,6 +44,10 @@ export class AppTopbar extends HTMLElement {
         
         this.querySelector('#profileToggle').addEventListener('click', e => { const hidden = this.querySelector('#profileDropdown').classList.toggle('hidden'); e.currentTarget.setAttribute('aria-expanded', String(!hidden)); });
         this.onOutsideClick = (e) => {
+            const sidebar = document.querySelector('app-sidebar');
+            if (!sidebar?.contains(e.target) && !this.querySelector('.menu-toggle').contains(e.target)) {
+                this.closeNavigation();
+            }
             if (!this.contains(e.target)) {
                 const drop = document.getElementById('profileDropdown');
                 if(drop) drop.classList.add('hidden');
@@ -50,6 +55,13 @@ export class AppTopbar extends HTMLElement {
             }
         };
         document.addEventListener('click', this.onOutsideClick);
+        this.onEscape = (e) => {
+            if (e.key === 'Escape' && document.querySelector('app-sidebar')?.classList.contains('open')) {
+                this.closeNavigation();
+                this.querySelector('.menu-toggle').focus();
+            }
+        };
+        document.addEventListener('keydown', this.onEscape);
         this.querySelector('.menu-toggle').addEventListener('click', e => { const sidebar = document.querySelector('app-sidebar'); const open = sidebar.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', String(open)); });
         this.querySelector('input').addEventListener('keydown', e => { if (e.key === 'Enter') window.location.href = '/dashboard.html?search=' + encodeURIComponent(e.target.value); });
         
@@ -61,10 +73,17 @@ export class AppTopbar extends HTMLElement {
             });
         }
         
+        this.onLive=e=>{if(e.detail.event==='wallet_updated')this.fetchBalance();};window.addEventListener('prophit-live',this.onLive);
         this.fetchBalance();
+		if(ApiClient.isAuthenticated())ApiClient.post('/me/daily-login').then(()=>this.fetchBalance()).catch(()=>{});
     }
     
-    disconnectedCallback() { document.removeEventListener('click', this.onOutsideClick); }
+    closeNavigation() {
+        document.querySelector('app-sidebar')?.classList.remove('open');
+        this.querySelector('.menu-toggle')?.setAttribute('aria-expanded', 'false');
+    }
+
+    disconnectedCallback() { window.removeEventListener('prophit-live',this.onLive); document.removeEventListener('click', this.onOutsideClick); document.removeEventListener('keydown', this.onEscape); }
     async fetchBalance() {
         if (!ApiClient.isAuthenticated()) return;
         try {

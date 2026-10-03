@@ -79,7 +79,7 @@ func GetActivity(c *gin.Context) {
 	}
 
 	var activity []gin.H
-	now := time.Now()
+	now := time.Now().UTC()
 	for _, r := range rows {
 		duration := now.Sub(r.CreatedAt)
 		var timeAgo string
@@ -110,9 +110,9 @@ func GetActivity(c *gin.Context) {
 	c.JSON(http.StatusOK, activity)
 }
 
-// GetTopStreak fetches users ranked by their longest daily login streak
+// GetTopStreak fetches users ranked by their longest prediction streak
 func GetTopStreak(c *gin.Context) {
-	var streaks []models.UserStreak
+	var streaks []models.PredictionStreak
 	if err := config.DB.Preload("User").Order("longest_streak desc").Limit(10).Find(&streaks).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch streak leaderboard"})
 		return
@@ -209,8 +209,8 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 	}
 
 	if sort == "streak" {
-		var streaks []models.UserStreak
-		query := config.DB.Model(&models.UserStreak{}).Preload("User").Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true")
+		var streaks []models.PredictionStreak
+		query := config.DB.Model(&models.PredictionStreak{}).Preload("User").Joins("JOIN users ON users.id = prediction_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true")
 		if search != "" {
 			query = query.Where("users.username LIKE ?", "%"+search+"%")
 		}
@@ -239,10 +239,10 @@ func GetUnifiedLeaderboard(c *gin.Context) {
 		response["meta"].(gin.H)["total"] = total
 
 		if currentUserID != 0 {
-			var myStreak models.UserStreak
+			var myStreak models.PredictionStreak
 			if err := config.DB.Where("user_id = ?", currentUserID).First(&myStreak).Error; err == nil {
 				var rank int64
-				if err := config.DB.Model(&models.UserStreak{}).Joins("JOIN users ON users.id = user_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true").Where("longest_streak > ? OR (longest_streak = ? AND user_id < ?)", myStreak.LongestStreak, myStreak.LongestStreak, currentUserID).Count(&rank).Error; err != nil {
+				if err := config.DB.Model(&models.PredictionStreak{}).Joins("JOIN users ON users.id = prediction_streaks.user_id").Where("users.deleted_at IS NULL AND users.is_active = true").Where("longest_streak > ? OR (longest_streak = ? AND user_id < ?)", myStreak.LongestStreak, myStreak.LongestStreak, currentUserID).Count(&rank).Error; err != nil {
 					c.JSON(500, gin.H{"error": "Could not load leaderboard rank"})
 					return
 				}

@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"os"
 	"profhit-backend/config"
 	"profhit-backend/middleware"
 	"profhit-backend/models"
 	"profhit-backend/services"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +24,22 @@ import (
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
+
+var usernamePattern = regexp.MustCompile(`^[a-z0-9_]{3,64}$`)
+
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unique constraint") || strings.Contains(message, "duplicate key")
+}
+
+func isValidEmail(email string) bool {
+	address, err := mail.ParseAddress(email)
+	return err == nil && address.Address == email && len(email) <= 254
+}
 
 func GenerateToken(user models.User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
@@ -50,8 +66,8 @@ func GenerateToken(user models.User) (string, error) {
 		Role:         user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        hex.EncodeToString(tokenID),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryMinutes) * time.Minute)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Duration(expiryMinutes) * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		},
 	}
 
@@ -67,11 +83,12 @@ func generateToken(user models.User) (string, error) {
 func RegisterUser(c *gin.Context) {
 	var input struct {
 		Username     string `json:"username" binding:"required,min=3,max=64"`
-		Email        string `json:"email" binding:"required,email"`
+		Email        string `json:"email" binding:"required"`
 		Password     string `json:"password" binding:"required,min=8,max=72"`
 		ReferralCode string `json:"referral_code"`
 		// PDF §2.1 — Demographic fields (all optional at registration)
 		Phone       string `json:"phone"`
+		FullName    string `json:"full_name"`
 		DateOfBirth string `json:"date_of_birth"` // Expected format: YYYY-MM-DD
 		City        string `json:"city"`
 		Country     string `json:"country"`
@@ -83,11 +100,29 @@ func RegisterUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	input.Username = strings.ToLower(strings.TrimSpace(input.Username))
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	input.ReferralCode = strings.ToUpper(strings.TrimSpace(input.ReferralCode))
+	if !usernamePattern.MatchString(input.Username) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username must be 3-64 characters using only letters, numbers, or underscores"})
+		return
+	}
+	if !isValidEmail(input.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A valid email address is required"})
+		return
+	}
+	if strings.TrimSpace(input.Password) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password cannot be blank"})
+		return
+	}
 
 	// Check if username or email already exists
 	var existing models.User
-	if err := config.DB.Where("username = ? OR email = ?", input.Username, input.Email).First(&existing).Error; err == nil {
+	if err := config.DB.Where("LOWER(username) = ? OR LOWER(email) = ?", input.Username, input.Email).First(&existing).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Username or email already taken"})
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not validate account details"})
 		return
 	}
 
@@ -122,6 +157,7 @@ func RegisterUser(c *gin.Context) {
 		ReferredBy:   0,
 		// Demographics
 		Phone:       input.Phone,
+		FullName:    strings.TrimSpace(input.FullName),
 		DateOfBirth: dob,
 		City:        input.City,
 		Country:     input.Country,
@@ -139,6 +175,10 @@ func RegisterUser(c *gin.Context) {
 
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
+		if isUniqueConstraintError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Username or email already taken"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
 		return
 	}
@@ -200,9 +240,14 @@ func LoginUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	if !isValidEmail(input.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A valid email address is required"})
+		return
+	}
 
 	var user models.User
-	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+	if err := config.DB.Where("LOWER(email) = ?", input.Email).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
@@ -217,16 +262,14 @@ func LoginUser(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "2fa_required"})
 			return
 		}
-
-		valid := totp.Validate(input.TwoFactorCode, user.TwoFactorSecret)
-		if !valid {
+		if !sixDigitCode.MatchString(input.TwoFactorCode) || !totp.Validate(input.TwoFactorCode, user.TwoFactorSecret) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid 2FA code"})
 			return
 		}
 	}
 
 	// Block banned users BEFORE generating the token
-	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now())) {
+	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now().UTC())) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended. Contact support."})
 		return
 	}
@@ -237,6 +280,11 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
+	if _, err := services.ClaimDailyLogin(user.ID, time.Now().UTC()); err != nil {
+		c.JSON(500, gin.H{"error": "Could not award daily login"})
+		return
+	}
+	config.DB.First(&user, user.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful!",
 		"token":   token,
@@ -289,7 +337,7 @@ func GetUserStats(c *gin.Context) {
 	config.DB.Model(&models.WalletLedger{}).Where("user_id = ? AND type IN ?", id, []string{string(models.TxTypePredictionStake), string(models.TxTypeRedemption)}).Select("COALESCE(SUM(debit), 0)").Scan(&coinsSpent)
 
 	var longestStreak int
-	var current models.UserStreak
+	var current models.PredictionStreak
 	if err := config.DB.Where("user_id = ?", id).First(&current).Error; err == nil {
 		longestStreak = current.LongestStreak
 	}
@@ -328,20 +376,36 @@ func GetMe(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Could not refresh profile"})
 		return
 	}
+	var badges []string
+	if err := config.DB.Table("user_badges ub").Select("b.name").Joins("JOIN badges b ON b.id = ub.badge_id").Where("ub.user_id = ? AND b.deleted_at IS NULL", userID).Scan(&badges).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load earned badges"})
+		return
+	}
+	var spendable int
+	if err := config.DB.Model(&models.CoinBatch{}).Where("user_id = ? AND expires_at > ?", userID, time.Now().UTC()).Select("COALESCE(SUM(balance),0)").Scan(&spendable).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load valid balance"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":            user.ID,
-		"username":      user.Username,
-		"email":         user.Email,
-		"tier":          user.Tier,
-		"role":          user.Role,
-		"is_active":     user.IsActive,
-		"points":        user.Points,
-		"kyc_status":    user.KycStatus,
-		"referral_code": user.ReferralCode,
-		"created_at":    user.CreatedAt,
+		"id":                      user.ID,
+		"badges":                  badges,
+		"priority_support_status": "Pending",
+		"ad_slot_status":          "Pending",
+		"username":                user.Username,
+		"email":                   user.Email,
+		"tier":                    user.Tier,
+		"role":                    user.Role,
+		"is_active":               user.IsActive,
+		"points":                  spendable,
+		"ledger_balance":          user.Points,
+		"kyc_status":              user.KycStatus,
+		"referral_code":           user.ReferralCode,
+		"created_at":              user.CreatedAt,
+		"two_factor_enabled":      user.TwoFactorEnabled,
 		// PDF §2.1 demographics
 		"phone":         user.Phone,
+		"full_name":     user.FullName,
 		"date_of_birth": user.DateOfBirth,
 		"city":          user.City,
 		"country":       user.Country,
@@ -375,13 +439,18 @@ func ForgotPassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
 		return
 	}
+	email := strings.ToLower(strings.TrimSpace(req["email"]))
+	if !isValidEmail(email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A valid email address is required"})
+		return
+	}
 
 	if os.Getenv("SMTP_HOST") == "" || os.Getenv("SMTP_USERNAME") == "" || os.Getenv("SMTP_PASSWORD") == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Password reset email is temporarily unavailable"})
 		return
 	}
 	var user models.User
-	if err := config.DB.Where("email = ?", req["email"]).First(&user).Error; err != nil {
+	if err := config.DB.Where("LOWER(email) = ?", email).First(&user).Error; err != nil {
 		// Don't leak user existence — always return the same message
 		c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link will be emailed shortly."})
 		return
@@ -397,21 +466,11 @@ func ForgotPassword(c *gin.Context) {
 
 	// Invalidate any existing tokens for this user
 
-	resetRecord := models.PasswordResetToken{
-		UserID:    user.ID,
-		Token:     fmt.Sprintf("%x", sha256.Sum256([]byte(token))),
-		ExpiresAt: time.Now().Add(1 * time.Hour),
-	}
-	if err := config.DB.Transaction(func(tx *gorm.DB) error {
-		var locked models.User
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, user.ID).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", user.ID).Delete(&models.PasswordResetToken{}).Error; err != nil {
-			return err
-		}
-		return tx.Create(&resetRecord).Error
-	}); err != nil {
+	if err := services.ReplacePasswordResetToken(
+		user.ID,
+		fmt.Sprintf("%x", sha256.Sum256([]byte(token))),
+		time.Now().UTC().Add(time.Hour),
+	); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist reset token"})
 		return
 	}
@@ -443,7 +502,7 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	if time.Now().After(record.ExpiresAt) {
+	if time.Now().UTC().After(record.ExpiresAt) {
 		config.DB.Delete(&record) // Clean up expired token
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token has expired. Please request a new one."})
 		return
@@ -459,7 +518,7 @@ func ResetPassword(c *gin.Context) {
 	// Claim the one-time token before changing the password.
 	tx := config.DB.Begin()
 	defer tx.Rollback()
-	claim := tx.Where("id = ? AND expires_at > ?", record.ID, time.Now()).Delete(&models.PasswordResetToken{})
+	claim := tx.Where("id = ? AND expires_at > ?", record.ID, time.Now().UTC()).Delete(&models.PasswordResetToken{})
 	if claim.Error != nil || claim.RowsAffected != 1 {
 		c.JSON(400, gin.H{"error": "Invalid or expired reset token"})
 		return

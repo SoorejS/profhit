@@ -124,7 +124,7 @@ export class AppSidebar extends HTMLElement {
                     </div>
                     <div class="flex justify-between items-center" style="margin-top: 0.5rem">
                         <div class="balance-amount font-bold"><span id="sidebarBalance">--</span> PTS</div>
-                        <a href="/wallet.html" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Deposit</a>
+                        <a href="/dashboard.html" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Earn coins</a>
                     </div>
                 </div>
             </aside>

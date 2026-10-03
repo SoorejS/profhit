@@ -21,6 +21,7 @@ export class AppSidebar extends HTMLElement {
                 <a href="/admin.html#kyc" class="nav-link"><i class="ph ph-identification-card"></i> KYC</a>
                 <a href="/admin.html#withdrawals" class="nav-link"><i class="ph ph-receipt"></i> Withdrawals</a>
                 <a href="/admin.html#analytics" class="nav-link"><i class="ph ph-chart-pie-slice"></i> Analytics</a>
+                <a href="/challenges.html" class="nav-link">Weekly challenges</a>
                 <span class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-megaphone"></i> Advertiser Portal <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></span>
                 <span class="nav-link" style="opacity:0.6; cursor:not-allowed;" title="Coming Soon"><i class="ph ph-star"></i> Sponsored Predictions <span class="badge badge-warning" style="margin-left:auto;font-size:0.6rem;">Coming Soon</span></span>
                 
@@ -31,6 +32,8 @@ export class AppSidebar extends HTMLElement {
                 <a href="/dashboard.html" class="nav-link ${activePage === 'home' ? 'active' : ''}"><i class="ph ph-house"></i> Dashboard</a>
                 <a href="/dashboard.html?view=markets" class="nav-link ${activePage === 'markets' ? 'active' : ''}"><i class="ph ph-chart-line-up"></i> Markets</a>
                 <a href="/portfolio.html" class="nav-link ${activePage === 'portfolio' ? 'active' : ''}"><i class="ph ph-chart-pie-slice"></i> Portfolio</a>
+                <a href="/challenges.html" class="nav-link ${activePage === 'challenges' ? 'active' : ''}">Weekly challenges</a>
+                <a href="/rules.html" class="nav-link">Game rules</a>
                 <a href="/wallet.html" class="nav-link ${activePage === 'wallet' ? 'active' : ''}"><i class="ph ph-wallet"></i> Wallet</a>
                 <a href="/rewards.html" class="nav-link ${activePage === 'rewards' ? 'active' : ''}"><i class="ph ph-gift"></i> Rewards</a>
                 <a href="/leaderboard.html" class="nav-link ${activePage === 'leaderboard' ? 'active' : ''}"><i class="ph ph-ranking"></i> Leaderboard</a>
@@ -64,14 +67,12 @@ export class AppSidebar extends HTMLElement {
                     </div>
                     <div class="flex justify-between items-center" style="margin-top: 0.5rem">
                         <div class="balance-amount font-bold"><span id="sidebarBalance">--</span> PTS</div>
-                        <a href="/wallet.html" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Deposit</a>
+                        <a href="/dashboard.html" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Earn coins</a>
                     </div>
                 </div>
             </aside>
         `;
 
-        this.querySelector('.sidebar-header').insertAdjacentHTML('beforeend', '<button type="button" class="btn btn-outline menu-toggle" aria-label="Close navigation">Close</button>');
-        this.querySelector('.menu-toggle').addEventListener('click', () => { this.classList.remove('open'); document.querySelector('app-topbar .menu-toggle')?.setAttribute('aria-expanded', 'false'); });
         this.fetchBalance();
     }
     

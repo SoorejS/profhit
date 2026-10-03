@@ -17,3 +17,5 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('showUnread').addEventListener('click', () => { unreadOnly = true; render(); });
  load();
 });
+
+window.addEventListener('prophit-live',e=>{if(e.detail.event==='notification_created')load();});

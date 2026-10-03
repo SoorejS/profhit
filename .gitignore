@@ -14,5 +14,6 @@
 __pycache__/
 node_modules/
 audit-artifacts/
+**/.tmp-go-cache/
 
 backend/api_output.json

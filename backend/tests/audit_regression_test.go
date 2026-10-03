@@ -60,7 +60,7 @@ func TestSuspendedLoginDoesNotIssueSession(t *testing.T) {
 	u := testUser(t, "suspended", 0)
 	password, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
 	require.NoError(t, err)
-	require.NoError(t, config.DB.Model(&u).Updates(map[string]interface{}{"password": string(password), "suspended_until": time.Now().Add(time.Hour)}).Error)
+	require.NoError(t, config.DB.Model(&u).Updates(map[string]interface{}{"password": string(password), "suspended_until": time.Now().UTC().Add(time.Hour)}).Error)
 	w := request(t, controllers.LoginUser, 0, `{"email":"suspended@test.invalid","password":"test-password"}`, nil)
 	require.Equal(t, 403, w.Code)
 	require.NotContains(t, w.Body.String(), `"token"`)
@@ -69,7 +69,7 @@ func TestSuspendedLoginDoesNotIssueSession(t *testing.T) {
 func TestRedemptionRejectRefundsAndRestocksExactlyOnce(t *testing.T) {
 	setupTestDB()
 	u := testUser(t, "redeemer", 100)
-	require.NoError(t, config.DB.Model(&u).Update("kyc_status", true).Error)
+	grantTestVerification(t, u.ID)
 	item := models.RewardItem{Name: "Voucher", Cost: 50, Inventory: 1, IsActive: true}
 	require.NoError(t, config.DB.Create(&item).Error)
 	body := fmt.Sprintf(`{"reward_item_id":%d}`, item.ID)
@@ -92,6 +92,7 @@ func TestEveryProtectedRouteRejectsAnonymousRequests(t *testing.T) {
 	t.Setenv("JWT_SECRET", strings.Repeat("test", 12))
 	router := routes.SetupRouter()
 	public := map[string]bool{
+		"GET /api/challenges": true, "GET /api/challenges/:id": true,
 		"POST /api/auth/register": true, "POST /api/auth/login": true, "POST /api/auth/google": true,
 		"POST /api/auth/forgot-password": true, "POST /api/auth/reset-password": true, "GET /api/auth/config": true,
 		"GET /api/health": true, "POST /api/webhooks/hyperverge": true, "POST /api/webhooks/razorpay": true,
@@ -148,7 +149,7 @@ func TestWebSocketPrivateIsolationAndRevocation(t *testing.T) {
 	defer b.Close()
 	// Server acknowledgement confirms registration before events are queued.
 	for _, conn := range []*websocket.Conn{a, b} {
-		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+		conn.SetReadDeadline(time.Now().UTC().Add(3 * time.Second))
 		var ready services.WSMessage
 		require.NoError(t, conn.ReadJSON(&ready))
 		require.Equal(t, "connected", ready.Event)
@@ -156,12 +157,12 @@ func TestWebSocketPrivateIsolationAndRevocation(t *testing.T) {
 	services.BroadcastToUser(alice.ID, "private", "only alice")
 	services.BroadcastToAll("public", "everyone")
 	var msg services.WSMessage
-	a.SetReadDeadline(time.Now().Add(3 * time.Second))
+	a.SetReadDeadline(time.Now().UTC().Add(3 * time.Second))
 	require.NoError(t, a.ReadJSON(&msg))
 	require.Equal(t, "private", msg.Event)
 	require.NoError(t, a.ReadJSON(&msg))
 	require.Equal(t, "public", msg.Event)
-	b.SetReadDeadline(time.Now().Add(3 * time.Second))
+	b.SetReadDeadline(time.Now().UTC().Add(3 * time.Second))
 	require.NoError(t, b.ReadJSON(&msg))
 	require.Equal(t, "public", msg.Event)
 	require.NoError(t, middleware.InvalidateToken(bToken))
@@ -230,13 +231,13 @@ func TestPredictionCategoryDayBoundaryUTC(t *testing.T) {
 			if previousDay {
 				prior = start.Add(-time.Nanosecond)
 			}
-			first := models.Market{Title: "Prior", Category: "Sports", Options: `["Yes","No"]`, ResolutionStatus: "Open", Payout: 20, EndDate: now.Add(time.Hour)}
+			first := compliantTestMarket("Sports", "Easy", now.Add(time.Hour))
 			next := first
 			next.Title = "Next"
 			require.NoError(t, config.DB.Create(&first).Error)
 			require.NoError(t, config.DB.Create(&next).Error)
 			require.NoError(t, config.DB.Create(&models.PredictionSubmission{UserID: u.ID, MarketID: first.ID, Choice: "Yes", Amount: 10, Potential: 20, CreatedAt: prior}).Error)
-			w := request(t, controllers.SubmitPrediction, u.ID, fmt.Sprintf(`{"market_id":%d,"choice":"Yes","amount":10}`, next.ID), nil)
+			w := request(t, controllers.SubmitPrediction, u.ID, fmt.Sprintf(`{"market_id":%d,"choice":"Yes","amount":0}`, next.ID), nil)
 			if previousDay {
 				require.Equal(t, 200, w.Code, w.Body.String())
 			} else {

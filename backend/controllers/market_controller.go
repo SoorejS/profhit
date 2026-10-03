@@ -58,7 +58,7 @@ func GetAllMarkets(c *gin.Context) {
 		orderClause = "created_at desc"
 	} else if sort == "ending_soon" {
 		orderClause = "lock_time asc"
-		query = query.Where("lock_time > ?", time.Now())
+		query = query.Where("lock_time > ?", time.Now().UTC())
 	}
 
 	if err := query.Order(orderClause).Limit(limit).Offset(offset).Find(&markets).Error; err != nil {
@@ -128,8 +128,10 @@ func ResolveMarket(c *gin.Context) {
 
 	var req struct {
 		// Accept both 'winner' (internal API) and 'outcome' (frontend shorthand)
-		Winner  string `json:"winner"`
-		Outcome string `json:"outcome"`
+		Winner      string     `json:"winner"`
+		Outcome     string     `json:"outcome"`
+		EvidenceURL string     `json:"evidence_url"`
+		ObservedAt  *time.Time `json:"observed_at"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -146,10 +148,18 @@ func ResolveMarket(c *gin.Context) {
 	}
 
 	// Validate that correct option is one of the market's actual options
-	if !isValidOption(correctOption, market.Options) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid winner option — not listed for this market"})
+	if !services.EvidenceMatchesSource(market, req.EvidenceURL) || req.ObservedAt == nil || req.ObservedAt.After(time.Now().UTC()) || (market.LockTime != nil && req.ObservedAt.Before(*market.LockTime)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Settlement requires approved-source evidence and an observation at or after the cutoff"})
 		return
 	}
+	canonical, err := services.ValidatePredictionValue(market, correctOption, true)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	correctOption = canonical
+	market.EvidenceURL = req.EvidenceURL
+	market.ObservedAt = req.ObservedAt
 
 	// Capture the resolving admin's ID
 	adminIDVal, _ := c.Get("userID")
@@ -159,6 +169,22 @@ func ResolveMarket(c *gin.Context) {
 	var predictions []models.PredictionSubmission
 	if err := tx.Where("market_id = ?", market.ID).Order("user_id ASC").Find(&predictions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load predictions"})
+		return
+	}
+	if len(predictions) > 0 {
+		ids := []uint{}
+		for _, p := range predictions {
+			ids = append(ids, p.UserID)
+		}
+		var users []models.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", ids).Order("id asc").Find(&users).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not lock settlement accounts"})
+			return
+		}
+	}
+	winners, err := services.PredictionWinners(market, correctOption, predictions)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -171,7 +197,7 @@ func ResolveMarket(c *gin.Context) {
 
 	for i := range predictions {
 		pred := &predictions[i]
-		isCorrect := pred.Choice == correctOption
+		isCorrect := winners[pred.ID]
 		pred.IsCorrect = &isCorrect
 
 		if err := tx.Save(pred).Error; err != nil {
@@ -198,13 +224,35 @@ func ResolveMarket(c *gin.Context) {
 				})
 				return
 			}
+			if err := tx.Create(&models.Notification{UserID: pred.UserID, Key: fmt.Sprintf("prediction:%d", pred.ID), Message: fmt.Sprintf("Correct prediction: +%d coins for %s", pred.Potential, market.Title)}).Error; err != nil {
+				c.JSON(500, gin.H{"error": "Could not record reward notification"})
+				return
+			}
 		} else {
 			loserCount++
+		}
+		if market.WeeklyChallengeID != nil {
+			reward := 0
+			score := 0
+			if isCorrect {
+				reward = pred.Potential
+				score = 1
+			}
+			if err := tx.Model(&models.ChallengeParticipant{}).Where("challenge_id = ? AND user_id = ?", *market.WeeklyChallengeID, pred.UserID).Updates(map[string]interface{}{"score": score, "reward_won": reward}).Error; err != nil {
+				c.JSON(500, gin.H{"error": "Could not settle challenge participation"})
+				return
+			}
+		}
+	}
+	if market.WeeklyChallengeID != nil {
+		if err := tx.Model(&models.WeeklyChallenge{}).Where("id = ?", *market.WeeklyChallengeID).Update("status", "Completed").Error; err != nil {
+			c.JSON(500, gin.H{"error": "Could not finish challenge"})
+			return
 		}
 	}
 
 	// ── Finalise the market ─────────────────────────────────────────────────
-	now := time.Now()
+	now := time.Now().UTC()
 	market.ResolutionStatus = "Resolved"
 	market.CorrectOption = correctOption
 	market.ResolvedAt = &now
@@ -246,6 +294,12 @@ func ResolveMarket(c *gin.Context) {
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
+	}
+	services.BroadcastToAll("market_resolved", gin.H{"market_id": market.ID})
+	services.BroadcastToAll("leaderboard_updated", gin.H{"market_id": market.ID})
+	for _, p := range predictions {
+		services.BroadcastToUser(p.UserID, "wallet_updated", gin.H{"market_id": market.ID})
+		services.BroadcastToUser(p.UserID, "notification_created", gin.H{"market_id": market.ID})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -296,17 +350,23 @@ func ApproveMarket(c *gin.Context) {
 		return
 	}
 
-	if market.ResolutionStatus != "Proposed" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Only proposed markets can be approved"})
+	if market.ResolutionStatus != "Proposed" && market.ResolutionStatus != "Draft" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only unpublished markets can be approved"})
 		return
 	}
 
-	if market.LockTime == nil || !market.LockTime.After(time.Now()) {
+	if market.LockTime == nil || !market.LockTime.After(time.Now().UTC()) {
 		c.JSON(400, gin.H{"error": "Proposal lock time has passed"})
 		return
 	}
+	checked := market
+	if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
+		c.JSON(400, gin.H{"error": "Review the typed rules and approved result source before publishing"})
+		return
+	}
+	previous := market.ResolutionStatus
 	market.ResolutionStatus = "Live"
-	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, "Proposed").Update("resolution_status", "Live")
+	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, previous).Update("resolution_status", "Live")
 	if result.Error != nil || result.RowsAffected != 1 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve market"})
 		return
@@ -321,7 +381,7 @@ func ApproveMarket(c *gin.Context) {
 // GetProposedMarkets returns all markets awaiting approval (admin only)
 func GetProposedMarkets(c *gin.Context) {
 	var markets []models.Market
-	if err := config.DB.Where("resolution_status = ?", "Proposed").Find(&markets).Error; err != nil {
+	if err := config.DB.Where("resolution_status IN ?", []string{"Draft", "Proposed"}).Find(&markets).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch proposed markets"})
 		return
 	}
@@ -449,11 +509,18 @@ func TransitionMarketState(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Illegal market state transition"})
 		return
 	}
-	if (req.Status == "Scheduled" || req.Status == "Live") && (market.LockTime == nil || !market.LockTime.After(time.Now())) {
+	if (req.Status == "Scheduled" || req.Status == "Live") && (market.LockTime == nil || !market.LockTime.After(time.Now().UTC())) {
 		c.JSON(400, gin.H{"error": "Market requires a future lock time"})
 		return
 	}
-	if req.Status == "Scheduled" && (market.StartTime == nil || !market.StartTime.After(time.Now())) {
+	if req.Status == "Scheduled" || req.Status == "Live" {
+		checked := market
+		if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
+			c.JSON(400, gin.H{"error": "Review typed rules before publishing"})
+			return
+		}
+	}
+	if req.Status == "Scheduled" && (market.StartTime == nil || !market.StartTime.After(time.Now().UTC())) {
 		c.JSON(400, gin.H{"error": "Scheduled market requires a future start time"})
 		return
 	}
@@ -537,7 +604,7 @@ func validateNewMarket(m *models.Market) error {
 	if m.LockTime == nil && !m.EndDate.IsZero() {
 		m.LockTime = &m.EndDate
 	}
-	if m.LockTime == nil || !m.LockTime.After(time.Now()) {
+	if m.LockTime == nil || !m.LockTime.After(time.Now().UTC()) {
 		return fmt.Errorf("A future lock time is required")
 	}
 	if m.StartTime != nil && !m.StartTime.Before(*m.LockTime) {
@@ -546,6 +613,16 @@ func validateNewMarket(m *models.Market) error {
 	if m.ResolutionTime != nil && m.ResolutionTime.Before(*m.LockTime) {
 		return fmt.Errorf("Resolution time must follow lock time")
 	}
+	lockUTC := m.LockTime.UTC()
+	m.LockTime = &lockUTC
+	if m.StartTime != nil {
+		v := m.StartTime.UTC()
+		m.StartTime = &v
+	}
+	if m.ResolutionTime != nil {
+		v := m.ResolutionTime.UTC()
+		m.ResolutionTime = &v
+	}
 	m.EndDate = *m.LockTime
 	if m.ResolutionStatus == "" {
 		m.ResolutionStatus = "Draft"
@@ -553,7 +630,7 @@ func validateNewMarket(m *models.Market) error {
 	if m.ResolutionStatus != "Draft" && m.ResolutionStatus != "Scheduled" && m.ResolutionStatus != "Live" {
 		return fmt.Errorf("Invalid initial status")
 	}
-	if m.ResolutionStatus == "Scheduled" && (m.StartTime == nil || !m.StartTime.After(time.Now())) {
+	if m.ResolutionStatus == "Scheduled" && (m.StartTime == nil || !m.StartTime.After(time.Now().UTC())) {
 		return fmt.Errorf("Scheduled markets need a future start time")
 	}
 	if m.Visibility == "" {
@@ -572,5 +649,6 @@ func validateNewMarket(m *models.Market) error {
 	m.CreatedAt = time.Time{}
 	m.UpdatedAt = time.Time{}
 	m.DeletedAt.Valid = false
-	return nil
+	m.WeeklyChallengeID = nil
+	return services.ConfigurePrediction(m)
 }

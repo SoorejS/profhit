@@ -56,7 +56,11 @@
                             </div>
                             
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
-                                <label for="pSource" style="font-weight: 600;">Official Resolution Source <span class="text-danger">*</span></label>
+                                <label for="pDifficulty">Difficulty</label><select id="pDifficulty" class="input-control"><option>Easy</option><option>Medium</option><option>Hard</option></select>
+<label for="pOptions">Named options / nominees (JSON array)</label><input id="pOptions" class="input-control" value='["Yes","No"]' required>
+<label for="pRangeWidth">Maximum interval width for range questions</label><input id="pRangeWidth" type="number" min="0" step="any" value="0" class="input-control">
+<p id="predictionFormat" class="text-muted"></p>
+<label for="pSource" style="font-weight: 600;">Official Resolution Source <span class="text-danger">*</span></label>
                                 <input type="url" id="pSource" class="input-control" placeholder="https://example.com/official-data" required>
                             </div>
                             
@@ -65,21 +69,10 @@
                                 <input type="datetime-local" id="pLockTime" class="input-control" required>
                             </div>
                             
-                            <div class="input-group" style="margin-bottom: var(--spacing-8);">
-                                <label style="font-weight: 600;">Options (Fixed)</label>
-                                <div class="flex gap-4">
-                                    <input type="text" aria-label="First fixed option" class="input-control font-bold" value="Yes" readonly style="color: var(--color-success); background: rgba(16, 185, 129, 0.1);">
-                                    <input type="text" aria-label="Second fixed option" class="input-control font-bold" value="No" readonly style="color: var(--color-danger); background: rgba(239, 68, 68, 0.1);">
-                                </div>
-                                <small class="text-muted mt-2 block">Currently only binary (Yes/No) markets are supported for user proposals.</small>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary w-full" style="padding: 1rem; font-size: 1.1rem; border-radius: var(--radius-lg);" id="submitBtn">
-                                Submit Proposal for Review
-                            </button>
+                            <p class="text-muted">All six categories support their published answer formats. Outcomes must be measurable and sourced.</p>
+                            <button id="submitBtn" type="submit" class="btn btn-primary w-full">Submit Proposal for Review</button>
                         </form>
                     </div>
-
                 </div>
             </div>
         </main>

@@ -170,12 +170,12 @@ app-sidebar {
 
 .main-content, .content-wrapper, .dashboard-grid > *, .card { min-width: 0; }
 .card, .transaction-item, .profile-header { overflow-wrap: anywhere; }
-.menu-toggle { display: none; }
+.btn.menu-toggle { display: none; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 [aria-pressed="true"] { border-color: var(--color-primary); background: var(--bg-surface-elevated); }
 @media (max-width: 768px) {
  app-sidebar { width: 240px; top: 0; bottom: 0; }
- .menu-toggle { display: inline-flex; position: relative; z-index: 201; }
+ .btn.menu-toggle { display: inline-flex; position: relative; z-index: 201; }
  .topbar { flex-wrap: wrap; gap: 8px; padding: 12px !important; }
  .topbar .search-container { order: 3; flex-basis: 100% !important; max-width: none !important; }
  .content-wrapper { padding: 12px; }
@@ -190,8 +190,14 @@ app-sidebar {
 .profile-header > div, .user-info, .markets-feed { min-width: 0; }
 .flex { min-width: 0; }
 .right-sidebar { min-width: 0; }
+.single-column-grid > * { min-width: 0; }
 .market-card-header, .market-card-stats { gap: 8px; flex-wrap: wrap; }
 @media (max-width: 768px) {
+ .wallet-header { flex-wrap: wrap; gap: 16px; padding: 20px !important; }
+ .wallet-header > div { min-width: 0; max-width: 100%; }
+ .leaderboard-header { flex-wrap: wrap; gap: 16px; }
+ .leaderboard-header > div { min-width: 0; max-width: 100%; }
+ .leaderboard-tabs { flex-wrap: wrap; border-radius: 16px !important; }
  .right-sidebar { display: flex; }
  .profile-header { flex-wrap: wrap; padding: 20px !important; }
  .markets-feed > .flex, .content-wrapper .flex.justify-between { flex-wrap: wrap; gap: 8px; }

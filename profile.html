@@ -72,7 +72,7 @@
                 <div class="single-column-grid">
                     
                     <div class="profile-header">
-                        <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=0A1128&size=120" alt="Avatar" class="profile-avatar" id="profileAvatar">
+                        <img src="assets/user-avatar.svg" alt="Avatar" class="profile-avatar" id="profileAvatar">
                         <div>
                             <h1 id="profileUsername" style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em;">@Username</h1>
                             <div id="profileJoined" class="text-muted" style="margin-bottom: var(--spacing-4); font-size: 0.95rem;">Loading join date...</div>
@@ -101,7 +101,8 @@
                     <div class="profile-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-4);">
                         <div class="card" style="border: 1px solid var(--color-primary); background: linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.02) 100%);">
                             <h3 style="margin-bottom: var(--spacing-4); color: var(--color-primary-light); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-users-three"></i> Refer a Friend</h3>
-                            <p class="text-sm text-muted" style="margin-bottom: var(--spacing-4); line-height: 1.5;">Share your code. Eligible friends receive the 100 PTS welcome balance and a 50 PTS referral bonus after 48 hours. Referral rewards are capped.</p>
+                            <p class="text-sm text-muted" style="margin-bottom: var(--spacing-4); line-height: 1.5;">Share your code. You earn 50 coins when an eligible friend makes their first prediction, after a 48-hour fraud check. Maximum 20 bonuses. Your friend receives the separate 100-coin sign-up bonus.</p>
+                            <div id="referralStatus">Loading referral status…</div>
                             <div class="input-group">
                                 <input type="text" id="myReferralCode" aria-label="Your referral code" class="input-control font-mono font-bold text-center" style="color: var(--color-primary-light); background: rgba(0,0,0,0.2); border-color: rgba(139,92,246,0.3);" readonly value="Loading...">
                             </div>

@@ -3,6 +3,7 @@ import '../components/topbar.js';
 import { escapeHTML } from '../utils/escape.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
+import { confirmAction } from '../components/dialog.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!ApiClient || !ApiClient.isAuthenticated()) {
@@ -80,7 +81,7 @@ async function loadHistory() {
 }
 
 window.redeemReward = async (id, name, cost) => {
-    if (!confirm(`Are you sure you want to redeem ${cost} PTS for "${name}"?`)) return;
+    if (!await confirmAction(`Redeem ${cost} PTS for "${name}"?`)) return;
 
     try {
         await ApiClient.post('/rewards/redeem', { reward_item_id: id });

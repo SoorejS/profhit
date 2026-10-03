@@ -38,7 +38,7 @@ func runEveryMinute() {
 }
 
 func runEveryHour() {
-	if err := config.DB.Where("expires_at < ?", time.Now()).Delete(&models.RevokedToken{}).Error; err != nil {
+	if err := config.DB.Where("expires_at < ?", time.Now().UTC()).Delete(&models.RevokedToken{}).Error; err != nil {
 		log.Printf("Session cleanup failed: %v", err)
 	}
 	processCoinExpiries()
@@ -49,7 +49,10 @@ func runEveryHour() {
 
 // transitionMarkets moves markets between states based on their lifecycle timestamps
 func transitionMarkets() {
-	now := time.Now()
+	now := time.Now().UTC()
+	if err := config.DB.Model(&models.WeeklyChallenge{}).Where("status = ? AND end_date <= ?", "Active", now).Update("status", "Closed").Error; err != nil {
+		log.Printf("Challenge cutoff transition failed: %v", err)
+	}
 
 	// 1. Scheduled -> Live
 	var scheduledMarkets []models.Market
@@ -99,7 +102,7 @@ func transitionMarkets() {
 
 // processCoinExpiries finds expired coin batches and deducts them from the ledger
 func processCoinExpiries() {
-	now := time.Now()
+	now := time.Now().UTC()
 	var expiredBatches []models.CoinBatch
 
 	// Find batches that have expired but still have a balance > 0
@@ -121,10 +124,10 @@ func processCoinExpiries() {
 // This cron fulfills PDF §4.3 — delayed referral payouts survive server restarts
 // because the pending state is persisted in the database.
 func processPendingReferrals() {
-	now := time.Now()
+	now := time.Now().UTC()
 	var pendingEvents []models.ReferralEvent
 
-	if err := config.DB.Where("is_paid = ? AND pending_until <= ? AND deleted_at IS NULL", false, now).Find(&pendingEvents).Error; err != nil {
+	if err := config.DB.Where("is_paid = ? AND status = ? AND earnings = 50 AND pending_until <= ?", false, models.ReferralStatusFirstBet, now).Find(&pendingEvents).Error; err != nil {
 		log.Printf("Referral scan failed: %v", err)
 		return
 	}
@@ -139,61 +142,22 @@ func processPendingReferrals() {
 
 // publishDailyWildCard generates a Daily Wild Card market if one doesn't exist for the day
 func publishDailyWildCard() {
-	// Simple check: Is there a Wild Card market created in the last 24h?
-	var count int64
-	yesterday := time.Now().Add(-24 * time.Hour)
-	config.DB.Model(&models.Market{}).Where("category = ? AND created_at > ?", "Wild Card", yesterday).Count(&count)
-
-	if count == 0 {
-		// Fetch top news for the Wild Card
-		articles, err := GetTrendingNews()
-
-		if err != nil || len(articles) == 0 {
-			log.Printf("Wild card awaiting news: %v", err)
-			return
-		}
-		day := time.Now().UTC().Format("2006-01-02")
-		title := ""
-		desc := ""
-
-		if err == nil && len(articles) > 0 {
-			// Use the top headline for the market
-			title = fmt.Sprintf("News follow-up: %s", articles[0].Title)
-			if len(title) > 100 {
-				title = title[:97] + "..."
-			}
-			desc = fmt.Sprintf("Based on today's trending news: %s... Will there be a major update on this story within 24 hours?", articles[0].Description)
-		}
-
-		start := time.Now()
-		lock := start.Add(12 * time.Hour)
-		res := lock.Add(12 * time.Hour)
-
-		m := models.Market{
-			Title:            title,
-			Description:      desc,
-			Category:         "Wild Card",
-			Difficulty:       "Easy",
-			Payout:           20,
-			Options:          `["Yes", "No"]`,
-			ResolutionStatus: "Draft",
-			DailyKey:         &day,
-			Visibility:       "Public",
-			StartTime:        &start,
-			LockTime:         &lock,
-			ResolutionTime:   &res,
-			EndDate:          lock,
-		}
-
-		if err := config.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&m).Error; err == nil {
-			log.Println("Daily wild card draft prepared for editorial review")
+	articles, err := GetTrendingNews()
+	if err != nil {
+		log.Printf("News candidates unavailable: %v", err)
+		return
+	}
+	for _, a := range articles {
+		if _, err := PrepareNewsCandidate(a, time.Now().UTC()); err == nil {
+			log.Println("News draft prepared for editorial review")
+			break
 		}
 	}
 }
 
 // sendExpiryReminders finds coin batches expiring within 30 days that haven't received a reminder
 func sendExpiryReminders() {
-	now := time.Now()
+	now := time.Now().UTC()
 	var batches []models.CoinBatch
 	if err := config.DB.Where("expires_at > ? AND expires_at <= ? AND balance > 0 AND reminder_sent_at IS NULL", now, now.AddDate(0, 0, 30)).Find(&batches).Error; err != nil {
 		log.Printf("Reminder query failed: %v", err)
@@ -206,12 +170,13 @@ func sendExpiryReminders() {
 	}
 }
 func SendExpiryReminder(batchID uint) error {
-	return config.DB.Transaction(func(tx *gorm.DB) error {
+	var notifiedUser uint
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
 		var batch models.CoinBatch
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&batch, batchID).Error; err != nil {
 			return err
 		}
-		now := time.Now()
+		now := time.Now().UTC()
 		if batch.ReminderSentAt != nil || batch.Balance <= 0 || !batch.ExpiresAt.After(now) || batch.ExpiresAt.After(now.AddDate(0, 0, 30)) {
 			return nil
 		}
@@ -219,24 +184,64 @@ func SendExpiryReminder(batchID uint) error {
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notification).Error; err != nil {
 			return err
 		}
+		notifiedUser = batch.UserID
 		return tx.Model(&batch).Update("reminder_sent_at", now).Error
 	})
+	if err == nil && notifiedUser != 0 {
+		BroadcastToUser(notifiedUser, "notification_created", "Coin expiry reminder")
+	}
+	return err
 }
 
 func PayReferralEvent(eventID uint) error {
-	return config.DB.Transaction(func(tx *gorm.DB) error {
+	var paidUser uint
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
 		var event models.ReferralEvent
 		if err := tx.First(&event, eventID).Error; err != nil {
 			return err
 		}
+		if event.Status != models.ReferralStatusFirstBet || event.Earnings != 50 || event.ReferrerID == event.ReferredID {
+			return nil
+		}
+		if err := LockWalletTx(tx, event.ReferrerID); err != nil {
+			return err
+		}
+		var parent, child models.User
+		if err := tx.First(&parent, event.ReferrerID).Error; err != nil {
+			return err
+		}
+		if err := tx.First(&child, event.ReferredID).Error; err != nil {
+			return err
+		}
+		if child.ReferredBy != parent.ID {
+			return nil
+		}
+		if !parent.IsActive || !child.IsActive || (parent.SuspendedUntil != nil && parent.SuspendedUntil.After(time.Now().UTC())) || (child.SuspendedUntil != nil && child.SuspendedUntil.After(time.Now().UTC())) {
+			return nil
+		}
+		var paid int64
+		if err := tx.Model(&models.ReferralEvent{}).Where("referrer_id = ? AND is_paid = ?", event.ReferrerID, true).Count(&paid).Error; err != nil {
+			return err
+		}
+		if paid >= models.MaxReferralRewards {
+			return nil
+		}
 		// Conditional claim makes repeated and concurrent cron executions idempotent.
-		claimed := tx.Model(&models.ReferralEvent{}).Where("id = ? AND is_paid = ? AND pending_until <= ?", eventID, false, time.Now()).Update("is_paid", true)
+		claimed := tx.Model(&models.ReferralEvent{}).Where("id = ? AND is_paid = ? AND pending_until <= ?", eventID, false, time.Now().UTC()).Update("is_paid", true)
 		if claimed.Error != nil {
 			return claimed.Error
 		}
 		if claimed.RowsAffected == 0 {
 			return nil
 		}
-		return CreditWalletTx(tx, event.ReferrerID, event.Earnings, models.TxTypeReferralBonus, event.ID, "Referral bonus: "+string(event.Status), nil)
+		if err := CreditWalletTx(tx, event.ReferrerID, event.Earnings, models.TxTypeReferralBonus, event.ID, "Referral bonus: "+string(event.Status), nil); err != nil {
+			return err
+		}
+		paidUser = event.ReferrerID
+		return nil
 	})
+	if err == nil && paidUser != 0 {
+		BroadcastToUser(paidUser, "wallet_updated", "Referral reward credited")
+	}
+	return err
 }

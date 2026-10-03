@@ -72,7 +72,7 @@ func GetTrendingNews() ([]Article, error) {
 
 	// Update cache
 	newsCache = result.Articles
-	newsCacheTime = time.Now()
+	newsCacheTime = time.Now().UTC()
 
 	log.Printf("[News] Fetched %d new articles from API", len(newsCache))
 	return newsCache, nil

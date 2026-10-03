@@ -37,7 +37,10 @@ func SendEmail(toEmail, subject, htmlBody string) error {
 	if smtpPortStr == "" {
 		smtpPortStr = "587"
 	}
-	smtpPort, _ := strconv.Atoi(smtpPortStr)
+	smtpPort, err := strconv.Atoi(smtpPortStr)
+	if err != nil || smtpPort < 1 || smtpPort > 65535 {
+		return fmt.Errorf("SMTP_PORT must be a valid TCP port")
+	}
 
 	// Construct MIME Headers & HTML Body
 	header := make(map[string]string)
@@ -59,7 +62,6 @@ func SendEmail(toEmail, subject, htmlBody string) error {
 	// Bound connection setup and the complete SMTP conversation.
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	var conn net.Conn
-	var err error
 	tlsConfig := &tls.Config{ServerName: smtpHost, MinVersion: tls.VersionTLS12}
 	if smtpPort == 465 {
 		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
@@ -70,7 +72,7 @@ func SendEmail(toEmail, subject, htmlBody string) error {
 		return fmt.Errorf("SMTP connection failed: %w", err)
 	}
 	defer conn.Close()
-	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+	if err := conn.SetDeadline(time.Now().UTC().Add(30 * time.Second)); err != nil {
 		return err
 	}
 	client, err := smtp.NewClient(conn, smtpHost)

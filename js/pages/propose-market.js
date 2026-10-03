@@ -36,7 +36,10 @@ window.submitProposal = async (e) => {
         description: description,
         resolution_source: source,
         lock_time: lockDate.toISOString(),
-        options: '["Yes","No"]',
+        options: document.getElementById('pOptions').value,
+        difficulty:document.getElementById('pDifficulty').value,
+        range_width:Number(document.getElementById('pRangeWidth').value),
+        resolution_rule:description,
     };
 
     const btn = document.getElementById('submitBtn');
@@ -55,3 +58,7 @@ window.submitProposal = async (e) => {
         btn.innerHTML = 'Submit Proposal for Review';
     }
 };
+
+const formats={Weather:['Binary rain: 20 coins','Temperature range: 50 coins','Exact temperature: 120 coins'],Sports:['Winner: 25 coins','Run/score range: 60 coins','Exact score or run total: 200 coins'],Politics:['Winner: 30 coins','Margin within 5 percentage points: 80 coins','Exact seat count: 250 coins'],Entertainment:['Winner: 25 coins','Exactly three nominees: 70 coins','Collection range: 150 coins'],'Financial Markets':['Direction: 20 coins','Percentage-change guess within ±1 percentage point: 80 coins','Closest price: 300 coins'],'Wild Card':['Two options: 40 coins','Four options: 100 coins','Closest measurable numeric answer: 400 coins']};
+function describeFormat(){const category=document.getElementById('pCategory').value;const difficulty=document.getElementById('pDifficulty').value;document.getElementById('predictionFormat').textContent=(formats[category]||formats['Financial Markets'])[['Easy','Medium','Hard'].indexOf(difficulty)]+'. Specify the exact outcome, units, observation time and approved source in the resolution criteria.';}
+document.getElementById('pCategory').addEventListener('change',describeFormat);document.getElementById('pDifficulty').addEventListener('change',describeFormat);describeFormat();

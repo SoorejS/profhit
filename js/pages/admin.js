@@ -3,6 +3,7 @@ import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
 import { escapeHTML } from '../utils/escape.js';
+import { askText, confirmAction } from '../components/dialog.js';
 
 /**
  * PROPHIT - Admin Panel Logic
@@ -70,7 +71,7 @@ async function fetchProposedMarkets() {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>ID: ${m.creator_id}</td>
                 <td>
-                    <button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Approve</button>
+                    <button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button><button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
                 </td>
             </tr>
         `).join('');
@@ -123,7 +124,7 @@ async function fetchActiveMarkets() {
 }
 
 async function approveMarket(id) {
-    if (!confirm("Make this market live?")) return;
+    if (!await confirmAction("Make this market live?")) return;
     try {
         await ApiClient.post(`/markets/${id}/approve`);
         showToast("Market approved successfully", "success");
@@ -134,13 +135,14 @@ async function approveMarket(id) {
 }
 
 async function resolveMarket(id) {
-    const outcome = prompt("Enter the winning option exactly as it appears (e.g. Yes or No):");
+    const outcome = await askText("Enter the measured outcome in the published format (option, number, score array or three nominees):");
     if (!outcome) return;
 
-    if (!confirm(`Are you sure you want to resolve Market ${id} with winner: ${outcome}? This will trigger payouts and cannot be undone.`)) return;
+    if (!await confirmAction(`Are you sure you want to resolve Market ${id} with winner: ${outcome}? This will trigger payouts and cannot be undone.`)) return;
 
     try {
-        const res = await ApiClient.post(`/markets/${id}/resolve`, { winner: outcome });
+        const evidence_url=await askText("Approved result-source evidence URL:");if(!evidence_url)return;const observed=await askText("Observation time (ISO date/time with timezone):",new Date().toISOString());if(!observed || Number.isNaN(Date.parse(observed)))throw new Error("Enter a valid observation timestamp");
+        const res = await ApiClient.post(`/markets/${id}/resolve`, { winner: outcome,evidence_url,observed_at:new Date(observed).toISOString() });
         showToast(`Market resolved! ${res.winners_paid} winners paid.`, "success");
         fetchActiveMarkets();
     } catch (err) {
@@ -194,8 +196,10 @@ async function fetchWithdrawals() {
                 <td class="font-bold text-gold">INR ${w.amount}</td>
                 <td><span class="badge badge-warning">${escapeHTML(w.status)}</span></td>
                 <td>
-                    <button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="processWithdrawal(${w.id}, 'Approve')">Approve</button>
-                    <button class="btn btn-no" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="processWithdrawal(${w.id}, 'Reject')">Reject</button>
+                    ${w.status==='Pending'?`<button class="btn btn-outline" onclick="processWithdrawal(${w.id}, 'Approve')">Start processing</button><button class="btn btn-outline" onclick="processWithdrawal(${w.id}, 'Reject')">Reject and refund valid coins</button>`:''}
+                    ${w.status==='Processing'?`<button class="btn btn-primary" onclick="fulfillVoucher(${w.id})">Supply sourced voucher</button>`:''}
+                    ${w.status==='Fulfilled'?`<button class="btn btn-primary" onclick="deliverVoucher(${w.id})">Send voucher email</button>`:''}
+                    ${w.status==='Failed'?'<p>Reconcile delivery attempt before retrying.</p>':''}
                 </td>
             </tr>
         `).join('');
@@ -205,7 +209,7 @@ async function fetchWithdrawals() {
 }
 
 async function processWithdrawal(id, action) {
-    if (!confirm(`${action} this withdrawal?`)) return;
+    if (!await confirmAction(`${action} this withdrawal?`)) return;
     try {
         await ApiClient.post(`/admin/withdrawals/${id}/${action.toLowerCase()}`);
         showToast(`Withdrawal ${action.toLowerCase()}d successfully`, "success");
@@ -241,6 +245,9 @@ window.changeUsersPage = dir => { usersPage = Math.max(0, usersPage + dir); fetc
 async function fetchAdminUsers() {
     const request = ++usersRequest;
     const list = document.getElementById('adminUsers');
+    document.getElementById('usersPrev').disabled=true;
+    document.getElementById('usersNext').disabled=true;
+    list.textContent='Loading users...';
     try {
         const response = await ApiClient.get('/admin/users?limit=100&offset=' + (usersPage * 100) + '&search=' + encodeURIComponent(document.getElementById('adminUserSearch').value));
         if (request !== usersRequest) return;
@@ -263,7 +270,7 @@ async function fetchAdminUsers() {
                 button.title = user.id === currentAdmin?.id ? 'You cannot moderate your own account' : 'This account cannot be moderated by your role';
             }
             button.addEventListener('click', async () => {
-                if (!confirm(`${button.textContent} ${user.username}?`)) return;
+                if (!await confirmAction(`${button.textContent} ${user.username}?`)) return;
                 try { await ApiClient.post(`/admin/users/${user.id}/${user.is_active ? 'ban' : 'unban'}`); await fetchAdminUsers(); }
                 catch (error) { showToast(error.message, 'error'); }
             });
@@ -286,8 +293,8 @@ async function fetchReports() {
             button.className = 'btn btn-outline'; button.textContent = 'Review report';
             button.addEventListener('click', async () => {
                 const actions = report.target_type === 'User' ? 'Dismiss, Mute, Suspend, Ban' : report.target_type === 'Comment' ? 'Dismiss, DeleteComment' : 'Dismiss';
-                const action = prompt(`Choose an action: ${actions}`);
-                if (!action || !confirm(`Apply ${action} to report #${report.id}? Suspensions last 7 days.`)) return;
+                const action = await askText(`Choose an action: ${actions}`);
+                if (!action || !await confirmAction(`Apply ${action} to report #${report.id}? Suspensions last 7 days.`)) return;
                 try { await ApiClient.post(`/admin/reports/${report.id}/resolve`, {action, duration_days: 7}); await fetchReports(); }
                 catch (error) { showToast(error.message, 'error'); }
             });
@@ -296,3 +303,7 @@ async function fetchReports() {
     } catch (error) { list.textContent = error.message; }
 }
 window.fetchAdminUsers = fetchAdminUsers;
+
+window.reviewRules=async id=>{try{const rows=await ApiClient.get('/markets/proposed');const market=rows.find(m=>Number(m.id)===Number(id));const edited=await askText('Review title, category, difficulty, options, measurable resolution_rule, approved resolution_source, range_width and future lock_time:',JSON.stringify(market,null,2));if(!edited)return;await ApiClient.put(`/markets/${Number(id)}/rules`,JSON.parse(edited));showToast('Rules saved for publication review.','success');fetchProposedMarkets();}catch(err){showToast(err.message,'error');}};
+window.fulfillVoucher=async id=>{const voucher_code=await askText('Actual officially sourced voucher code:');if(!voucher_code)return;const source_reference=await askText('Official supplier and invoice/order reference:');if(!source_reference)return;try{await ApiClient.post(`/admin/withdrawals/${Number(id)}/fulfill`,{voucher_code,source_reference});showToast('Voucher fulfilled. Email delivery is separate.','success');fetchWithdrawals();}catch(err){showToast(err.message,'error');}};
+window.deliverVoucher=async id=>{if(!await confirmAction('Send this sourced voucher to the account email now?'))return;try{const result=await ApiClient.post(`/admin/withdrawals/${Number(id)}/deliver`);showToast(result.message,'success');}catch(err){showToast(err.message,'error');}finally{fetchWithdrawals();}};

@@ -2,6 +2,7 @@ import '../components/sidebar.js';
 import '../components/topbar.js';
 import ApiClient from '../api/client.js';
 import { escapeHTML } from '../utils/escape.js';
+let page=1;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!ApiClient || !ApiClient.isAuthenticated()) {
@@ -9,26 +10,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    document.getElementById('portfolioPrev').addEventListener('click',()=>{if(page>1){page--;loadPortfolio();}});
+    document.getElementById('portfolioNext').addEventListener('click',()=>{page++;loadPortfolio();});
     loadPortfolio();
 });
 
 async function loadPortfolio() {
     const list = document.getElementById('portfolioList');
+    list.textContent='Loading portfolio...';
+    document.getElementById('portfolioPrev').disabled=true;
+    document.getElementById('portfolioNext').disabled=true;
     try {
         const [res, statsRes] = await Promise.allSettled([
-            ApiClient.get('/portfolio'),
+            ApiClient.get('/portfolio?page='+page),
             ApiClient.get('/me/stats')
         ]);
 
-        const rawData = res.status === 'fulfilled' ? res.value : null;
+        if(res.status!=='fulfilled')throw res.reason;
+        const rawData = res.value;
         const data = Array.isArray(rawData) ? rawData : (rawData?.items || []);
+        document.getElementById('portfolioPrev').disabled=page===1;
+        document.getElementById('portfolioNext').disabled=page>=(rawData.total_pages||1);
+        document.getElementById('portfolioPage').textContent=`Page ${page} of ${Math.max(1,rawData.total_pages||1)}`;
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
             const stats = statsRes.value;
             document.getElementById('statMarketsJoined').textContent = stats.total_predictions || '0';
             document.getElementById('statWinRate').textContent = stats.win_rate || '0%';
         } else {
-            document.getElementById('statMarketsJoined').textContent = data.length.toString();
+            document.getElementById('statMarketsJoined').textContent = rawData.total ?? data.length;
+            document.getElementById('statWinRate').textContent = 'Unavailable';
         }
 
         if (!data || data.length === 0) {
@@ -43,7 +54,7 @@ async function loadPortfolio() {
                 totalPayout += (p.potential_payout || 0);
             }
         });
-        document.getElementById('statTotalPayout').textContent = `${totalPayout} PTS`;
+        document.getElementById('statTotalPayout').textContent = statsRes.status==='fulfilled' ? `${statsRes.value.pending_potential} PTS` : 'Unavailable';
 
         list.innerHTML = data.map(p => {
             let status = '';
@@ -82,6 +93,7 @@ async function loadPortfolio() {
         }).join('');
 
     } catch (err) {
+        for(const id of ['statWinRate','statMarketsJoined','statTotalPayout'])document.getElementById(id).textContent='Unavailable';
         list.innerHTML = `<div class="text-danger text-center" style="padding: var(--spacing-6);">Failed to load portfolio.</div>`;
     }
 }

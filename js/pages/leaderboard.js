@@ -7,6 +7,7 @@ let currentTab = 'points';
 let currentPage = 1;
 let currentSearch = '';
 let debounceTimer;
+let requestVersion=0;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!ApiClient || !ApiClient.isAuthenticated()) {
@@ -44,8 +45,12 @@ window.changePage = (dir) => {
 };
 
 async function loadLeaderboard() {
+    const version=++requestVersion;
     const listEl = document.getElementById('leaderboardList');
     const userCardEl = document.getElementById('currentUserCard');
+    userCardEl.style.display='none';
+    document.getElementById('prevPageBtn').disabled=true;
+    document.getElementById('nextPageBtn').disabled=true;
     
     listEl.innerHTML = `
         <div class="card skeleton" style="height: 80px; border-radius: var(--radius-lg);"></div>
@@ -62,6 +67,7 @@ async function loadLeaderboard() {
         if (currentSearch) query.set('search', currentSearch);
 
         const response = await ApiClient.get(`/leaderboard?${query.toString()}`);
+        if(version!==requestVersion)return;
         
         if (!response.data || response.data.length === 0) {
             listEl.innerHTML = `
@@ -93,6 +99,7 @@ async function loadLeaderboard() {
         }
         
     } catch (err) {
+        if(version!==requestVersion)return;
         listEl.innerHTML = `
             <div class="text-center text-danger" style="padding: var(--spacing-8);">
                 <i class="ph ph-warning-circle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
@@ -125,7 +132,7 @@ function renderLeaderboardRow(user, tab, isCurrentUser = false) {
     }
     
     const username = user.username || 'You';
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=1E1E1E&color=D4AF37&size=48`;
+    const avatar = 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" rx="24" fill="#1E1E1E"/><text x="24" y="32" text-anchor="middle" font-size="28" fill="#D4AF37">${escapeHTML(username.slice(0,1).toUpperCase())}</text></svg>`);
     const bgClass = isCurrentUser ? 'style="border-color: var(--color-primary); background: rgba(212,175,55,0.05);"' : '';
     
     return `
@@ -145,3 +152,5 @@ function renderLeaderboardRow(user, tab, isCurrentUser = false) {
         </div>
     `;
 }
+
+window.addEventListener('prophit-live',e=>{if(e.detail.event==='leaderboard_updated')loadLeaderboard();});

@@ -116,7 +116,7 @@ func ResolveReport(c *gin.Context) {
 		if req.DurationDays <= 0 {
 			req.DurationDays = 7 // default to 7 days
 		}
-		until := time.Now().AddDate(0, 0, req.DurationDays)
+		until := time.Now().UTC().AddDate(0, 0, req.DurationDays)
 		if err := tx.Model(&models.User{}).Where("id = ?", report.TargetID).Updates(map[string]interface{}{"suspended_until": until}).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to suspend user"})

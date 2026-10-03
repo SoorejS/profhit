@@ -25,10 +25,14 @@ func SubmitPrediction(c *gin.Context) {
 	var req struct {
 		MarketID uint   `json:"market_id" binding:"required"`
 		Choice   string `json:"choice" binding:"required"`
-		Amount   int    `json:"amount" binding:"required,gte=10,lte=1000000"`
+		Amount   int    `json:"amount"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Amount != 0 {
+		c.JSON(400, gin.H{"error": "Predictions are free; no stake or payment is accepted"})
 		return
 	}
 
@@ -53,6 +57,11 @@ func SubmitPrediction(c *gin.Context) {
 	}
 	if market.Payout <= 0 {
 		c.JSON(400, gin.H{"error": "Market payout is not configured"})
+		return
+	}
+	checked := market
+	if market.PredictionType == "" || services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout {
+		c.JSON(409, gin.H{"error": "Market rules require editorial reconciliation before new predictions"})
 		return
 	}
 	if err := services.LockReferralWalletsTx(tx, userID); err != nil {
@@ -89,10 +98,12 @@ func SubmitPrediction(c *gin.Context) {
 	}
 
 	// Validate the chosen option is one of the declared market options.
-	if !isValidOption(req.Choice, market.Options) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid choice — not an option for this market"})
+	canonical, err := services.ValidatePredictionValue(market, req.Choice, false)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Choice = canonical
 
 	prediction := models.PredictionSubmission{
 		UserID:    userID,
@@ -102,13 +113,20 @@ func SubmitPrediction(c *gin.Context) {
 		Potential: market.Payout,
 		CreatedAt: now,
 	}
-
-	// 1. Deduct coins from wallet first (safe from race conditions due to row lock)
-	if err := services.DebitWalletTx(tx, userID, req.Amount, models.TxTypePredictionStake, market.ID, "Staked on market: "+market.Title, nil); err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance or wallet error"})
-		return
+	if market.WeeklyChallengeID != nil {
+		var challenge models.WeeklyChallenge
+		if tx.First(&challenge, *market.WeeklyChallengeID).Error != nil || challenge.Status != "Active" || now.Before(challenge.StartDate) || !now.Before(challenge.EndDate) {
+			c.JSON(400, gin.H{"error": "Challenge is outside its participation window"})
+			return
+		}
+		prediction.Potential = market.Payout * 2
+		if err := tx.Create(&models.ChallengeParticipant{ChallengeID: challenge.ID, UserID: userID}).Error; err != nil {
+			c.JSON(409, gin.H{"error": "Challenge participation already recorded"})
+			return
+		}
 	}
+
+	// Participation is free. No balance check, coin debit, or money provider call.
 
 	// 2. Create the prediction record
 	if err := tx.Create(&prediction).Error; err != nil {
@@ -130,6 +148,10 @@ func SubmitPrediction(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Could not record prediction reward"})
 		return
 	}
+	if err := services.RecordPredictionDayTx(tx, userID, now); err != nil {
+		c.JSON(500, gin.H{"error": "Could not record prediction day"})
+		return
+	}
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
 		return
@@ -142,8 +164,11 @@ func SubmitPrediction(c *gin.Context) {
 
 	// Broadcast to live clients
 	if market.Visibility == "Public" {
-		services.BroadcastToAll("trade_placed", gin.H{"market_id": market.ID})
+		services.BroadcastToAll("prediction_count_changed", gin.H{"market_id": market.ID})
+		services.BroadcastToAll("market_activity_changed", gin.H{"market_id": market.ID})
 	}
+	services.BroadcastToUser(userID, "wallet_updated", gin.H{"user_id": userID})
+	services.BroadcastToAll("leaderboard_updated", gin.H{"market_id": market.ID})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Prediction locked! Good luck 🎯",

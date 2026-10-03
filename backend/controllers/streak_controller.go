@@ -27,137 +27,24 @@ type DailyLoginResponse struct {
 // DailyLogin handles POST /api/me/daily-login
 // It is idempotent — calling it multiple times on the same calendar day is safe.
 func DailyLogin(c *gin.Context) {
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(uint)
-
-	today := truncateToDay(time.Now().UTC())
-
-	tx := config.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		}
-	}()
-
-	if err := services.LockWalletTx(tx, userID); err != nil {
-		tx.Rollback()
-		c.JSON(500, gin.H{"error": "Could not lock wallet"})
+	id := c.MustGet("userID").(uint)
+	claimed, err := services.ClaimDailyLogin(id, time.Now().UTC())
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Could not award daily login"})
 		return
 	}
-	// Upsert the streak row under the user lock
-	var streak models.UserStreak
-	result := tx.Where("user_id = ?", userID).First(&streak)
-
-	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		tx.Rollback()
-		c.JSON(500, gin.H{"error": "Could not load streak"})
+	var u models.User
+	if config.DB.First(&u, id).Error != nil {
+		c.JSON(500, gin.H{"error": "Could not load balance"})
 		return
 	}
-	if result.Error != nil {
-		// First-ever login — create a fresh streak record
-		streak = models.UserStreak{
-			UserID:        userID,
-			CurrentStreak: 0,
-			LongestStreak: 0,
-			LastLoginDate: time.Time{}, // zero value
-			TotalLogins:   0,
-		}
+	earned := 0
+	message := "Daily login already rewarded today"
+	if claimed {
+		earned = 10
+		message = "Daily login: +10 coins. Prediction streaks are separate."
 	}
-
-	// Already checked in today → return early
-	if sameDay(streak.LastLoginDate, today) {
-		tx.Rollback() // Rollback transaction as no writes are needed
-		var user models.User
-		config.DB.First(&user, userID)
-		c.JSON(http.StatusOK, DailyLoginResponse{
-			AlreadyCheckedIn: true,
-			CoinsEarned:      0,
-			CurrentStreak:    streak.CurrentStreak,
-			NextMilestone:    nextMilestone(streak.CurrentStreak),
-			NewBalance:       user.Points,
-			Message:          "Already checked in today!",
-		})
-		return
-	}
-
-	// Determine new streak value
-	yesterday := today.AddDate(0, 0, -1)
-	if sameDay(streak.LastLoginDate, yesterday) {
-		streak.CurrentStreak++
-	} else {
-		streak.CurrentStreak = 1 // Streak broken — reset
-	}
-	if streak.CurrentStreak > streak.LongestStreak {
-		streak.LongestStreak = streak.CurrentStreak
-	}
-	streak.LastLoginDate = today
-	streak.TotalLogins++
-
-	// Save streak
-	if result.Error != nil {
-		if err := tx.Create(&streak).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create streak"})
-			return
-		}
-	} else {
-		if err := tx.Save(&streak).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update streak"})
-			return
-		}
-	}
-
-	// --- Award coins ---
-	totalCoins := models.DailyLoginBaseCoins
-	streakBonus := 0
-
-	for _, reward := range models.StreakRewardTable {
-		if streak.CurrentStreak == reward.Milestone {
-			streakBonus = reward.Coins
-			break
-		}
-	}
-
-	// Base daily login coins
-	if err := services.CreditWalletTx(tx, userID, models.DailyLoginBaseCoins,
-		models.TxTypeDailyLogin, 0,
-		"Daily login reward", nil); err != nil {
-		tx.Rollback()
-		c.JSON(500, gin.H{"error": "Could not award daily reward"})
-		return
-	}
-
-	// Streak bonus coins
-	if streakBonus > 0 {
-		totalCoins += streakBonus
-		if err := services.CreditWalletTx(tx, userID, streakBonus,
-			models.TxTypeStreakBonus, 0,
-			"Streak bonus – day "+itoa(streak.CurrentStreak), nil); err != nil {
-			tx.Rollback()
-			c.JSON(500, gin.H{"error": "Could not award streak bonus"})
-			return
-		}
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
-		return
-	}
-
-	// Fetch updated balance
-	var user models.User
-	config.DB.First(&user, userID)
-
-	c.JSON(http.StatusOK, DailyLoginResponse{
-		AlreadyCheckedIn: false,
-		CoinsEarned:      totalCoins,
-		CurrentStreak:    streak.CurrentStreak,
-		NextMilestone:    nextMilestone(streak.CurrentStreak),
-		NewBalance:       user.Points,
-		Message:          buildMessage(streak.CurrentStreak, totalCoins, streakBonus),
-	})
+	c.JSON(200, DailyLoginResponse{AlreadyCheckedIn: !claimed, CoinsEarned: earned, NewBalance: u.Points, Message: message})
 }
 
 // GetStreakInfo handles GET /api/me/streak
@@ -165,7 +52,7 @@ func GetStreakInfo(c *gin.Context) {
 	userIDVal, _ := c.Get("userID")
 	userID, _ := userIDVal.(uint)
 
-	var streak models.UserStreak
+	var streak models.PredictionStreak
 	if err := config.DB.Where("user_id = ?", userID).First(&streak).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(500, gin.H{"error": "Could not load streak"})
@@ -173,20 +60,24 @@ func GetStreakInfo(c *gin.Context) {
 		}
 		// No streak record yet
 		c.JSON(http.StatusOK, gin.H{
-			"current_streak":  0,
-			"longest_streak":  0,
-			"total_logins":    0,
-			"next_milestone":  models.StreakRewardTable[0].Milestone,
-			"last_login_date": nil,
+			"current_streak":        0,
+			"longest_streak":        0,
+			"total_prediction_days": 0,
+			"next_milestone":        models.StreakRewardTable[0].Milestone,
+			"last_prediction_date":  nil,
 		})
 		return
 	}
+	current := streak.CurrentStreak
+	if streak.LastPredictionDate.Before(time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)) {
+		current = 0
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"current_streak":  streak.CurrentStreak,
-		"longest_streak":  streak.LongestStreak,
-		"total_logins":    streak.TotalLogins,
-		"next_milestone":  nextMilestone(streak.CurrentStreak),
-		"last_login_date": streak.LastLoginDate,
+		"current_streak":        current,
+		"longest_streak":        streak.LongestStreak,
+		"total_prediction_days": streak.TotalDays,
+		"next_milestone":        nextMilestone(streak.CurrentStreak),
+		"last_prediction_date":  streak.LastPredictionDate,
 	})
 }
 
@@ -208,7 +99,7 @@ func nextMilestone(current int) int {
 			return r.Milestone
 		}
 	}
-	return models.StreakRewardTable[len(models.StreakRewardTable)-1].Milestone + 30
+	return 0
 }
 
 func buildMessage(streak, total, bonus int) string {

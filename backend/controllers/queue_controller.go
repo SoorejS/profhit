@@ -25,7 +25,7 @@ func GetWithdrawals(c *gin.Context) {
 	}
 
 	var reqs []models.WithdrawalRequest
-	if err := config.DB.Where("status = ?", "Pending").Order("created_at asc").Limit(limit).Offset(offset).Find(&reqs).Error; err != nil {
+	if err := config.DB.Order("created_at asc").Limit(limit).Offset(offset).Find(&reqs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch withdrawals"})
 		return
 	}
@@ -48,9 +48,9 @@ func ApproveWithdrawal(c *gin.Context) {
 		return
 	}
 
-	wReq.Status = "Approved"
+	wReq.Status = "Processing"
 	wReq.AdminID = &adminID
-	result := config.DB.Model(&models.WithdrawalRequest{}).Where("id = ? AND status = ?", wReq.ID, "Pending").Updates(map[string]interface{}{"status": "Approved", "admin_id": adminID})
+	result := config.DB.Model(&models.WithdrawalRequest{}).Where("id = ? AND status = ?", wReq.ID, "Pending").Updates(map[string]interface{}{"status": "Processing", "admin_id": adminID})
 	if result.Error != nil || result.RowsAffected != 1 {
 		c.JSON(409, gin.H{"error": "Request changed; refresh and retry"})
 		return
@@ -86,15 +86,7 @@ func RejectWithdrawal(c *gin.Context) {
 	}
 
 	// Refund via the immutable ledger — no direct User.Points mutation
-	if err := services.CreditWalletTx(
-		tx,
-		wReq.UserID,
-		wReq.CoinsDeducted,
-		models.TxTypeRefund,
-		0,
-		"Refund: rejected voucher redemption",
-		&adminID,
-	); err != nil {
+	if err := services.RefundRedemptionTx(tx, wReq.UserID, "tier", wReq.ID, &adminID); err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund coins"})
 		return

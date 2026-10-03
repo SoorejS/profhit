@@ -143,11 +143,17 @@ func GoogleLogin(c *gin.Context) {
 		config.DB.First(&user, user.ID)
 	}
 
-	if user.TwoFactorEnabled && !totp.Validate(input.TwoFactorCode, user.TwoFactorSecret) {
-		c.JSON(401, gin.H{"error": "2fa_required"})
-		return
+	if user.TwoFactorEnabled {
+		if input.TwoFactorCode == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "2fa_required"})
+			return
+		}
+		if !sixDigitCode.MatchString(input.TwoFactorCode) || !totp.Validate(input.TwoFactorCode, user.TwoFactorSecret) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid 2FA code"})
+			return
+		}
 	}
-	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now())) {
+	if !user.IsActive || (user.SuspendedUntil != nil && user.SuspendedUntil.After(time.Now().UTC())) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Your account has been suspended."})
 		return
 	}
@@ -158,6 +164,11 @@ func GoogleLogin(c *gin.Context) {
 		return
 	}
 
+	if _, err := services.ClaimDailyLogin(user.ID, time.Now().UTC()); err != nil {
+		c.JSON(500, gin.H{"error": "Could not award daily login"})
+		return
+	}
+	config.DB.First(&user, user.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Google Login successful!",
 		"token":   token,

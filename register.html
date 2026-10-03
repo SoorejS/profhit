@@ -39,7 +39,7 @@
                     <label for="username">Username</label>
                     <div style="position: relative;">
                         <i class="ph ph-user" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
-                        <input type="text" id="username" class="input-control" placeholder="Choose a unique username" style="padding-left: 2.5rem;" required minlength="3">
+                        <input type="text" id="username" class="input-control" placeholder="Choose a unique username" style="padding-left: 2.5rem;" required minlength="3" maxlength="64" pattern="[A-Za-z0-9_]{3,64}" title="Use 3–64 letters, numbers, or underscores">
                     </div>
                 </div>
 
@@ -55,7 +55,7 @@
                     <label for="regPassword">Password</label>
                     <div class="password-input-wrapper" style="position: relative;">
                         <i class="ph ph-lock-key" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
-                        <input type="password" id="regPassword" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required minlength="8">
+                        <input type="password" id="regPassword" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required minlength="8" maxlength="72">
                         <button type="button" aria-label="Show or hide password" class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></button>
                     </div>
                     <div class="password-strength" style="display: flex; gap: 4px; margin-top: 8px;">
@@ -66,8 +66,17 @@
                     </div>
                 </div>
 
+                <div class="input-group">
+                    <label for="regPasswordConfirm">Confirm Password</label>
+                    <div class="password-input-wrapper" style="position: relative;">
+                        <i class="ph ph-lock-key" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;"></i>
+                        <input type="password" id="regPasswordConfirm" class="input-control" placeholder="••••••••" style="padding-left: 2.5rem;" required minlength="8" maxlength="72">
+                        <button type="button" aria-label="Show or hide password confirmation" class="ph ph-eye password-toggle" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"></button>
+                    </div>
+                </div>
+
                 <div class="input-group" style="margin-top: var(--spacing-4);">
-                    <label for="referralCode">Referral Code (Optional) <span class="badge badge-gold" style="font-size:0.7rem; padding: 2px 6px;"><i class="ph-fill ph-gift" style="margin-right: 2px;"></i> +150 PTS Bonus</span></label>
+                    <label for="referralCode">Referral Code (Optional)</label><p class="text-muted">Your referrer earns 50 coins after your first prediction and a 48-hour fraud-check delay. Sign-up grants your separate 100 welcome coins.</p>
                     <div style="position: relative;">
                         <i class="ph ph-ticket" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-gold); font-size: 1.2rem;"></i>
                         <input type="text" id="referralCode" class="input-control" placeholder="e.g. USER1234" style="padding-left: 2.5rem; border-color: rgba(212,175,55,0.3);">

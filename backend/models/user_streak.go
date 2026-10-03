@@ -28,9 +28,8 @@ type StreakReward struct {
 
 // StreakRewardTable is the business-rule lookup from the game plan PDF.
 var StreakRewardTable = []StreakReward{
-	{Milestone: 3, Coins: 25},   // 3-day streak bonus
-	{Milestone: 7, Coins: 75},   // 7-day streak bonus
-	{Milestone: 30, Coins: 500}, // Monthly loyalty bonus
+	{Milestone: 3, Coins: 25}, // 3-day streak bonus
+	{Milestone: 7, Coins: 75}, // 7-day streak bonus
 }
 
 // DailyLoginBaseCoins is the base award for any valid daily login.

@@ -45,8 +45,10 @@ type HyperVergeKYC struct {
 	// For auditing webhooks
 	WebhookPayload string `gorm:"type:text" json:"-"`
 
-	VerifiedAt *time.Time     `json:"verified_at"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	VerifiedAt       *time.Time     `json:"verified_at"`
+	PhoneVerifiedAt  *time.Time     `json:"phone_verified_at"`
+	EmailConfirmedAt *time.Time     `json:"email_confirmed_at"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 }

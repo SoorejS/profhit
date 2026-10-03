@@ -51,8 +51,8 @@ func UpgradeAndRegister(conn *websocket.Conn, userID uint, token string) {
 		conn.Close()
 	}()
 	conn.SetReadLimit(maxMessageSize)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error { return conn.SetReadDeadline(time.Now().Add(pongWait)) })
+	conn.SetReadDeadline(time.Now().UTC().Add(pongWait))
+	conn.SetPongHandler(func(string) error { return conn.SetReadDeadline(time.Now().UTC().Add(pongWait)) })
 	client.send <- WSMessage{Event: "connected", Payload: "Authenticated connection established"}
 	go client.writeLoop()
 	for {
@@ -80,7 +80,7 @@ func (client *Client) writeLoop() {
 		if _, _, err := middleware.ValidateToken(client.Token); err != nil {
 			return
 		}
-		client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+		client.Conn.SetWriteDeadline(time.Now().UTC().Add(writeWait))
 		var err error
 		if ping {
 			err = client.Conn.WriteMessage(websocket.PingMessage, nil)

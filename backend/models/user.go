@@ -15,6 +15,7 @@ const (
 )
 
 type User struct {
+	FullName     string `json:"full_name"`
 	TokenVersion uint   `gorm:"not null;default:0" json:"-"`
 	ID           uint   `gorm:"primaryKey" json:"id"`
 	Username     string `gorm:"uniqueIndex;not null" json:"username"`

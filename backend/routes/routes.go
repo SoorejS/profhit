@@ -114,6 +114,8 @@ func SetupRouter() *gin.Engine {
 		api.GET("/leaderboard/streak", controllers.GetTopStreak)
 		api.GET("/leaderboard/winrate", controllers.GetTopWinRate)
 		api.GET("/activity", controllers.GetActivity)
+		api.GET("/challenges", controllers.ListWeeklyChallenges)
+		api.GET("/challenges/:id", controllers.GetWeeklyChallenge)
 
 		// Public user profiles
 		api.GET("/users/:id", controllers.GetUser)
@@ -126,15 +128,23 @@ func SetupRouter() *gin.Engine {
 		predLimit := middleware.RateLimit(30, 1*time.Minute)
 		// Strict limit for financial endpoints (e.g. 5 requests / 1 minute)
 		financeLimit := middleware.RateLimit(5, 1*time.Minute)
+		securityLimit := middleware.RateLimit(10, 5*time.Minute)
 
 		protected := api.Group("/")
 		protected.Use(middleware.AuthRequired())
 		{
 			// Auth
 			protected.POST("/auth/logout", controllers.LogoutUser)
+			protected.POST("/admin/challenges", middleware.RoleRequired(models.RoleAdmin, models.RoleSuperAdmin), controllers.CreateWeeklyChallenge)
 
 			// Wallet & Identity
 			protected.GET("/me", controllers.GetMe)
+			protected.GET("/me/stats", controllers.GetMyStats)
+			protected.PUT("/me/profile", securityLimit, controllers.UpdateProfile)
+			protected.GET("/me/2fa", controllers.GetTwoFactorStatus)
+			protected.POST("/me/2fa/setup", securityLimit, controllers.SetupTwoFactor)
+			protected.POST("/me/2fa/enable", securityLimit, controllers.EnableTwoFactor)
+			protected.POST("/me/2fa/disable", securityLimit, controllers.DisableTwoFactor)
 			protected.GET("/me/achievements", controllers.GetMyAchievements)
 			protected.GET("/notifications", controllers.GetNotifications)
 			protected.POST("/notifications/read", controllers.ReadNotifications)
@@ -143,6 +153,8 @@ func SetupRouter() *gin.Engine {
 			protected.GET("/kyc/status", controllers.GetKYCStatus)
 			protected.POST("/me/daily-login", controllers.DailyLogin)
 			protected.GET("/me/streak", controllers.GetStreakInfo)
+			protected.GET("/wallet/batches", controllers.GetWalletBatches)
+			protected.GET("/wallet/vouchers", controllers.GetVoucherRequests)
 			protected.GET("/wallet/history", controllers.GetWalletHistory)
 			protected.GET("/wallet/transaction/:id", controllers.GetWalletTransaction)
 
@@ -184,6 +196,7 @@ func SetupRouter() *gin.Engine {
 		{
 			contentRoutes.POST("/markets", controllers.CreateMarket)
 			contentRoutes.GET("/markets/proposed", controllers.GetProposedMarkets)
+			contentRoutes.PUT("/markets/:id/rules", controllers.UpdateMarketRules)
 			contentRoutes.POST("/markets/:id/approve", controllers.ApproveMarket)
 			contentRoutes.PUT("/markets/:id/transition", controllers.TransitionMarketState)
 			contentRoutes.DELETE("/markets/:id", controllers.DeleteMarket)
@@ -239,6 +252,8 @@ func SetupRouter() *gin.Engine {
 
 			// Withdrawal/Redemption queue (admin, super_admin)
 			adminPanel.GET("/withdrawals", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.GetWithdrawals)
+			adminPanel.POST("/withdrawals/:id/fulfill", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.FulfillVoucher)
+			adminPanel.POST("/withdrawals/:id/deliver", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.DeliverVoucher)
 			adminPanel.POST("/withdrawals/:id/approve", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.ApproveWithdrawal)
 			adminPanel.POST("/withdrawals/:id/reject", middleware.RoleRequired(models.RoleSuperAdmin, models.RoleAdmin), controllers.RejectWithdrawal)
 

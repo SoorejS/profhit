@@ -27,7 +27,7 @@ for page in pages:
         
         # Let's just make sure functions called from HTML are on window
         if page == 'wallet.js':
-            content += "\nwindow.openWithdraw = openWithdraw;\nwindow.deposit = deposit;\nwindow.startKYC = startKYC;\n"
+            content += "\nwindow.openWithdraw = openWithdraw;\n\nwindow.startKYC = startKYC;\n"
         elif page == 'market.js':
             content += "\nwindow.submitPrediction = submitPrediction;\nwindow.postComment = postComment;\n"
         elif page == 'admin.js':

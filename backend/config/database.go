@@ -27,7 +27,8 @@ func ConnectDB() {
 		log.Println("Connecting to PostgreSQL using DATABASE_URL...")
 		for i := 0; i < 10; i++ {
 			db, err = gorm.Open(postgres.Open(dbURL), &gorm.Config{
-				Logger: logger.Default.LogMode(logger.Silent),
+				Logger:  logger.Default.LogMode(logger.Silent),
+				NowFunc: func() time.Time { return time.Now().UTC() },
 			})
 			if err == nil {
 				break
@@ -38,7 +39,8 @@ func ConnectDB() {
 	} else if os.Getenv("USE_SQLITE") == "true" {
 		log.Println("Using SQLite for local development")
 		db, err = gorm.Open(sqlite.Open("profhit.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"), &gorm.Config{
-			Logger: logger.Default.LogMode(logger.Silent),
+			Logger:  logger.Default.LogMode(logger.Silent),
+			NowFunc: func() time.Time { return time.Now().UTC() },
 		})
 		if err != nil {
 			log.Fatal("Failed to connect to SQLite: ", err)
@@ -54,7 +56,8 @@ func ConnectDB() {
 		dsn := dsnURL.String()
 		for i := 0; i < 10; i++ {
 			db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-				Logger: logger.Default.LogMode(logger.Silent),
+				Logger:  logger.Default.LogMode(logger.Silent),
+				NowFunc: func() time.Time { return time.Now().UTC() },
 			})
 			if err == nil {
 				break

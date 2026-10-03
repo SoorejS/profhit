@@ -124,20 +124,14 @@
                             </div>
 
                             <div id="tradeForm" class="hidden">
-                                <div class="input-group" style="margin-bottom: var(--spacing-4);">
-                                    <label style="font-weight: 500;">Amount (PTS)</label>
-                                    <div style="position: relative;">
-                                        <i class="ph ph-coins" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                                        <input type="number" id="tradeAmount" aria-label="Prediction stake in points" max="1000000" step="1" class="input-control" placeholder="10" min="10" style="padding-left: 2.5rem; font-size: 1.1rem; font-weight: 600;">
-                                    </div>
-                                </div>
+                                <p>Free prediction. No payment or coin stake is required.</p><div id="typedAnswer"></div>
                                 
                                 <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-5); padding-top: var(--spacing-3); border-top: 1px dashed var(--border-subtle);">
-                                    <span style="color: var(--text-secondary); font-weight: 500;">Potential Return</span>
+                                    <span style="color: var(--text-secondary); font-weight: 500;">Correct-answer reward</span>
                                     <span id="potentialReturn" class="font-bold text-success" style="font-size: 1.1rem;">--</span>
                                 </div>
 
-                                <button class="btn btn-primary w-full" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Confirm Prediction</button>
+                                <button class="btn btn-primary w-full" id="confirmPrediction" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Confirm Prediction</button>
                             </div>
                         </div>
                         

@@ -14,6 +14,9 @@ import (
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 func addLedgerEntry(db *gorm.DB, userID uint, txType models.TransactionType, credit int, debit int, sourceRef uint, note string, adminID *uint) error {
+	return recordLedger(db, userID, txType, credit, debit, sourceRef, note, adminID, true)
+}
+func recordLedger(db *gorm.DB, userID uint, txType models.TransactionType, credit int, debit int, sourceRef uint, note string, adminID *uint, newBatch bool) error {
 	if credit < 0 || debit < 0 {
 		return errors.New("credit and debit amounts must be non-negative")
 	}
@@ -55,13 +58,15 @@ func addLedgerEntry(db *gorm.DB, userID uint, txType models.TransactionType, cre
 		return err
 	}
 
-	// For credits, always mint a new 1-year CoinBatch
-	if credit > 0 {
+	// Each earned batch has its own six-calendar-month validity.
+	if credit > 0 && newBatch {
+		earnedAt := time.Now().UTC()
 		batch := models.CoinBatch{
 			UserID:    userID,
 			Amount:    credit,
 			Balance:   credit,
-			ExpiresAt: time.Now().AddDate(1, 0, 0),
+			ExpiresAt: CoinExpiry(earnedAt),
+			CreatedAt: earnedAt,
 			Source:    string(txType),
 		}
 		if err := db.Create(&batch).Error; err != nil {
@@ -103,7 +108,7 @@ func ConsumeCoinBatchesTx(tx *gorm.DB, userID uint, debitAmount int) error {
 	var batches []models.CoinBatch
 	// Lock the rows to prevent race conditions during FIFO consumption
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("user_id = ? AND balance > 0 AND expires_at > ?", userID, time.Now()).
+		Where("user_id = ? AND balance > 0 AND expires_at > ?", userID, time.Now().UTC()).
 		Order("created_at ASC, id ASC").
 		Find(&batches).Error; err != nil {
 		return err
@@ -181,7 +186,8 @@ func LockReferralWalletsTx(tx *gorm.DB, userID uint) error {
 
 // ExpireCoinBatch removes only the expired batch, never an unexpired FIFO batch.
 func ExpireCoinBatch(batchID uint) error {
-	return config.DB.Transaction(func(tx *gorm.DB) error {
+	var expiredUser uint
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
 		var batch models.CoinBatch
 		if err := tx.First(&batch, batchID).Error; err != nil {
 			return err
@@ -192,12 +198,17 @@ func ExpireCoinBatch(batchID uint) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&batch, batchID).Error; err != nil {
 			return err
 		}
-		if batch.Balance == 0 || batch.ExpiresAt.After(time.Now()) {
+		if batch.Balance == 0 || batch.ExpiresAt.After(time.Now().UTC()) {
 			return nil
 		}
 		if err := addLedgerEntry(tx, batch.UserID, models.TxTypeExpired, 0, batch.Balance, batch.ID, "Coin expiry", nil); err != nil {
 			return err
 		}
+		expiredUser = batch.UserID
 		return tx.Model(&batch).Update("balance", 0).Error
 	})
+	if err == nil && expiredUser != 0 {
+		BroadcastToUser(expiredUser, "wallet_updated", "Coin batch expired")
+	}
+	return err
 }
