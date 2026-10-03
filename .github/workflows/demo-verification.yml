@@ -30,7 +30,15 @@ jobs:
           audit_dsn="postgres://profhit:$audit_password@127.0.0.1:15432/profhit?sslmode=disable"
           echo "::add-mask::$audit_dsn"
           echo "TEST_POSTGRES_DSN=$audit_dsn" >> "$GITHUB_ENV"
+          audit_container_dsn="postgres://profhit:$audit_password@profhit-audit-postgres:5432/profhit?sslmode=disable"
+          echo "::add-mask::$audit_container_dsn"
+          echo "AUDIT_CONTAINER_DSN=$audit_container_dsn" >> "$GITHUB_ENV"
+          audit_jwt=$(openssl rand -hex 48)
+          echo "::add-mask::$audit_jwt"
+          echo "AUDIT_JWT=$audit_jwt" >> "$GITHUB_ENV"
+          docker network create profhit-audit-net
           docker run --detach --name profhit-audit-postgres \
+            --network profhit-audit-net \
             --publish 127.0.0.1:15432:5432 \
             --env POSTGRES_USER=profhit --env POSTGRES_DB=profhit \
             --env POSTGRES_PASSWORD="$audit_password" postgres:18-alpine
@@ -58,6 +66,24 @@ jobs:
           git diff --check
       - name: Build production container
         run: docker build --tag profhit-audit:${{ github.sha }} .
+      - name: Verify container startup and public API contract
+        shell: bash
+        run: |
+          docker run --detach --name profhit-audit-api --network profhit-audit-net \
+            --publish 127.0.0.1:18080:8080 \
+            --env DATABASE_URL="$AUDIT_CONTAINER_DSN" --env JWT_SECRET="$AUDIT_JWT" \
+            --env GIN_MODE=release --env PORT=8080 --env USE_SQLITE=false \
+            --env SEED_DEMO_DATA=false --env BETA_MODE=false \
+            --env APP_URL=http://127.0.0.1:18080 --env ALLOWED_ORIGINS=http://127.0.0.1:18080 \
+            profhit-audit:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health > /tmp/profhit-health.json; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:18080/api/live-feed > /tmp/profhit-feed.json
+          node -e "const fs=require('fs'); const assert=require('assert/strict'); const health=JSON.parse(fs.readFileSync('/tmp/profhit-health.json')); const feed=JSON.parse(fs.readFileSync('/tmp/profhit-feed.json')); assert.equal(health.status,'ok'); assert.equal(feed.currency,'virtual coins'); assert.equal(feed.paid_entry,false); assert.ok(Array.isArray(feed.items)); assert.equal(feed.target_met,feed.playable_count>=50);"
       - name: Remove disposable container
         if: always()
-        run: docker rm --force profhit-audit-postgres || true
+        run: |
+          docker rm --force profhit-audit-api profhit-audit-postgres || true
+          docker network rm profhit-audit-net || true

@@ -4,6 +4,13 @@ scripts/
 .git/
 .vercel/
 audit-artifacts/
+.tmp/
+.github/
+node_modules/
+*.exe
+*.db
+*.db-*
+*.log
 .env*
 *.py
 *.md
