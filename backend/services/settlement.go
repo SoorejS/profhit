@@ -173,7 +173,7 @@ func SettleMarket(id interface{}, input ResolutionInput) (map[string]interface{}
 			),
 			win_rate = COALESCE((
 				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(is_correct), 0)
-				FROM prediction_submissions 
+				FROM prediction_submissions
 				WHERE user_id = users.id AND deleted_at IS NULL
 			), 0)
 			WHERE id IN ?
