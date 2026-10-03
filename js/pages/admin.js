@@ -324,7 +324,7 @@ function setupMarketEditor() {
     form.addEventListener('submit',async event=>{
         event.preventDefault();
         const fields=new FormData(form), button=form.querySelector('[type="submit"]');
-        const market={title:fields.get('title'), description:fields.get('description'), category:fields.get('category'), difficulty:fields.get('difficulty'), options:JSON.stringify(String(fields.get('options')).split('\n').map(s=>s.trim()).filter(Boolean)), entry_coins:Number(fields.get('entry_coins')), resolution_rule:fields.get('resolution_rule'), resolution_source:fields.get('resolution_source'), lock_time:new Date(fields.get('lock_time')).toISOString(), resolution_time:new Date(fields.get('resolution_time')).toISOString(), news_url:fields.get('news_url'), news_source_name:fields.get('news_source_name'), source_kind:fields.get('source_kind'), news_published_at:fields.get('news_published_at')?new Date(fields.get('news_published_at')).toISOString():null, resolution_status:'Draft'};
+        const market={title:fields.get('title'), description:fields.get('description'), category:fields.get('category'), difficulty:fields.get('difficulty'), options:JSON.stringify(String(fields.get('options')).split('\n').map(s=>s.trim()).filter(Boolean)), entry_coins:Number(fields.get('entry_coins')), range_width:((['Weather','Sports'].includes(fields.get('category'))&&fields.get('difficulty')==='Medium')||(fields.get('category')==='Entertainment'&&fields.get('difficulty')==='Hard'))?Number(fields.get('range_width')):0, resolution_rule:fields.get('resolution_rule'), resolution_source:fields.get('resolution_source'), lock_time:new Date(fields.get('lock_time')).toISOString(), resolution_time:new Date(fields.get('resolution_time')).toISOString(), news_url:fields.get('news_url'), news_source_name:fields.get('news_source_name'), source_kind:fields.get('source_kind'), news_published_at:fields.get('news_published_at')?new Date(fields.get('news_published_at')).toISOString():null, resolution_status:'Draft'};
         if(fields.get('start_time'))market.start_time=new Date(fields.get('start_time')).toISOString();
         const id=form.dataset.marketId;
         button.disabled=true;
@@ -340,6 +340,7 @@ async function editMarket(id) {
         const form=document.getElementById('adminMarketForm');
         form.dataset.marketId=String(id);
         for(const name of ['title','description','category','difficulty','entry_coins','resolution_rule','resolution_source','news_url','news_source_name','source_kind'])form.elements[name].value=m[name]??'';
+        form.elements.range_width.value=m.range_width||5;
         form.elements.options.value=JSON.parse(m.options).join('\n');
         for(const name of ['start_time','lock_time','resolution_time','news_published_at']) {
             const date=m[name]?new Date(m[name]):null;
