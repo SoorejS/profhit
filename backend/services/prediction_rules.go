@@ -26,10 +26,10 @@ var CategoryTypes = map[string][3]string{
 var resultDomains = map[string][]string{
 	"Weather":           {"openweathermap.org", "mausam.imd.gov.in", "weather.gov"},
 	"Sports":            {"cricapi.com", "cricketdata.org", "sportmonks.com", "espn.com", "espncricinfo.com"},
-	"Politics":          {"eci.gov.in", "results.eci.gov.in"},
-	"Entertainment":     {"bollywoodhungama.com", "boxofficeindia.com", "oscars.org", "grammy.com"},
+	"Politics":          {"eci.gov.in", "results.eci.gov.in", "fec.gov"},
+	"Entertainment":     {"bollywoodhungama.com", "boxofficeindia.com", "oscars.org", "grammy.com", "nobelprize.org"},
 	"Financial Markets": {"nseindia.com", "bseindia.com", "coingecko.com"},
-	"Wild Card":         {"mausam.imd.gov.in", "eci.gov.in", "nseindia.com", "bseindia.com", "oscars.org", "nasa.gov", "isro.gov.in"},
+	"Wild Card":         {"mausam.imd.gov.in", "eci.gov.in", "nseindia.com", "bseindia.com", "oscars.org", "nasa.gov", "isro.gov.in", "nobelprize.org"},
 	"Technology":        {"apple.com", "google.com", "microsoft.com", "github.com", "nasa.gov", "openai.com"},
 	"Geopolitics":       {"un.org", "consilium.europa.eu", "nato.int", "state.gov", "mea.gov.in"},
 }

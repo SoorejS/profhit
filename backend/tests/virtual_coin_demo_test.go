@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"profhit-backend/config"
 	"profhit-backend/controllers"
@@ -109,4 +110,21 @@ func TestPostgresVirtualCoinEntryAndSettlement(t *testing.T) {
 	verifyPostgresWalletInvariant(t, u.ID)
 	require.NoError(t, config.DB.First(&u, u.ID).Error)
 	require.Equal(t, 110, u.Points)
+}
+
+func TestStaleCuratedArticleCannotBePublished(t *testing.T) {
+	setupTestDB()
+	u := testUser(t, "curated_editor", 0)
+	m := compliantTestMarket("Weather", "Easy", time.Now().UTC().Add(time.Hour))
+	m.ResolutionStatus = "Draft"
+	m.IsCurated = true
+	m.SourceKind = "article"
+	old := time.Now().UTC().Add(-25 * time.Hour)
+	m.NewsPublishedAt = &old
+	require.NoError(t, config.DB.Create(&m).Error)
+	w := request(t, controllers.ApproveMarket, u.ID, "", gin.Params{{Key: "id", Value: fmt.Sprint(m.ID)}})
+	require.Equal(t, 400, w.Code)
+	require.Contains(t, w.Body.String(), "stale")
+	require.NoError(t, config.DB.First(&m, m.ID).Error)
+	require.Equal(t, "Draft", m.ResolutionStatus)
 }

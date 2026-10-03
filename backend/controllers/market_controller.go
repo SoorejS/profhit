@@ -200,6 +200,10 @@ func ApproveMarket(c *gin.Context) {
 		return
 	}
 	checked := market
+	if market.IsCurated && market.SourceKind == "article" && (market.NewsPublishedAt == nil || market.NewsPublishedAt.Before(time.Now().UTC().Add(-24*time.Hour))) {
+		c.JSON(400, gin.H{"error": "The curated article is stale; use a current dated source before publishing"})
+		return
+	}
 	if market.NewsEventID != nil {
 		var event models.NewsEvent
 		if config.DB.First(&event, *market.NewsEventID).Error != nil || services.ValidateNewsPrediction(event, &checked, time.Now().UTC()) != nil {

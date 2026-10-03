@@ -42,7 +42,7 @@ func SettleMarket(id interface{}, input ResolutionInput) (map[string]interface{}
 	// "Open" was a legacy value that never existed in the real lifecycle.
 	resolvableStatuses := map[string]bool{"Locked": true, "Awaiting Resolution": true}
 	if !resolvableStatuses[market.ResolutionStatus] {
-		return nil, &SettlementError{Status: http.StatusBadRequest, Message: "Market must be Locked or Awaiting Resolution before it can be resolved. Current status: "}
+		return nil, &SettlementError{Status: http.StatusBadRequest, Message: "Market must be Locked or Awaiting Resolution before it can be resolved. Current status: " + market.ResolutionStatus}
 	}
 
 	// Normalise: prefer 'winner', fallback to 'outcome'
