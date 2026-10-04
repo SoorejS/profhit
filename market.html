@@ -50,6 +50,8 @@
             font-weight: 700;
             border-radius: var(--radius-md);
         }
+        .prediction-buttons:has(button:nth-child(3)) { grid-template-columns: 1fr; }
+        .prediction-buttons:has(button:nth-child(3)) .btn { font-size: 1rem; text-align: left; }
         .market-source { margin-bottom: var(--spacing-6); color: var(--text-secondary); }
         .entry-cost { margin-bottom: var(--spacing-4); color: var(--color-gold); }
         .market-layout .right-sidebar { display: flex; }
