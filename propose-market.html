@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/propose-market.css">
 </head>
 <body>
     <div class="app-layout">
@@ -26,14 +27,14 @@
 
             <div class="content-wrapper scroll-y">
                 
-                <div class="single-column-grid" style="max-width: 800px; margin: 0 auto;">
+                <div class="single-column-grid proposal-layout">
                     
                     <div style="margin-bottom: var(--spacing-6); text-align: center;">
                         <h1 style="font-size: 2.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary);"><i class="ph-fill ph-lightbulb"></i> Propose a Market</h1>
                         <p class="text-muted" style="font-size: 1.1rem; margin-top: 4px;">Got a great idea for a prediction market? Submit it for admin review!</p>
                     </div>
 
-                    <div class="card" style="border: 1px solid var(--border-subtle); padding: var(--spacing-8);">
+                    <div class="card proposal-card">
                         <form id="proposeForm" onsubmit="submitProposal(event)">
                             <div class="input-group" style="margin-bottom: var(--spacing-5);">
                                 <label for="pTitle" style="font-weight: 600;">Market Title <span class="text-danger">*</span></label>

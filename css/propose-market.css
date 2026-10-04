@@ -1,0 +1,19 @@
+.proposal-layout {
+    max-width: none;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.proposal-card {
+    padding: var(--spacing-8);
+}
+
+#pDescription {
+    resize: vertical;
+}
+
+@media (max-width: 768px) {
+    .proposal-card {
+        padding: var(--spacing-4);
+    }
+}

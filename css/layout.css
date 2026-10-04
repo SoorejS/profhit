@@ -5,7 +5,9 @@
 .app-layout {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
 }
 
@@ -169,6 +171,8 @@ app-sidebar {
 }
 
 .main-content, .content-wrapper, .dashboard-grid > *, .card { min-width: 0; }
+/* Keep a long sidebar from stretching the grid row below the viewport. */
+app-sidebar, .sidebar, .main-content, .content-wrapper { min-height: 0; }
 .card, .transaction-item, .profile-header { overflow-wrap: anywhere; }
 .btn.menu-toggle { display: none; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
