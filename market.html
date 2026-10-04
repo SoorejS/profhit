@@ -6,9 +6,11 @@
     <title>Market Details - PROPHIT</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="assets/phosphor/regular.css">
+    <link rel="stylesheet" href="assets/phosphor/bold.css">
+    <link rel="stylesheet" href="assets/phosphor/fill.css">
 
-    <!-- Lightweight Charts for Probability Graph -->
+
 
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
@@ -27,15 +29,6 @@
             letter-spacing: -0.02em;
             margin-bottom: var(--spacing-2);
         }
-        .chart-container {
-            height: 350px;
-            width: 100%;
-            background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            margin-bottom: var(--spacing-6);
-            overflow: hidden;
-        }
         .trade-card {
             position: sticky;
             top: 20px;
@@ -43,17 +36,27 @@
             border-color: var(--border-strong);
         }
         .prediction-buttons {
-            display: flex;
-            gap: var(--spacing-4);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+            gap: var(--spacing-3);
             margin-bottom: var(--spacing-4);
         }
         .prediction-buttons .btn {
-            flex: 1;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
             padding: 1rem;
             font-size: 1.15rem;
             font-weight: 700;
             border-radius: var(--radius-md);
         }
+        .market-source { margin-bottom: var(--spacing-6); color: var(--text-secondary); }
+        .entry-cost { margin-bottom: var(--spacing-4); color: var(--color-gold); }
+        .market-layout .right-sidebar { display: flex; }
+        .market-layout .trade-card { position: static; }
+        .market-layout .right-sidebar .flex { flex-wrap: wrap; gap: 8px; }
+        .market-layout .right-sidebar .flex span:last-child { text-align: right; }
+        @media (max-width: 1024px) { .market-layout > div { display: contents; } .market-layout .market-header { grid-row: 1; } .market-layout .market-source { grid-row: 2; margin-bottom: 0; } .market-layout .right-sidebar { grid-row: 3; } .market-title { font-size: 1.8rem; } }
         .comment-item {
             padding: var(--spacing-4);
             border-bottom: 1px solid var(--border-subtle);
@@ -72,11 +75,11 @@
 
             <div class="content-wrapper scroll-y">
 
-                <div class="dashboard-grid">
+                <div class="dashboard-grid market-layout">
                     <!-- Left: Market Details & Chart -->
                     <div>
                         <div class="market-header">
-                            <a href="dashboard.html" style="color: var(--text-secondary); margin-bottom: var(--spacing-4); display: inline-flex; align-items: center; gap: 4px; font-weight: 500; transition: color var(--transition-fast);">
+                            <a href="dashboard.html?view=markets" id="backToMarkets" style="color: var(--text-secondary); margin-bottom: var(--spacing-4); display: inline-flex; align-items: center; gap: 4px; font-weight: 500; transition: color var(--transition-fast);">
                                 <i class="ph ph-arrow-left"></i> Back to Markets
                             </a>
                             <div class="flex items-center gap-2" style="margin-bottom: var(--spacing-3);">
@@ -87,7 +90,7 @@
                             <p class="text-secondary" id="marketDesc" style="font-size: 1.05rem; line-height: 1.6;"></p>
                         </div>
 
-                        <div class="chart-container" id="chartContainer"></div>
+                        <p id="marketSource" class="market-source"></p>
 
                         <div class="card" style="margin-bottom: var(--spacing-6); border: 1px solid var(--border-subtle);">
                             <h3 style="margin-bottom: var(--spacing-4); font-size: 1.1rem; font-weight: 600;"><i class="ph-fill ph-scales text-gold"></i> Resolution Criteria</h3>
@@ -111,40 +114,41 @@
                     <!-- Right: Trade Execution -->
                     <aside class="right-sidebar">
                         <div class="card trade-card">
-                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Place Prediction</h3>
+                            <h3 style="margin-bottom: var(--spacing-4); font-size: 1.25rem; font-weight: 700;">Make a prediction</h3>
 
                             <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-3); padding: var(--spacing-3); background: var(--bg-base); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                                <span style="color: var(--text-secondary); font-weight: 500;">Fixed payout</span>
-                                <strong id="marketFixedPayout" class="text-success">-- PTS</strong>
+                                <span style="color: var(--text-secondary); font-weight: 500;">Potential reward</span>
+                                <strong id="marketFixedPayout" class="text-success">-- Coins</strong>
                             </div>
 
+                            <p class="entry-cost">Cost: <strong id="entryCost">-- Coins</strong></p>
                             <div class="prediction-buttons">
                                 <button class="btn btn-yes" onclick="selectPrediction('Yes')">Yes</button>
                                 <button class="btn btn-no" onclick="selectPrediction('No')">No</button>
                             </div>
 
                             <div id="tradeForm" class="hidden">
-                                <p><span id="entryCost">Checking virtual coin entry…</span></p><div id="typedAnswer"></div>
+                                <div id="typedAnswer"></div>
 
                                 <div class="flex justify-between items-center" style="margin-bottom: var(--spacing-5); padding-top: var(--spacing-3); border-top: 1px dashed var(--border-subtle);">
                                     <span style="color: var(--text-secondary); font-weight: 500;">Correct-answer reward</span>
                                     <span id="potentialReturn" class="font-bold text-success" style="font-size: 1.1rem;">--</span>
                                 </div>
 
-                                <button class="btn btn-primary w-full" id="confirmPrediction" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Confirm Prediction</button>
+                                <button class="btn btn-primary w-full" id="confirmPrediction" onclick="executeTrade()" style="padding: 1rem; font-size: 1.1rem; font-weight: 600;"><i class="ph-bold ph-check-circle"></i> Make prediction</button>
                             </div>
                         </div>
 
                         <div class="card" style="margin-top: var(--spacing-4); border: 1px solid var(--border-subtle);">
-                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4); font-weight: 600;">Market Stats</h3>
+                            <h3 style="font-size: 1rem; margin-bottom: var(--spacing-4); font-weight: 600;">Market information</h3>
                             <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
-                                <span>Predictions</span>
+                                <span>Players</span>
                                 <span id="marketPredictionCount" class="text-primary font-bold">--</span>
                             </div>
                             <div class="flex justify-between items-center text-muted" style="font-size: 0.9rem;">
                                 <span>Closes</span>
                                 <span id="marketCloseDate" class="font-bold text-primary-light">--</span>
-                            </div>
+                            </div><div class="flex justify-between items-center text-muted"><span>Resolution</span><span id="marketResolutionDate">--</span></div>
                         </div>
                     </aside>
                 </div>

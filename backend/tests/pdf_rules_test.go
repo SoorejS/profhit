@@ -362,7 +362,10 @@ func TestPDFNewsFreshnessDuplicateAndEditorialGate(t *testing.T) {
 	params := gin.Params{{Key: "id", Value: fmt.Sprint(m.ID)}}
 	require.Equal(t, 400, request(t, controllers.ApproveMarket, admin.ID, `{}`, params).Code)
 	reviewed := compliantTestMarket("Wild Card", "Easy", now.Add(time.Hour))
+	reviewed.Description = "An isolated upcoming observation tests reviewed publication of measurable rules."
+	resolution := now.Add(2 * time.Hour)
+	reviewed.ResolutionTime = &resolution
 	body, _ := json.Marshal(reviewed)
 	require.Equal(t, 200, request(t, controllers.UpdateMarketRules, admin.ID, string(body), params).Code)
-	require.Equal(t, 200, request(t, controllers.ApproveMarket, admin.ID, `{}`, params).Code)
+	require.Equal(t, 200, request(t, controllers.ApproveMarket, admin.ID, `{"current":true,"future_outcome":true,"objective":true,"trusted_source":true,"sensible_cutoff":true,"interesting":true,"rationale":"Isolated regression verifies a complete and accountable editorial publication review."}`, params).Code)
 }

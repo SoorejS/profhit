@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -30,8 +31,7 @@ func UpdateMarketRules(c *gin.Context) {
 			return gorm.ErrInvalidData
 		}
 		originalID := m.ID
-		newsURL := m.NewsURL
-		published := m.NewsPublishedAt
+		sourceURL, sourceName, published, sourceKind := input.NewsURL, input.NewsSourceName, input.NewsPublishedAt, input.SourceKind
 		creator := m.CreatorID
 		key := m.DailyKey
 		input.ResolutionStatus = "Draft"
@@ -46,10 +46,15 @@ func UpdateMarketRules(c *gin.Context) {
 			if err := services.ValidateNewsPrediction(event, &input, time.Now().UTC()); err != nil {
 				return err
 			}
+		} else if m.IsCurated {
+			now := time.Now().UTC()
+			if !services.PublicProviderURL(sourceURL) || sourceName == "" || len(sourceName) > 100 || (published != nil && published.After(now)) || (sourceKind != "article" && sourceKind != "official_event") || (sourceKind == "article" && (published == nil || published.Before(now.Add(-24*time.Hour)))) || (sourceKind == "official_event" && !services.ApprovedEditorialSource(input.Category, sourceURL)) {
+				return fmt.Errorf("provide a current article or approved official event source")
+			}
 		}
 		input.ID = originalID
-		input.NewsURL = newsURL
-		input.NewsPublishedAt = published
+		input.NewsURL = m.NewsURL
+		input.NewsPublishedAt = m.NewsPublishedAt
 		input.NewsEventID = m.NewsEventID
 		input.NewsSourceName = m.NewsSourceName
 		input.NewsEventTitle = m.NewsEventTitle
@@ -57,6 +62,9 @@ func UpdateMarketRules(c *gin.Context) {
 		input.IsDemo = m.IsDemo
 		input.IsCurated = m.IsCurated
 		input.SourceKind = m.SourceKind
+		if m.NewsEventID == nil && m.IsCurated {
+			input.NewsURL, input.NewsSourceName, input.NewsPublishedAt, input.SourceKind = sourceURL, sourceName, published, sourceKind
+		}
 		input.ResultSpec = m.ResultSpec
 		input.ResultApprovedBy = m.ResultApprovedBy
 		if err := services.ConfigurePrediction(&input); err != nil {
@@ -65,12 +73,14 @@ func UpdateMarketRules(c *gin.Context) {
 		input.CreatorID = creator
 		input.DailyKey = key
 		input.CreatedAt = m.CreatedAt
-		return tx.Save(&input).Error
+		if err := tx.Save(&input).Error; err != nil {
+			return err
+		}
+		return services.LogAction(tx, c.MustGet("userID").(uint), "REVIEW_MARKET_RULES", "market_"+c.Param("id"), "Reviewed unpublished measurable rules", c.ClientIP())
 	})
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	services.LogAction(nil, c.MustGet("userID").(uint), "REVIEW_MARKET_RULES", "market_"+c.Param("id"), "Reviewed unpublished measurable rules", c.ClientIP())
 	c.JSON(200, gin.H{"message": "Rules saved. Publish only after reviewing the source, wording, deadline and deterministic outcome."})
 }

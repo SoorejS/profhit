@@ -83,6 +83,7 @@ func SubmitPrediction(c *gin.Context) {
 		  AND ps.created_at < ?
 		  AND ps.deleted_at IS NULL
 		  AND m.deleted_at IS NULL
+		  AND m.resolution_status <> 'Voided'
 	`, userID, market.Category, todayStart, tomorrowStart).Scan(&topicCount)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "Could not check prediction limit"})

@@ -233,6 +233,10 @@ func SetupRouter() *gin.Engine {
 		))
 		{
 			adminRoutes.POST("/markets/:id/resolve", controllers.ResolveMarket)
+			adminRoutes.GET("/admin/markets", controllers.AdminMarkets)
+			adminRoutes.GET("/admin/markets/:id/preview", controllers.PreviewMarket)
+			adminRoutes.PUT("/admin/markets/:id/feature", controllers.FeatureMarket)
+			adminRoutes.POST("/admin/markets/:id/void", controllers.VoidMarket)
 			adminRoutes.GET("/admin/redemptions", controllers.AdminGetRedemptions)
 			adminRoutes.PUT("/admin/redemptions/:id", controllers.AdminProcessRedemption)
 		}

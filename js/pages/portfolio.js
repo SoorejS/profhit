@@ -44,7 +44,7 @@ async function loadPortfolio() {
 
         if (!data || data.length === 0) {
             list.innerHTML = `<div class="text-muted text-center" style="padding: var(--spacing-6);">You haven't made any predictions yet.</div>`;
-            document.getElementById('statTotalPayout').textContent = '0 PTS';
+            document.getElementById('statTotalPayout').textContent = '0 Coins';
             return;
         }
 
@@ -54,11 +54,11 @@ async function loadPortfolio() {
                 totalPayout += (p.potential_payout || 0);
             }
         });
-        document.getElementById('statTotalPayout').textContent = statsRes.status==='fulfilled' ? `${statsRes.value.pending_potential} PTS` : 'Unavailable';
+        document.getElementById('statTotalPayout').textContent = statsRes.status==='fulfilled' ? `${statsRes.value.pending_potential} Coins` : 'Unavailable';
 
         list.innerHTML = data.map(p => {
             let status = '';
-            if (p.is_correct !== null) {
+            if(p.market_status==='Voided') { status='<span class="text-muted">Cancelled · Coins refunded</span>'; } else if (p.is_correct !== null) {
                 const isWin = p.is_correct === true;
                 status = isWin 
                     ? `<span class="text-success font-bold"><i class="ph-fill ph-check-circle"></i> WON</span>` 
@@ -85,7 +85,7 @@ async function loadPortfolio() {
                         </div>
                         <div>
                             <span class="text-muted">Potential:</span> 
-                            <span class="font-bold">${p.potential_payout} PTS</span>
+                            <span class="font-bold">${p.market_status==='Voided' ? 'Refunded' : p.potential_payout+' Coins'}</span>
                         </div>
                     </div>
                 </div>
@@ -98,4 +98,4 @@ async function loadPortfolio() {
     }
 }
 
-window.addEventListener('prophit-live',e=>{if(['wallet_updated','market_resolved','market_locked','prediction_count_changed'].includes(e.detail.event))loadPortfolio();});
+window.addEventListener('prophit-live',e=>{if(['wallet_updated','market_resolved','market_locked','prediction_count_changed','market_state_changed'].includes(e.detail.event))loadPortfolio();});

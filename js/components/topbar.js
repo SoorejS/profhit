@@ -25,11 +25,11 @@ export class AppTopbar extends HTMLElement {
                 
                 <div class="topbar-actions flex items-center gap-4">
                     <button class="btn btn-outline" onclick="window.location.href='/wallet.html'" style="border-radius: var(--radius-full);">
-                        <i class="ph-fill ph-coins text-gold"></i> <span id="topbarBalance">--</span> PTS
+                        <i class="ph-fill ph-coins text-gold"></i> <span id="topbarBalance">--</span> Coins
                     </button>
                     
                     <div class="profile-menu" style="position: relative; cursor: pointer;">
-                        <button type="button" class="btn btn-outline" id="profileToggle" aria-label="Open profile menu" aria-expanded="false"><i class="ph ph-user"></i></button>
+                        <button type="button" class="btn btn-outline" id="profileToggle" aria-label="Open profile menu" aria-expanded="false"><span>Profile</span></button>
                         
                         <div id="profileDropdown" class="hidden" style="position: absolute; top: 50px; right: 0; background: var(--bg-surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-md); width: 200px; box-shadow: var(--shadow-lg); z-index: 100;">
                             <a href="/profile.html" class="nav-link" style="padding: 10px 15px; display: block; color: var(--text-primary);"><i class="ph ph-user"></i> Profile</a>

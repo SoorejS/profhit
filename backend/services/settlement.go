@@ -169,7 +169,7 @@ func SettleMarket(id interface{}, input ResolutionInput) (map[string]interface{}
 		if err := tx.Exec(`
 			UPDATE users
 			SET total_predictions = (
-				SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL
+				SELECT COUNT(id) FROM prediction_submissions WHERE user_id = users.id AND deleted_at IS NULL AND market_id IN (SELECT id FROM markets WHERE resolution_status <> 'Voided' AND deleted_at IS NULL)
 			),
 			win_rate = COALESCE((
 				SELECT (SUM(CASE WHEN is_correct = true THEN 1 ELSE 0 END) * 100.0) / NULLIF(COUNT(is_correct), 0)

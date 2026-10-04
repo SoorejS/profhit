@@ -21,6 +21,7 @@ func TestCuratedFutureOpportunityExcludesDemoAndExpiredMarkets(t *testing.T) {
 	m.SourceKind = "official_event"
 	m.NewsURL = "https://api.weather.gov/gridpoints/LWX/96,72/forecast"
 	m.NewsSourceName = "National Weather Service"
+	m.EditorialReviewedBy = 1
 	m.NewsDiscoveredAt = &now
 	require.NoError(t, config.DB.Create(&m).Error)
 	fixture := m

@@ -21,3 +21,17 @@
 .markets-grid[hidden] { display:none; }
 .public-live-feed { padding:24px; max-width:1400px; margin:0 auto 48px; }
 @media(max-width:768px) { .public-live-feed { padding:12px; } .live-feed-heading h2 { font-size:1.35rem; } .live-feed-search { align-items:stretch; } .live-feed-tabs .btn { padding:8px 12px; } }
+
+.live-opportunity { border-top: 3px solid var(--color-primary); padding: var(--spacing-5); }
+.live-opportunity[data-category="Financial Markets"] { border-top-color: var(--color-gold); }
+.live-opportunity[data-category="Weather"] { border-top-color: var(--color-yes); }
+.live-opportunity .market-card-title { margin-bottom: 0; font-size: 1.15rem; }
+.market-context { color: var(--text-secondary); line-height: 1.6; font-size: .9rem; }
+.live-opportunity .market-source { font-size: .8rem; color: var(--text-secondary); }
+.market-dates { display: grid; gap: 8px; font-size: .8rem; }
+.market-dates > div { display: flex; justify-content: space-between; gap: 12px; }
+.market-dates dt { color: var(--text-secondary); }
+.market-dates dd { margin: 0; text-align: right; }
+.market-coin-row { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:var(--spacing-3) 0; border-top:1px solid var(--border-subtle); font-size:.85rem; }
+.market-coin-row strong { display:block; margin-top:4px; color:var(--color-gold); }
+.live-feed-tabs [aria-pressed="true"] { color:var(--color-primary); border-color:var(--color-primary); }

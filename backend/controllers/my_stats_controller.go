@@ -16,7 +16,7 @@ func GetMyStats(c *gin.Context) {
 		Won              int64
 		PendingPotential int64
 	}
-	err := config.DB.Model(&models.PredictionSubmission{}).Where("user_id = ?", userID).
+	err := config.DB.Model(&models.PredictionSubmission{}).Where("market_id IN (?)", config.DB.Model(&models.Market{}).Select("id").Where("resolution_status <> ?", "Voided")).Where("user_id = ?", userID).
 		Select("COUNT(*) AS total, COALESCE(SUM(CASE WHEN is_correct IS NOT NULL THEN 1 ELSE 0 END),0) AS settled, COALESCE(SUM(CASE WHEN is_correct = ? THEN 1 ELSE 0 END),0) AS won, COALESCE(SUM(CASE WHEN is_correct IS NULL THEN potential ELSE 0 END),0) AS pending_potential", true).Scan(&stats).Error
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Could not load prediction summary"})

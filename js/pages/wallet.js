@@ -52,7 +52,7 @@ async function loadLedger() {
                         <div class="text-muted" style="font-size: 0.8rem;">${new Date(tx.created_at).toLocaleString()}</div>
                     </div>
                     <div style="color: ${color}; font-weight: 700;">
-                        ${sign}${Math.abs(change)} PTS
+                        ${sign}${Math.abs(change)} Coins
                     </div>
                 </div>
             `;
@@ -71,25 +71,25 @@ async function checkKycStatus() {
         const data = await ApiClient.get('/kyc/status');
         
         if (data.status === 'Verified' && data.redemption_eligible) {
-            icon.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i>';
+            icon.innerHTML = '<i class="ph-bold ph-check-circle text-success"></i>';
             text.textContent = 'Verified Identity';
             text.style.color = 'var(--color-success)';
             btn.style.display = 'none';
         } else if (['Pending', 'Started', 'DocumentsUploaded'].includes(data.status)) {
-            icon.innerHTML = '<i class="fa-solid fa-clock text-warning"></i>';
+            icon.innerHTML = '<i class="ph-bold ph-clock text-warning"></i>';
             text.textContent = 'Verification Pending';
             text.style.color = 'var(--color-warning)';
             btn.textContent = 'Check Status';
             btn.onclick = checkKycStatus;
         } else if (data.status === 'Rejected') {
-            icon.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
+            icon.innerHTML = '<i class="ph-bold ph-x-circle text-danger"></i>';
             text.textContent = 'Verification Failed';
             text.style.color = 'var(--color-danger)';
             btn.textContent = 'Retry KYC';
             btn.onclick = startKyc;
         } else {
             // Expired or missing contact verification
-            icon.innerHTML = '<i class="fa-solid fa-shield-halved text-muted"></i>';
+            icon.innerHTML = '<i class="ph-bold ph-shield-check text-muted"></i>';
             text.textContent = data.status === 'Verified' ? 'Phone OTP and email confirmation pending' : data.status; btn.onclick = startKyc; if(data.status==='Verified'){btn.disabled=true;btn.textContent='Contact workflow pending';}
         }
     } catch (err) {
@@ -101,7 +101,7 @@ async function startKyc() {
     try {
         const btn = document.getElementById('kycBtn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Initializing...';
+        btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Initializing...';
 
         const res = await ApiClient.post('/kyc/start');
         
@@ -127,7 +127,7 @@ async function openWithdraw() {
  if (!entered) return;
  const tier = Object.keys(tiers).find(key => key.toLowerCase() === entered.trim().toLowerCase());
  if (!tier) { showToast('Choose one of the listed voucher tiers.', 'error'); return; }
- if (!await confirmAction(`Redeem ${tiers[tier][0]} PTS for an INR ${tiers[tier][1]} ${tier} voucher?`)) return;
+ if (!await confirmAction(`Redeem ${tiers[tier][0]} Coins for an INR ${tiers[tier][1]} ${tier} voucher?`)) return;
  try { const result = await ApiClient.post('/payments/redeem', {tier}); showToast(result.message, 'success'); loadBatchesAndVouchers(); loadWalletData(); loadLedger(); document.querySelector('app-topbar')?.fetchBalance(); document.querySelector('app-sidebar')?.fetchBalance(); }
  catch (err) { showToast(err.message, 'error'); }
 }

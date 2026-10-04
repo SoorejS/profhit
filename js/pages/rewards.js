@@ -31,7 +31,7 @@ async function loadCatalog() {
                 <div class="card market-card" style="text-align: center; border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated); opacity: ${outOfStock ? 0.6 : 1};">
                     <i class="ph-fill ph-gift" style="font-size: 3rem; margin-bottom: 12px; color: ${outOfStock ? 'var(--text-muted)' : 'var(--color-gold)'};"></i>
                     <div class="font-bold" style="font-size: 1.1rem; margin-bottom: 4px;">${escapeHTML(item.name)}</div>
-                    <div class="text-gold font-bold" style="margin-bottom: var(--spacing-4); font-size: 1.1rem;">${item.cost} PTS</div>
+                    <div class="text-gold font-bold" style="margin-bottom: var(--spacing-4); font-size: 1.1rem;">${item.cost} Coins</div>
                     <button class="btn btn-outline w-full" ${outOfStock ? 'disabled' : ''} data-reward-id="${item.id}">${outOfStock ? 'Out of Stock' : 'Redeem'}</button>
                 </div>
             `;
@@ -67,7 +67,7 @@ async function loadHistory() {
                         <span style="color: ${statusColor}; font-weight: 600; font-size: 0.85rem;">${escapeHTML(item.status)}</span>
                     </div>
                     <div class="flex justify-between items-center text-sm text-muted">
-                        <span>Cost: ${item.cost_paid} PTS</span>
+                        <span>Cost: ${item.cost_paid} Coins</span>
                         <span>${new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
                     ${item.voucher_code ? `<div class="mt-2 text-sm">Voucher: <span class="font-mono font-bold text-success">${escapeHTML(item.voucher_code)}</span></div>` : ''}
@@ -81,7 +81,7 @@ async function loadHistory() {
 }
 
 window.redeemReward = async (id, name, cost) => {
-    if (!await confirmAction(`Redeem ${cost} PTS for "${name}"?`)) return;
+    if (!await confirmAction(`Redeem ${cost} Coins for "${name}"?`)) return;
 
     try {
         await ApiClient.post('/rewards/redeem', { reward_item_id: id });

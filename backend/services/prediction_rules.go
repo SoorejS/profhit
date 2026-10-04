@@ -24,14 +24,14 @@ var CategoryTypes = map[string][3]string{
 }
 
 var resultDomains = map[string][]string{
-	"Weather":           {"openweathermap.org", "mausam.imd.gov.in", "weather.gov"},
-	"Sports":            {"cricapi.com", "cricketdata.org", "sportmonks.com", "espn.com", "espncricinfo.com"},
-	"Politics":          {"eci.gov.in", "results.eci.gov.in", "fec.gov"},
-	"Entertainment":     {"bollywoodhungama.com", "boxofficeindia.com", "oscars.org", "grammy.com", "nobelprize.org"},
-	"Financial Markets": {"nseindia.com", "bseindia.com", "coingecko.com"},
-	"Wild Card":         {"mausam.imd.gov.in", "eci.gov.in", "nseindia.com", "bseindia.com", "oscars.org", "nasa.gov", "isro.gov.in", "nobelprize.org"},
-	"Technology":        {"apple.com", "google.com", "microsoft.com", "github.com", "nasa.gov", "openai.com"},
-	"Geopolitics":       {"un.org", "consilium.europa.eu", "nato.int", "state.gov", "mea.gov.in"},
+	"Weather":           {"openweathermap.org", "imd.gov.in", "weather.gov"},
+	"Sports":            {"cricapi.com", "cricketdata.org", "sportmonks.com", "espn.com", "espncricinfo.com", "bcci.tv", "windiescricket.com", "icc-cricket.com", "formula1.com", "fia.com"},
+	"Politics":          {"eci.gov.in", "results.eci.gov.in", "fec.gov", "elections.tn.gov.in"},
+	"Entertainment":     {"bollywoodhungama.com", "boxofficeindia.com", "oscars.org", "grammy.com", "nobelprize.org", "nobelpeaceprize.org"},
+	"Financial Markets": {"apple.com", "microsoft.com", "nseindia.com", "bseindia.com", "coingecko.com", "sec.gov", "rbi.org.in", "federalreserve.gov", "imf.org", "worldbank.org", "tesla.com", "tsmc.com", "infosys.com", "tcs.com", "netflix.net", "amd.com", "nvidia.com", "abc.xyz"},
+	"Wild Card":         {"mausam.imd.gov.in", "eci.gov.in", "nseindia.com", "bseindia.com", "oscars.org", "nasa.gov", "isro.gov.in", "nobelprize.org", "nobelpeaceprize.org"},
+	"Technology":        {"apple.com", "blog.google", "google.com", "microsoft.com", "github.com", "nasa.gov", "openai.com", "anthropic.com", "nvidia.com", "meta.com", "about.fb.com", "sec.gov", "python.org", "w3.org", "ubuntu.com", "fedoraproject.org", "fedorapeople.org", "abc.xyz"},
+	"Geopolitics":       {"un.org", "consilium.europa.eu", "nato.int", "state.gov", "mea.gov.in", "kremlin.ru", "president.gov.ua", "whitehouse.gov", "ustr.gov", "g20.org", "unfccc.int", "imf.org", "worldbank.org"},
 }
 
 func ApprovedResultURL(category, raw string) bool {
@@ -78,6 +78,9 @@ func ConfigurePrediction(m *models.Market) error {
 		return errors.New("virtual coin entry cost must be non-negative and less than the correct-answer reward")
 	}
 	expected := CategoryTypes[m.Category][idx]
+	if m.PredictionType == "binary" && idx == 0 && (expected == "winner" || expected == "direction") {
+		expected = "binary"
+	}
 	if m.PredictionType != "" && m.PredictionType != expected {
 		return errors.New("prediction type does not match category and difficulty")
 	}

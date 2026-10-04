@@ -36,7 +36,7 @@ func FindMarketDuplicate(db *gorm.DB, market models.Market) (*models.Market, err
 		return nil, nil
 	}
 	var candidates []models.Market
-	err := db.Where("id <> ? AND category = ? AND resolution_status NOT IN ? AND lock_time BETWEEN ? AND ?", market.ID, market.Category, []string{"Archived", "Resolved"}, market.LockTime.Add(-24*time.Hour), market.LockTime.Add(24*time.Hour)).Order("id desc").Limit(500).Find(&candidates).Error
+	err := db.Where("id <> ? AND category = ? AND resolution_status NOT IN ? AND lock_time BETWEEN ? AND ?", market.ID, market.Category, []string{"Archived", "Resolved", "Voided"}, market.LockTime.Add(-24*time.Hour), market.LockTime.Add(24*time.Hour)).Order("id desc").Limit(500).Find(&candidates).Error
 	if err != nil {
 		return nil, err
 	}

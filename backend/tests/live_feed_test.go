@@ -27,6 +27,7 @@ func TestLiveFeedCountsPlayableMarketsNotArticlesOrFixtures(t *testing.T) {
 		m.NewsSourceName = event.SourceName
 		m.NewsEventTitle = event.Title
 		m.NewsPublishedAt = &event.PublishedAt
+		m.EditorialReviewedBy = 1
 		m.NewsDiscoveredAt = &event.DiscoveredAt
 		switch i {
 		case 50:

@@ -66,6 +66,13 @@ assert.equal(remaining('2026-10-03T12:19:00Z',clock),'19 min left');
 assert.equal(remaining('2026-10-03T11:00:00Z',clock),'Closed');
 assert.equal(age('2026-10-03T11:00:00Z',clock),'1 hr ago');
 assert.equal(age('invalid',clock),'Time unavailable');
+const dataModule = file => 'data:text/javascript;base64,'+fs.readFileSync(path.join(root,file)).toString('base64');
+const cardSource=fs.readFileSync(path.join(root,'js/components/market-card.js'),'utf8').replace('../utils/escape.js',dataModule('js/utils/escape.js')).replace('../utils/time.js',dataModule('js/utils/time.js'));
+const {marketCard,marketStatus}=await import('data:text/javascript;base64,'+Buffer.from(cardSource).toString('base64'));
+assert.equal(marketStatus({resolution_status:'Live',lock_time:'2026-10-03T11:00:00Z'},clock),'Locked');
+assert.equal(marketStatus({resolution_status:'Voided',start_time:'2026-10-04T12:00:00Z'},clock),'Voided');
+const card=marketCard({id:3,title:'<img src=x onerror=alert(1)>',description:'Real context',category:'Sports',resolution_status:'Paused',news_url:'javascript:alert(1)',entry_coins:10,payout:25,volume:0});
+assert.ok(card.includes('&lt;img'));assert.ok(!card.includes('javascript:'));assert.ok(card.includes('Be the first to predict'));assert.ok(card.includes('10 Coins'));assert.ok(!card.includes('>LIVE<'));
 const marketPage = fs.readFileSync(path.join(root,'market.html'),'utf8');
 for (const fabricatedValue of ['55%', '142,500', '1,204']) {
     assert.equal(marketPage.includes(fabricatedValue), false, `market.html: fabricated statistic ${fabricatedValue}`);

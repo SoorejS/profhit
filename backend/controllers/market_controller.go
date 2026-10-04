@@ -15,6 +15,8 @@ import (
 	"profhit-backend/services"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetAllMarkets fetches markets with discovery and lifecycle filtering
@@ -26,7 +28,7 @@ func GetAllMarkets(c *gin.Context) {
 
 	// By default, only show Public markets to users. We assume Admin uses a different endpoint or passes a flag if needed.
 	// But let's allow all if admin, else Public. To keep it simple, just filter Public unless status is explicitly Draft.
-	query := config.DB.Where("visibility = ? AND resolution_status NOT IN ?", "Public", []string{"Draft", "Proposed"})
+	query := config.DB.Where("is_demo = ?", false).Where("visibility = ? AND resolution_status NOT IN ?", "Public", []string{"Draft", "Proposed"})
 
 	if status != "" {
 		query = query.Where("resolution_status = ?", status)
@@ -85,6 +87,7 @@ func CreateMarket(c *gin.Context) {
 		return
 	}
 
+	market.ResolutionStatus = "Draft"
 	isAudit := market.IsDemo
 	sourceURL, sourceName, published, sourceKind := market.NewsURL, market.NewsSourceName, market.NewsPublishedAt, market.SourceKind
 	if sourceKind == "" {
@@ -103,7 +106,7 @@ func CreateMarket(c *gin.Context) {
 	// market from the genuine-opportunity count. Proposals cannot set this flag.
 	market.IsDemo = isAudit && os.Getenv("VIRTUAL_COIN_DEMO") == "true"
 	if sourceURL != "" {
-		if (sourceKind == "article" && (published == nil || published.Before(time.Now().UTC().Add(-24*time.Hour)))) || (sourceKind == "official_event" && !services.ApprovedResultURL(market.Category, sourceURL)) {
+		if (sourceKind == "article" && (published == nil || published.Before(time.Now().UTC().Add(-24*time.Hour)))) || (sourceKind == "official_event" && !services.ApprovedEditorialSource(market.Category, sourceURL)) {
 			c.JSON(400, gin.H{"error": "Articles need actual publication dates; official events need an approved official source"})
 			return
 		}
@@ -182,55 +185,59 @@ func ProposeMarket(c *gin.Context) {
 
 // ApproveMarket moves a proposed market to Open status (admin only)
 func ApproveMarket(c *gin.Context) {
-	id := c.Param("id")
+	var review services.EditorialReview
+	bindErr := c.ShouldBindJSON(&review)
 	var market models.Market
-
-	if err := config.DB.Where("id = ?", id).First(&market).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Market not found"})
-		return
-	}
-
-	if market.ResolutionStatus != "Proposed" && market.ResolutionStatus != "Draft" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Only unpublished markets can be approved"})
-		return
-	}
-
-	if market.LockTime == nil || !market.LockTime.After(time.Now().UTC()) {
-		c.JSON(400, gin.H{"error": "Proposal lock time has passed"})
-		return
-	}
-	checked := market
-	if market.IsCurated && market.SourceKind == "article" && (market.NewsPublishedAt == nil || market.NewsPublishedAt.Before(time.Now().UTC().Add(-24*time.Hour))) {
-		c.JSON(400, gin.H{"error": "The curated article is stale; use a current dated source before publishing"})
-		return
-	}
-	if market.NewsEventID != nil {
-		var event models.NewsEvent
-		if config.DB.First(&event, *market.NewsEventID).Error != nil || services.ValidateNewsPrediction(event, &checked, time.Now().UTC()) != nil {
-			c.JSON(400, gin.H{"error": "News event is stale or rules need source-linked editorial review"})
-			return
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", c.Param("id")).First(&market).Error; err != nil {
+			return err
 		}
-	}
-	if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
-		c.JSON(400, gin.H{"error": "Review the typed rules and approved result source before publishing"})
+		if market.ResolutionStatus != "Draft" && market.ResolutionStatus != "Proposed" {
+			return fmt.Errorf("only unpublished markets can be approved")
+		}
+		now := time.Now().UTC()
+		if market.LockTime == nil || !market.LockTime.After(now) {
+			return fmt.Errorf("prediction cutoff has passed")
+		}
+		if market.IsCurated && market.SourceKind == "article" && (market.NewsPublishedAt == nil || market.NewsPublishedAt.Before(now.Add(-24*time.Hour)) || market.NewsPublishedAt.After(now)) {
+			return fmt.Errorf("stale article: use a current dated source before publishing")
+		}
+		checked := market
+		if market.NewsEventID != nil {
+			var event models.NewsEvent
+			if tx.First(&event, *market.NewsEventID).Error != nil || services.ValidateNewsPrediction(event, &checked, now) != nil {
+				return fmt.Errorf("news event needs current source-linked review")
+			}
+		}
+		if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
+			return fmt.Errorf("review typed rules and the approved result source before publishing")
+		}
+		{
+			if bindErr != nil {
+				return fmt.Errorf("complete the editorial review")
+			}
+			if err := services.ValidateEditorialReview(market, review, now); err != nil {
+				return err
+			}
+			market.EditorialRationale = strings.TrimSpace(review.Rationale)
+			market.EditorialReviewedBy = c.MustGet("userID").(uint)
+			market.EditorialReviewedAt = &now
+		}
+		market.ResolutionStatus = "Live"
+		if market.StartTime != nil && market.StartTime.After(now) {
+			market.ResolutionStatus = "Scheduled"
+		}
+		if err := tx.Save(&market).Error; err != nil {
+			return err
+		}
+		return services.LogAction(tx, c.MustGet("userID").(uint), "APPROVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Published reviewed rules: "+market.Title, c.ClientIP())
+	})
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	previous := market.ResolutionStatus
-	market.ResolutionStatus = "Live"
-	if market.StartTime != nil && market.StartTime.After(time.Now().UTC()) {
-		market.ResolutionStatus = "Scheduled"
-	}
-	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, previous).Update("resolution_status", market.ResolutionStatus)
-	if result.Error != nil || result.RowsAffected != 1 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve market"})
-		return
-	}
-
-	callerID := c.MustGet("userID").(uint)
-	_ = services.LogAction(nil, callerID, "APPROVE_MARKET", fmt.Sprintf("market_%d", market.ID), "Approved proposed market: "+market.Title, c.ClientIP())
 	services.BroadcastToAll("market_live", gin.H{"market_id": market.ID})
-
-	c.JSON(http.StatusOK, gin.H{"message": "Market published", "market": market})
+	c.JSON(200, gin.H{"message": "Market published", "market": market})
 }
 
 // GetProposedMarkets returns all markets awaiting approval (admin only)
@@ -340,7 +347,7 @@ func TransitionMarketState(c *gin.Context) {
 	}
 
 	validStatuses := map[string]bool{
-		"Draft": true, "Scheduled": true, "Live": true, "Locked": true, "Awaiting Resolution": true, "Archived": true,
+		"Draft": true, "Scheduled": true, "Live": true, "Locked": true, "Awaiting Resolution": true, "Archived": true, "Paused": true,
 	}
 	if !validStatuses[req.Status] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
@@ -353,7 +360,7 @@ func TransitionMarketState(c *gin.Context) {
 		return
 	}
 
-	allowed := map[string][]string{"Draft": {"Scheduled", "Live"}, "Scheduled": {"Live"}, "Open": {"Locked"}, "Live": {"Locked"}, "Locked": {"Awaiting Resolution"}, "Resolved": {"Archived"}}
+	allowed := map[string][]string{"Draft": {}, "Scheduled": {"Live", "Paused"}, "Open": {"Locked", "Paused"}, "Live": {"Locked", "Paused"}, "Paused": {"Live", "Locked"}, "Locked": {"Awaiting Resolution"}, "Resolved": {"Archived"}}
 	legal := false
 	for _, state := range allowed[market.ResolutionStatus] {
 		if state == req.Status {
@@ -370,6 +377,10 @@ func TransitionMarketState(c *gin.Context) {
 	}
 	if req.Status == "Scheduled" || req.Status == "Live" {
 		checked := market
+		if (market.IsCurated || market.NewsEventID != nil) && market.EditorialReviewedBy == 0 {
+			c.JSON(400, gin.H{"error": "Editorial review is required before publication"})
+			return
+		}
 		if services.ConfigurePrediction(&checked) != nil || checked.Payout != market.Payout || market.PredictionType == "" {
 			c.JSON(400, gin.H{"error": "Review typed rules before publishing"})
 			return
@@ -379,12 +390,22 @@ func TransitionMarketState(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Scheduled market requires a future start time"})
 		return
 	}
-	result := config.DB.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, market.ResolutionStatus).Update("resolution_status", req.Status)
-	market.ResolutionStatus = req.Status
-	if result.Error != nil || result.RowsAffected != 1 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transition market state"})
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.Market{}).Where("id = ? AND resolution_status = ?", market.ID, market.ResolutionStatus).Update("resolution_status", req.Status)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return fmt.Errorf("market changed; refresh and retry")
+		}
+		return services.LogAction(tx, c.MustGet("userID").(uint), "TRANSITION_MARKET", fmt.Sprint(market.ID), market.ResolutionStatus+" -> "+req.Status, c.ClientIP())
+	})
+	if err != nil {
+		c.JSON(409, gin.H{"error": "Failed to transition market state"})
 		return
 	}
+	market.ResolutionStatus = req.Status
+	services.BroadcastToAll("market_state_changed", gin.H{"market_id": market.ID})
 
 	// Trigger WebSocket notification for certain transitions
 	if req.Status == "Live" {
@@ -512,6 +533,11 @@ func validateNewMarket(m *models.Market) error {
 	m.NewsPublishedAt = nil
 	m.NewsDiscoveredAt = nil
 	m.IsDemo = false
+	m.IsFeatured = false
+	m.EditorialRationale = ""
+	m.EditorialReviewedBy = 0
+	m.EditorialReviewedAt = nil
+	m.VoidReason = ""
 	m.IsCurated = false
 	m.SourceKind = "article"
 	m.ResultSpec = ""

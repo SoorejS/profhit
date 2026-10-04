@@ -32,7 +32,7 @@ func main() {
 	if os.Getenv("AUTO_MIGRATE") == "false" {
 		// Container functions have a short startup budget. The operator runs the
 		// same migration before deployment; a missing schema still fails closed.
-		err = config.DB.Exec("SELECT id, entry_coins, is_curated, source_kind FROM markets LIMIT 0").Error
+		err = config.DB.Exec("SELECT id, entry_coins, is_curated, source_kind, editorial_reviewed_by, is_featured, void_reason FROM markets LIMIT 0").Error
 		if err == nil {
 			err = config.DB.Exec("SELECT key FROM rate_limit_buckets LIMIT 0").Error
 		}

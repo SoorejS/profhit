@@ -78,10 +78,10 @@ async function loadProfileData() {
     if (kycResult.status === 'fulfilled') {
         const kyc = kycResult.value;
         if (kyc.status === 'Verified') {
-            badge.innerHTML = '<i class="fa-solid fa-shield-halved"></i> KYC Verified';
+            badge.innerHTML = '<i class="ph-bold ph-shield-check"></i> KYC Verified';
             badge.className = 'badge badge-success';
         } else {
-            badge.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Unverified';
+            badge.innerHTML = '<i class="ph-bold ph-shield-check"></i> Unverified';
             badge.className = 'badge badge-outline';
         }
     } else {

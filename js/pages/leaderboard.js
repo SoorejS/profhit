@@ -120,7 +120,7 @@ function renderLeaderboardRow(user, tab, isCurrentUser = false) {
     let scoreLabel = '';
     
     if (tab === 'points') {
-        scoreValue = `${(user.points || 0).toLocaleString()} <span style="font-size:0.8rem">PTS</span>`;
+        scoreValue = `${(user.points || 0).toLocaleString()} <span style="font-size:0.8rem">Coins</span>`;
         scoreLabel = 'Total Points';
     } else if (tab === 'streak') {
         scoreValue = `${user.longest_streak || 0} <i class="ph-fill ph-fire text-gold" style="font-size: 1rem;"></i>`;

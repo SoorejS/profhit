@@ -6,6 +6,11 @@ import (
 )
 
 type Market struct {
+	IsFeatured              bool           `gorm:"not null;default:false;index" json:"is_featured"`
+	EditorialRationale      string         `json:"editorial_rationale"`
+	EditorialReviewedBy     uint           `gorm:"not null;default:0" json:"editorial_reviewed_by"`
+	EditorialReviewedAt     *time.Time     `json:"editorial_reviewed_at"`
+	VoidReason              string         `json:"void_reason"`
 	SourceKind              string         `gorm:"not null;default:article" json:"source_kind"`
 	IsCurated               bool           `gorm:"not null;default:false;index" json:"is_curated"`
 	EntryCoins              int            `gorm:"not null;default:0;check:entry_coins >= 0" json:"entry_coins"`

@@ -73,7 +73,7 @@ async function fetchProposedMarkets() {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>ID: ${m.creator_id}</td>
                 <td>
-                    <button class="btn btn-outline" onclick="editMarket(${m.id})">Edit draft</button><button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button>${m.category==='Weather'&&m.difficulty==='Easy'?`<button class="btn btn-outline" onclick="configureWeatherResult(${m.id})">Configure weather result</button>`:''}<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
+                    <button class="btn btn-outline" onclick="editMarket(${m.id})">Edit draft</button><a class="btn btn-outline" href="market.html?id=${m.id}&preview=1">Preview</a><button class="btn btn-outline" onclick="reviewRules(${m.id})">Review rules</button>${m.category==='Weather'&&m.difficulty==='Easy'?`<button class="btn btn-outline" onclick="configureWeatherResult(${m.id})">Configure weather result</button>`:''}<button class="btn btn-yes" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="approveMarket(${m.id})">Publish reviewed rules</button>
                 </td>
             </tr>
         `).join('');
@@ -89,7 +89,7 @@ async function fetchActiveMarkets(append=false) {
     const more=document.getElementById('activeMarketsMore'), version=++activeRequestVersion;
     if(!append)activeOffset=0;more.disabled=true;
     try {
-        const markets = await ApiClient.get(`/markets?limit=100&offset=${activeOffset}`);
+        const markets = await ApiClient.get(`/admin/markets?offset=${activeOffset}`);
         if(version!==activeRequestVersion)return;
         more.hidden=markets.length<100;
         activeOffset+=markets.length;
@@ -121,7 +121,7 @@ async function fetchActiveMarkets(append=false) {
                 <td><span class="badge badge-outline">${escapeHTML(m.category)}</span></td>
                 <td>${statusBadge}</td>
                 <td>
-                    ${['Live','Open'].includes(m.resolution_status)?`<button class="btn btn-outline" onclick="lockMarket(${m.id})">Lock</button>`:''} ${resolveBtn}
+                    <a class="btn btn-outline" href="market.html?id=${m.id}&preview=1">Preview</a> ${['Live','Open','Scheduled'].includes(m.resolution_status)?`<button class="btn btn-outline" onclick="pauseMarket(${m.id},false)">Pause</button>`:''} ${m.resolution_status==='Paused'?`<button class="btn btn-outline" onclick="pauseMarket(${m.id},true)">Resume</button>`:''} ${m.resolution_status==='Live'?`<button class="btn btn-outline" onclick="featureMarket(${m.id},${!m.is_featured})">${m.is_featured?'Unfeature':'Feature'}</button>`:''} ${!['Resolved','Voided','Archived'].includes(m.resolution_status)?`<button class="btn btn-outline" onclick="voidMarket(${m.id})">Void & refund</button>`:''} ${['Live','Open','Paused'].includes(m.resolution_status)?`<button class="btn btn-outline" onclick="lockMarket(${m.id})">Lock</button>`:''} ${resolveBtn}
                 </td>
             </tr>
             `;
@@ -135,14 +135,20 @@ async function fetchActiveMarkets(append=false) {
 }
 
 async function approveMarket(id) {
-    if (!await confirmAction("Make this market live?")) return;
-    try {
-        await ApiClient.post(`/markets/${id}/approve`);
-        showToast("Market approved successfully", "success");
-        fetchProposedMarkets(); fetchActiveMarkets();
-    } catch (err) {
-        showToast(err.message, "error");
-    }
+    const review=await editorialReview(); if(!review)return;
+    try { await ApiClient.post(`/markets/${id}/approve`, review); showToast('Prediction published.','success'); fetchProposedMarkets();fetchActiveMarkets(); }
+    catch(err){showToast(err.message,'error');}
+}
+function editorialReview() {
+    return new Promise(resolve=>{
+        const dialog=document.createElement('dialog');dialog.className='modal-content';
+        const checks=[['current','Current event and real context verified'],['future_outcome','Outcome is still in the future'],['objective','Resolution rule is objective and measurable'],['trusted_source','Trusted source and evidence checked'],['sensible_cutoff','Cutoff leaves no outcome known before entry'],['interesting','Question is worth predicting now']];
+        dialog.innerHTML=`<form style="display:grid;gap:12px"><h2>Publication review</h2>${checks.map(([name,label])=>`<label><input type="checkbox" name="${name}" required> ${label}</label>`).join('')}<label>Why does this matter now?<textarea class="input-control" name="rationale" minlength="30" maxlength="2000" required></textarea></label><button type="submit" class="btn btn-primary">Publish reviewed prediction</button><button type="button" class="btn btn-outline" data-cancel>Cancel</button></form>`;
+        const close=value=>{dialog.close();dialog.remove();resolve(value);};
+        dialog.querySelector('[data-cancel]').onclick=()=>close(null);dialog.addEventListener('cancel',event=>{event.preventDefault();close(null);});
+        dialog.querySelector('form').onsubmit=event=>{event.preventDefault();const fields=new FormData(event.currentTarget);const review={rationale:fields.get('rationale')};for(const [name] of checks)review[name]=fields.has(name);close(review);};
+        document.body.append(dialog);dialog.showModal();
+    });
 }
 
 async function resolveMarket(id) {
@@ -334,6 +340,7 @@ function setupMarketEditor() {
         event.preventDefault();
         const fields=new FormData(form), button=form.querySelector('[type="submit"]');
         const market={title:fields.get('title'), description:fields.get('description'), category:fields.get('category'), difficulty:fields.get('difficulty'), options:JSON.stringify(String(fields.get('options')).split('\n').map(s=>s.trim()).filter(Boolean)), entry_coins:Number(fields.get('entry_coins')), range_width:((['Weather','Sports'].includes(fields.get('category'))&&fields.get('difficulty')==='Medium')||(fields.get('category')==='Entertainment'&&fields.get('difficulty')==='Hard'))?Number(fields.get('range_width')):0, resolution_rule:fields.get('resolution_rule'), resolution_source:fields.get('resolution_source'), lock_time:new Date(fields.get('lock_time')).toISOString(), resolution_time:new Date(fields.get('resolution_time')).toISOString(), news_url:fields.get('news_url'), news_source_name:fields.get('news_source_name'), source_kind:fields.get('source_kind'), news_published_at:fields.get('news_published_at')?new Date(fields.get('news_published_at')).toISOString():null, resolution_status:'Draft'};
+        if(market.difficulty==='Easy' && market.options===JSON.stringify(['Yes','No']))market.prediction_type='binary';
         if(fields.get('start_time'))market.start_time=new Date(fields.get('start_time')).toISOString();
         const id=form.dataset.marketId;
         button.disabled=true;
@@ -363,3 +370,7 @@ async function lockMarket(id) {
     try{await ApiClient.put(`/markets/${id}/transition`,{status:'Locked'});fetchActiveMarkets();showToast('Market locked.','success');}catch(error){showToast(error.message,'error');}
 }
 window.editMarket=editMarket;window.lockMarket=lockMarket;
+
+window.pauseMarket=async(id,resume)=>{try{await ApiClient.put(`/markets/${id}/transition`,{status:resume?'Live':'Paused'});fetchActiveMarkets();showToast(resume?'Predictions resumed.':'Predictions paused.','success');}catch(err){showToast(err.message,'error');}};
+window.featureMarket=async(id,featured)=>{try{await ApiClient.put(`/admin/markets/${id}/feature`,{featured});fetchActiveMarkets();}catch(err){showToast(err.message,'error');}};
+window.voidMarket=async id=>{const reason=await askText('Why should this prediction be cancelled? Entries will be refunded.');if(!reason)return;try{await ApiClient.post(`/admin/markets/${id}/void`,{reason});fetchActiveMarkets();showToast('Cancelled. Entry Coins refunded.','success');}catch(err){showToast(err.message,'error');}};
