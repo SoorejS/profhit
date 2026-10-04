@@ -35,3 +35,7 @@
 .market-coin-row { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:var(--spacing-3) 0; border-top:1px solid var(--border-subtle); font-size:.85rem; }
 .market-coin-row strong { display:block; margin-top:4px; color:var(--color-gold); }
 .live-feed-tabs [aria-pressed="true"] { color:var(--color-primary); border-color:var(--color-primary); }
+.live-opportunity .market-context { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.live-opportunity .market-card-stats { margin-bottom:0; align-items:center; }
+.live-opportunity .market-card-header { margin-bottom:0; }
+.public-live-feed { scroll-margin-top:90px; }

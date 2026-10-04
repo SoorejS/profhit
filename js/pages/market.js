@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadMarketDetails();
-    loadComments();
+    if (urlParams.has('preview')) document.getElementById('commentsList').textContent='Discussion opens after publication.';
+    else loadComments();
 });
 
 async function loadMarketDetails() {
@@ -81,7 +82,7 @@ async function loadMarketDetails() {
         } else {
             statusEl.textContent = market.resolution_status || 'Active';
             statusEl.className = 'badge badge-primary';
-            if(!market.prediction_type || !market.resolution_rule || !market.resolution_source)document.querySelector('.trade-card').textContent='This historical market needs reviewed prediction rules before new participation.';
+            if(!market.prediction_type || !market.resolution_rule || !market.resolution_source)document.querySelector('.trade-card').textContent='Predictions are currently unavailable for this market.';
         }
 
     } catch (err) {

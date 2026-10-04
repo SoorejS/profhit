@@ -4,5 +4,5 @@ export function age(date, now=Date.now()) {
 }
 export function remaining(date, now=Date.now()) {
     const minutes=Math.ceil((new Date(date).getTime()-now)/60000);
-    return !Number.isFinite(minutes)||minutes<=0?'Closed':minutes<60?`${minutes} min left`:`${Math.floor(minutes/60)} hr ${minutes%60} min left`;
+    return !Number.isFinite(minutes)||minutes<=0?'Closed':minutes<60?`${minutes} min left`:minutes>=2880?`${Math.floor(minutes/1440)} days left`:`${Math.floor(minutes/60)} hr ${minutes%60} min left`;
 }
