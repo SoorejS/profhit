@@ -19,6 +19,7 @@
 .live-feed-more[hidden] { display:none; }
 .live-feed-empty { grid-column:1 / -1; }
 .markets-grid[hidden] { display:none; }
+#legacyFeedControls[hidden] { display:none; }
 .public-live-feed { padding:24px; max-width:1400px; margin:0 auto 48px; }
 @media(max-width:768px) { .public-live-feed { padding:12px; } .live-feed-heading h2 { font-size:1.35rem; } .live-feed-search { align-items:stretch; } .live-feed-tabs .btn { padding:8px 12px; } }
 
