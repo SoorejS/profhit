@@ -1,4 +1,5 @@
 import ApiClient from '../api/client.js';
+import '../services/live.js';
 
 export class AppSidebar extends HTMLElement {
     connectedCallback() {
@@ -73,8 +74,12 @@ export class AppSidebar extends HTMLElement {
             </aside>
         `;
 
+        this.onLive = e => { if (e.detail.event === 'wallet_updated') this.fetchBalance(); };
+        window.addEventListener('prophit-live', this.onLive);
         this.fetchBalance();
     }
+
+    disconnectedCallback() { window.removeEventListener('prophit-live', this.onLive); }
     
     async fetchBalance() {
         if (!ApiClient.isAuthenticated()) return;

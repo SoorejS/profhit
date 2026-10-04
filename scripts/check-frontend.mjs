@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -74,6 +75,24 @@ assert.equal(marketStatus({resolution_status:'Voided',start_time:'2026-10-04T12:
 const card=marketCard({id:3,title:'<img src=x onerror=alert(1)>',description:'Real context',category:'Sports',resolution_status:'Paused',news_url:'javascript:alert(1)',entry_coins:10,payout:25,volume:0});
 assert.ok(card.includes('&lt;img'));assert.ok(!card.includes('javascript:'));assert.ok(card.includes('Be the first to predict'));assert.ok(card.includes('10 Coins'));assert.ok(!card.includes('>LIVE<'));
 const marketPage = fs.readFileSync(path.join(root,'market.html'),'utf8');
+// A settlement received while the page is open must refresh the sidebar wallet.
+const walletListeners = new Map();
+const balanceNode = {textContent:'--'};
+let actualBalance = 90;
+const sidebarContext = vm.createContext({
+    HTMLElement:class {getAttribute(){return null;} querySelector(){return balanceNode;}},
+    URLSearchParams, document:{getElementById:()=>balanceNode},
+    window:{location:{search:''},addEventListener:(name,fn)=>walletListeners.set(name,fn),removeEventListener:(name,fn)=>{if(walletListeners.get(name)===fn)walletListeners.delete(name);}},
+    ApiClient:{isAuthenticated:()=>true,get:async()=>({points:actualBalance})},
+    customElements:{define:(name,ctor)=>{sidebarContext.Sidebar=ctor;}}
+});
+vm.runInContext(fs.readFileSync(path.join(root,'js/components/sidebar.js'),'utf8').replace(/^import .*;\r?\n/gm,'').replace('export class','class'),sidebarContext);
+const sidebar = new sidebarContext.Sidebar();
+sidebar.connectedCallback(); await new Promise(resolve=>setImmediate(resolve));
+assert.equal(balanceNode.textContent,90);
+actualBalance=110; walletListeners.get('prophit-live')({detail:{event:'wallet_updated'}}); await new Promise(resolve=>setImmediate(resolve));
+assert.equal(balanceNode.textContent,110,'settlement must update the sidebar balance');
+sidebar.disconnectedCallback(); assert.equal(walletListeners.has('prophit-live'),false);
 for (const fabricatedValue of ['55%', '142,500', '1,204']) {
     assert.equal(marketPage.includes(fabricatedValue), false, `market.html: fabricated statistic ${fabricatedValue}`);
 }

@@ -75,7 +75,7 @@ export class AppTopbar extends HTMLElement {
         
         this.onLive=e=>{if(e.detail.event==='wallet_updated')this.fetchBalance();};window.addEventListener('prophit-live',this.onLive);
         this.fetchBalance();
-		if(ApiClient.isAuthenticated())ApiClient.post('/me/daily-login').then(()=>this.fetchBalance()).catch(()=>{});
+		if(ApiClient.isAuthenticated())ApiClient.post('/me/daily-login').then(()=>{this.fetchBalance();document.querySelector('app-sidebar')?.fetchBalance();}).catch(()=>{});
     }
     
     closeNavigation() {
