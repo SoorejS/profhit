@@ -60,7 +60,9 @@
                                 <span class="text-sm" style="color: var(--text-secondary);">Prediction streak:</span>
                                 <span class="badge badge-gold"><span id="streakCount">--</span> Days</span>
                             </div>
-                            <button class="btn btn-primary w-full" id="claimDailyBtn" onclick="claimDailyReward()">Daily login: 10 coins</button>
+                            <button class="btn btn-primary w-full" id="claimDailyBtn" onclick="claimDailyReward()" disabled>Checking daily reward…</button>
+                            <p id="dailyRewardStatus" class="text-muted" role="status" style="font-size:0.85rem; margin:12px 0 0;"></p>
+                            <a href="wallet.html" style="font-size:0.85rem;">View reward in wallet history</a>
                         </div>
 
                         <div class="card" style="border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);">

@@ -81,13 +81,20 @@ export class AppSidebar extends HTMLElement {
 
     disconnectedCallback() { window.removeEventListener('prophit-live', this.onLive); }
     
+    setBalance(balance) {
+        if (!Number.isFinite(balance)) return;
+        this.balanceRevision = (this.balanceRevision || 0) + 1;
+        const el = this.querySelector('#sidebarBalance');
+        if (el) el.textContent = balance;
+    }
     async fetchBalance() {
         if (!ApiClient.isAuthenticated()) return;
+        const revision = this.balanceRevision = (this.balanceRevision || 0) + 1;
         try {
             const data = await ApiClient.get('/me');
             const el = document.getElementById('sidebarBalance');
-            if (el) el.textContent = data.points;
-        } catch(e) { const el = this.querySelector('#sidebarBalance'); if (el) el.textContent = 'Unavailable'; }
+            if (el && revision === this.balanceRevision) el.textContent = data.points;
+        } catch(e) { const el = this.querySelector('#sidebarBalance'); if (el && revision === this.balanceRevision) el.textContent = 'Unavailable'; }
     }
 }
 customElements.define('app-sidebar', AppSidebar);

@@ -81,6 +81,7 @@ class ApiClient {
                 throw error;
             }
             
+            if ((options.method || 'GET') !== 'GET') this.profileRequest = null;
             return data;
         } catch (error) {
             clearTimeout(timeoutId);
@@ -101,8 +102,9 @@ class ApiClient {
         // Never retain the balance after the request completes.
         if (endpoint === '/me') {
             if (!this.profileRequest) {
-                this.profileRequest = this.request(endpoint, { ...options, method: 'GET' })
-                    .finally(() => { this.profileRequest = null; });
+                const request = this.request(endpoint, { ...options, method: 'GET' })
+                    .finally(() => { if (this.profileRequest === request) this.profileRequest = null; });
+                this.profileRequest = request;
             }
             return this.profileRequest;
         }

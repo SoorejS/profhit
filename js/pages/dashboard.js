@@ -4,6 +4,7 @@ import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
 import { escapeHTML, safeURL } from '../utils/escape.js';
 import { initLiveFeed } from '../components/live-feed.js';
+let dailyRewardRevision = 0;
 
 /**
  * PROPHIT - Dashboard Logic
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('marketsContainer').hidden = true;
     initLiveFeed(document.getElementById('liveFeed'));
     fetchStreak();
+    fetchDailyRewardStatus();
     fetchNews();
     fetchTrendingMarkets();
 });
@@ -107,25 +109,55 @@ async function fetchStreak() {
     }
 }
 
+function renderDailyReward(reward) {
+    const btn = document.getElementById('claimDailyBtn');
+    const status = document.getElementById('dailyRewardStatus');
+    if (!btn) return;
+    btn.disabled = reward.already_checked_in || reward.coins_earned > 0;
+    btn.textContent = btn.disabled ? '10 coins credited today ✓' : 'Claim daily login: 10 coins';
+    if (status) status.textContent = btn.disabled
+        ? `Awarded once per day. Next reward: ${new Date(reward.next_claim_at).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}.`
+        : 'Your daily login reward is ready to claim.';
+}
+
+async function fetchDailyRewardStatus() {
+    const revision = dailyRewardRevision;
+    try {
+        const reward = await ApiClient.get('/me/daily-login');
+        if (revision === dailyRewardRevision) renderDailyReward(reward);
+    } catch {
+        if (revision !== dailyRewardRevision) return;
+        document.getElementById('claimDailyBtn').disabled = false;
+        document.getElementById('claimDailyBtn').textContent = 'Retry daily reward';
+        document.getElementById('dailyRewardStatus').textContent = 'Could not confirm your reward status. Retry to check safely.';
+    }
+}
+
+window.addEventListener('prophit-daily-reward', e => {
+    dailyRewardRevision++;
+    renderDailyReward(e.detail);
+});
+
 window.claimDailyReward = async () => {
     const btn = document.getElementById('claimDailyBtn');
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
 
     btn.disabled = true;
     btn.textContent = 'Claiming…';
 
     try {
         const reward = await ApiClient.post('/me/daily-login');
+        dailyRewardRevision++;
         showToast(reward.message, 'success');
         fetchStreak();
-        // Update topbar balance
-        document.querySelector('app-topbar').fetchBalance();
-        document.querySelector('app-sidebar').fetchBalance();
-        btn.textContent = 'Claimed';
+        document.querySelector('app-topbar')?.setBalance(reward.new_balance);
+        document.querySelector('app-sidebar')?.setBalance(reward.new_balance);
+        renderDailyReward(reward);
     } catch (err) {
         showToast(err.message, "error");
         btn.disabled = false;
-        btn.innerHTML = 'Claim Today\'s Bonus';
+        btn.textContent = 'Retry daily reward';
+        document.getElementById('dailyRewardStatus').textContent = 'Reward could not be confirmed. Retry safely; you can only be credited once per day.';
     }
 };
 

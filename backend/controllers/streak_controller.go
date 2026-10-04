@@ -16,12 +16,13 @@ import (
 
 // DailyLoginResponse is what the client receives after a successful check-in.
 type DailyLoginResponse struct {
-	AlreadyCheckedIn bool   `json:"already_checked_in"`
-	CoinsEarned      int    `json:"coins_earned"`
-	CurrentStreak    int    `json:"current_streak"`
-	NextMilestone    int    `json:"next_milestone"`
-	NewBalance       int    `json:"new_balance"`
-	Message          string `json:"message"`
+	AlreadyCheckedIn bool      `json:"already_checked_in"`
+	CoinsEarned      int       `json:"coins_earned"`
+	CurrentStreak    int       `json:"current_streak"`
+	NextMilestone    int       `json:"next_milestone"`
+	NewBalance       int       `json:"new_balance"`
+	Message          string    `json:"message"`
+	NextClaimAt      time.Time `json:"next_claim_at"`
 }
 
 // DailyLogin handles POST /api/me/daily-login
@@ -44,7 +45,26 @@ func DailyLogin(c *gin.Context) {
 		earned = 10
 		message = "Daily login: +10 coins. Prediction streaks are separate."
 	}
-	c.JSON(200, DailyLoginResponse{AlreadyCheckedIn: !claimed, CoinsEarned: earned, NewBalance: u.Points, Message: message})
+	c.JSON(200, DailyLoginResponse{AlreadyCheckedIn: !claimed, CoinsEarned: earned, NewBalance: u.Points, Message: message, NextClaimAt: time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)})
+}
+
+// GetDailyLoginInfo reports eligibility without claiming another reward.
+func GetDailyLoginInfo(c *gin.Context) {
+	id := c.MustGet("userID").(uint)
+	var user models.User
+	if err := config.DB.First(&user, id).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Could not load daily reward status"})
+		return
+	}
+	var login models.UserStreak
+	err := config.DB.Where("user_id = ?", id).First(&login).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(500, gin.H{"error": "Could not load daily reward status"})
+		return
+	}
+	day := time.Now().UTC().Truncate(24 * time.Hour)
+	claimed := !login.LastLoginDate.IsZero() && !login.LastLoginDate.UTC().Before(day)
+	c.JSON(200, DailyLoginResponse{AlreadyCheckedIn: claimed, NewBalance: user.Points, NextClaimAt: day.Add(24 * time.Hour)})
 }
 
 // GetStreakInfo handles GET /api/me/streak

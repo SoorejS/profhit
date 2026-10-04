@@ -75,7 +75,11 @@ export class AppTopbar extends HTMLElement {
         
         this.onLive=e=>{if(e.detail.event==='wallet_updated')this.fetchBalance();};window.addEventListener('prophit-live',this.onLive);
         this.fetchBalance();
-		if(ApiClient.isAuthenticated())ApiClient.post('/me/daily-login').then(()=>{this.fetchBalance();document.querySelector('app-sidebar')?.fetchBalance();}).catch(()=>{});
+		if(ApiClient.isAuthenticated())ApiClient.post('/me/daily-login').then(reward=>{
+            this.setBalance(reward.new_balance);
+            document.querySelector('app-sidebar')?.setBalance(reward.new_balance);
+            window.dispatchEvent(new CustomEvent('prophit-daily-reward', {detail:reward}));
+        }).catch(()=>{});
     }
     
     closeNavigation() {
@@ -84,12 +88,19 @@ export class AppTopbar extends HTMLElement {
     }
 
     disconnectedCallback() { window.removeEventListener('prophit-live',this.onLive); document.removeEventListener('click', this.onOutsideClick); document.removeEventListener('keydown', this.onEscape); }
+    setBalance(balance) {
+        if (!Number.isFinite(balance)) return;
+        this.balanceRevision = (this.balanceRevision || 0) + 1;
+        const el = this.querySelector('#topbarBalance');
+        if (el) el.textContent = balance;
+    }
     async fetchBalance() {
         if (!ApiClient.isAuthenticated()) return;
+        const revision = this.balanceRevision = (this.balanceRevision || 0) + 1;
         try {
             const data = await ApiClient.get('/me');
             const el = document.getElementById('topbarBalance');
-            if (el) el.textContent = data.points;
+            if (el && revision === this.balanceRevision) el.textContent = data.points;
             
             if(data.role === 'admin' || data.role === 'super_admin') {
                 const drop = document.getElementById('profileDropdown');

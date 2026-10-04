@@ -175,6 +175,7 @@ func SetupRouter() *gin.Engine {
 			protected.POST("/kyc/start", financeLimit, controllers.StartKYCSession)
 			protected.GET("/kyc/status", controllers.GetKYCStatus)
 			protected.POST("/me/daily-login", controllers.DailyLogin)
+			protected.GET("/me/daily-login", controllers.GetDailyLoginInfo)
 			protected.GET("/me/streak", controllers.GetStreakInfo)
 			protected.GET("/wallet/batches", controllers.GetWalletBatches)
 			protected.GET("/wallet/vouchers", controllers.GetVoucherRequests)

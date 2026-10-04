@@ -4,6 +4,7 @@ import { escapeHTML, safeURL } from '../utils/escape.js';
 import ApiClient from '../api/client.js';
 import { showToast } from '../components/toast.js';
 import { askSelect, confirmAction } from '../components/dialog.js';
+let walletBalanceRevision = 0;
 
 /**
  * PROPHIT - Wallet & Identity Logic
@@ -22,11 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadWalletData() {
+    const revision = ++walletBalanceRevision;
     try {
         const data = await ApiClient.get('/me');
-        document.getElementById('walletBalance').textContent = data.points;
+        if (revision === walletBalanceRevision) document.getElementById('walletBalance').textContent = data.points;
     } catch (err) {
-        document.getElementById('walletBalance').textContent = 'Unavailable';
+        if (revision === walletBalanceRevision) document.getElementById('walletBalance').textContent = 'Unavailable';
     }
 }
 
@@ -145,4 +147,12 @@ async function loadBatchesAndVouchers(){
  if(b.status==='fulfilled')voucherEl.innerHTML=b.value?.length?b.value.map(row=>`<p>Request #${Number(row.id)} · ${escapeHTML(row.tier)} · ₹${Number(row.amount)} · ${escapeHTML(row.status)}${row.delivery_error?' — '+escapeHTML(row.delivery_error):''}</p>`).join(''):'No voucher requests yet.';
  else voucherEl.textContent='Voucher status could not load. Refresh to retry.';
 }
-window.addEventListener('prophit-live',e=>{if(['wallet_updated','notification_created'].includes(e.detail.event)){loadLedger();loadBatchesAndVouchers();}});
+window.addEventListener('prophit-live',e=>{if(['wallet_updated','notification_created'].includes(e.detail.event)){loadWalletData();loadLedger();loadBatchesAndVouchers();}});
+window.addEventListener('prophit-daily-reward', e => {
+    if (Number.isFinite(e.detail.new_balance)) {
+        walletBalanceRevision++;
+        document.getElementById('walletBalance').textContent = e.detail.new_balance;
+    }
+    loadLedger();
+    loadBatchesAndVouchers();
+});

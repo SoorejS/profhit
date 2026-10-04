@@ -128,6 +128,67 @@ assert.equal(balanceNode.textContent,90);
 actualBalance=110; walletListeners.get('prophit-live')({detail:{event:'wallet_updated'}}); await new Promise(resolve=>setImmediate(resolve));
 assert.equal(balanceNode.textContent,110,'settlement must update the sidebar balance');
 sidebar.disconnectedCallback(); assert.equal(walletListeners.has('prophit-live'),false);
+// A delayed read started before the credit must not overwrite its confirmed balance.
+let resolveOldBalance;
+sidebarContext.ApiClient.get=()=>new Promise(resolve=>{resolveOldBalance=resolve;});
+const oldBalanceRead=sidebar.fetchBalance();
+sidebar.setBalance(120);
+resolveOldBalance({points:110});
+await oldBalanceRead;
+assert.equal(balanceNode.textContent,120,'pre-reward wallet response must not overwrite the credited balance');
+
+const profileReads=[];
+const apiContext=vm.createContext({
+    AbortController,setTimeout,clearTimeout,
+    document:{querySelector:()=>null},localStorage:{getItem:()=>null},window:{location:{}},
+    fetch:(url,options)=>options.method==='POST'
+        ? Promise.resolve({ok:true,status:200,text:async()=>JSON.stringify({new_balance:100})})
+        : new Promise(resolve=>profileReads.push(resolve))
+});
+vm.runInContext(fs.readFileSync(path.join(root,'js/api/client.js'),'utf8').replace('export default ApiClient;','this.TestApiClient = ApiClient;'),apiContext);
+const client=apiContext.TestApiClient;
+const staleProfile=client.get('/me');
+await client.post('/me/daily-login');
+const freshProfile=client.get('/me');
+assert.equal(profileReads.length,2,'reward mutation must invalidate an older in-flight balance read');
+profileReads[0]({ok:true,status:200,text:async()=>JSON.stringify({points:90})});
+await staleProfile;
+assert.equal(client.profileRequest,freshProfile,'older read must not clear a newer shared read');
+profileReads[1]({ok:true,status:200,text:async()=>JSON.stringify({points:100})});
+assert.equal((await freshProfile).points,100);
+
+const rewardButton={disabled:true,textContent:''};
+const rewardStatus={textContent:''};
+const rewardBalances=[];
+const dashboardContext=vm.createContext({
+    document:{addEventListener:()=>{},getElementById:id=>id==='claimDailyBtn'?rewardButton:id==='dailyRewardStatus'?rewardStatus:{textContent:''},querySelector:()=>({setBalance:balance=>rewardBalances.push(balance)})},
+    window:{addEventListener:()=>{}},
+    ApiClient:{get:async()=>({current_streak:1})},showToast:()=>{}
+});
+vm.runInContext(fs.readFileSync(path.join(root,'js/pages/dashboard.js'),'utf8').replace(/^import .*;\r?\n/gm,''),dashboardContext);
+dashboardContext.renderDailyReward({already_checked_in:true,coins_earned:0,next_claim_at:'2026-10-05T00:00:00Z'});
+assert.equal(rewardButton.disabled,true,'an automatic login credit must disable the duplicate claim');
+assert.match(rewardButton.textContent,/credited today/);
+dashboardContext.renderDailyReward({already_checked_in:false,coins_earned:0});
+assert.equal(rewardButton.disabled,false);
+dashboardContext.renderDailyReward({already_checked_in:false,coins_earned:10,next_claim_at:'2026-10-05T00:00:00Z'});
+assert.equal(rewardButton.disabled,true,'a successful manual claim must show credited');
+dashboardContext.renderDailyReward({already_checked_in:false,coins_earned:0});
+let resolveClaim;
+let claimCalls=0;
+dashboardContext.ApiClient.post=()=>{claimCalls++;return new Promise(resolve=>{resolveClaim=resolve;});};
+const dailyClaim=dashboardContext.window.claimDailyReward();
+await dashboardContext.window.claimDailyReward();
+assert.equal(claimCalls,1,'rapid double clicks must send only one claim');
+resolveClaim({already_checked_in:false,coins_earned:10,new_balance:100,next_claim_at:'2026-10-05T00:00:00Z'});
+await dailyClaim;
+assert.deepEqual(rewardBalances,[100,100],'confirmed credit must update both balance displays');
+assert.equal(rewardButton.disabled,true);
+dashboardContext.renderDailyReward({already_checked_in:false,coins_earned:0});
+dashboardContext.ApiClient.post=async()=>{throw new Error('Offline');};
+await dashboardContext.window.claimDailyReward();
+assert.equal(rewardButton.disabled,false,'failed claim must remain retryable');
+assert.match(rewardButton.textContent,/Retry/);
 for (const fabricatedValue of ['55%', '142,500', '1,204']) {
     assert.equal(marketPage.includes(fabricatedValue), false, `market.html: fabricated statistic ${fabricatedValue}`);
 }
