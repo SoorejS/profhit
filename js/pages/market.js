@@ -33,6 +33,7 @@ async function loadMarketDetails() {
     try {
         const market = await ApiClient.get(new URLSearchParams(location.search).has('preview') ? `/admin/markets/${encodeURIComponent(currentMarketId)}/preview` : `/markets/${encodeURIComponent(currentMarketId)}`);
         currentMarket=market;
+        currentSelection = null;
         document.querySelector(".trade-card").innerHTML=tradeMarkup;
         currentPayout = Number(market.payout) * (market.weekly_challenge_id ? 2 : 1);
         document.getElementById('entryCost').textContent = `${Number(market.entry_coins)||0} Coins`;
@@ -40,7 +41,12 @@ async function loadMarketDetails() {
         document.getElementById('marketPredictionCount').textContent = participation(market);
         const options = JSON.parse(market.options);
         const optionsContainer = document.querySelector('.prediction-buttons');
-        if (optionsContainer) { optionsContainer.replaceChildren(); ( ['binary','winner','direction','multi_choice',''].includes(market.prediction_type||'') ? options : [] ).forEach(option => { const button = document.createElement('button'); button.className = 'btn btn-outline'; button.textContent = option; button.dataset.option = option; button.addEventListener('click', () => selectPrediction(option)); optionsContainer.append(button); }); }
+        if (optionsContainer) {
+            optionsContainer.replaceChildren();
+            (['binary','winner','direction','multi_choice',''].includes(market.prediction_type||'') ? options : []).forEach(option => {
+                optionsContainer.append(createPredictionButton(option));
+            });
+        }
         renderTypedAnswer(market);
         document.getElementById('potentialReturn').textContent = `${currentPayout} coins${market.weekly_challenge_id?' (weekly challenge: 2×)':''}`;
 
@@ -68,7 +74,7 @@ async function loadMarketDetails() {
             statusEl.className = 'badge badge-success';
             document.querySelector('.trade-card').innerHTML = `<h3 class="text-success text-center">Market Resolved: ${escapeHTML(market.correct_option)}</h3>`;
         } else if (['Draft','Proposed'].includes(market.resolution_status)) {
-            statusEl.textContent='Draft preview'; document.querySelector('.trade-card').innerHTML=tradeMarkup; document.getElementById('entryCost').textContent=`${market.entry_coins} Coins`; document.getElementById('marketFixedPayout').textContent=`${market.payout} Coins`; const choices=document.querySelector('.prediction-buttons'); choices.replaceChildren(); for(const option of options){const b=document.createElement('button');b.className='btn btn-outline';b.textContent=option;b.disabled=true;choices.append(b);} document.getElementById('tradeForm').classList.add('hidden');
+            statusEl.textContent='Draft preview'; document.querySelector('.trade-card').innerHTML=tradeMarkup; document.getElementById('entryCost').textContent=`${market.entry_coins} Coins`; document.getElementById('marketFixedPayout').textContent=`${market.payout} Coins`; const choices=document.querySelector('.prediction-buttons'); choices.replaceChildren(); for(const option of options){choices.append(createPredictionButton(option, true));} document.getElementById('tradeForm').classList.add('hidden');
         } else if (['Paused','Voided'].includes(market.resolution_status)) {
             statusEl.textContent = market.resolution_status;
             document.querySelector('.trade-card').textContent = market.resolution_status === 'Voided' ? 'This prediction was cancelled. Entry Coins have been refunded.' : 'Predictions are temporarily paused.';
@@ -98,6 +104,20 @@ async function loadMarketDetails() {
     }
 }
 
+function createPredictionButton(option, disabled = false) {
+    const button = document.createElement('button');
+    const label = String(option).trim().toLowerCase();
+    const tone = label === 'yes' ? 'btn-yes' : label === 'no' ? 'btn-no' : 'btn-outline';
+    button.className = `btn ${tone}`;
+    button.type = 'button';
+    button.textContent = option;
+    button.dataset.option = option;
+    button.disabled = disabled;
+    button.setAttribute('aria-pressed', 'false');
+    if (!disabled) button.addEventListener('click', () => selectPrediction(option));
+    return button;
+}
+
 function selectPrediction(outcome) {
     currentSelection = outcome;
     document.getElementById('tradeForm').classList.remove('hidden');
@@ -116,6 +136,7 @@ async function executeTrade() {
         const result=await ApiClient.post('/predictions',{market_id:Number(currentMarketId),choice,amount:Number(currentMarket.entry_coins)||0});
         showToast(`Prediction recorded. ${result.staked} virtual coins spent. Correct-answer reward: ${result.potential_payout} coins.`,'success');
         document.getElementById('tradeForm').classList.add('hidden');currentSelection=null;
+        document.querySelectorAll('[data-option]').forEach(option => option.setAttribute('aria-pressed', 'false'));
         document.querySelector('app-topbar')?.fetchBalance();document.querySelector('app-sidebar')?.fetchBalance();
         await refreshActivity();
     }catch(err){showToast(err.message,'error');}finally{button.disabled=false;}

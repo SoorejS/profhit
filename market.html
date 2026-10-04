@@ -42,6 +42,7 @@
             margin-bottom: var(--spacing-4);
         }
         .prediction-buttons .btn {
+            position: relative;
             min-width: 0;
             white-space: normal;
             overflow-wrap: anywhere;
@@ -49,6 +50,32 @@
             font-size: 1.15rem;
             font-weight: 700;
             border-radius: var(--radius-md);
+        }
+        .prediction-buttons .btn-yes {
+            background-color: var(--color-yes);
+            border-color: var(--color-yes);
+        }
+        .prediction-buttons .btn-no {
+            background-color: var(--color-no);
+            border-color: var(--color-no);
+        }
+        .prediction-buttons .btn:hover:not(:disabled) { filter: brightness(1.12); }
+        .prediction-buttons .btn:active:not(:disabled) { transform: translateY(1px); }
+        .prediction-buttons .btn:focus-visible {
+            outline: 2px solid var(--text-primary);
+            outline-offset: 3px;
+        }
+        .prediction-buttons .btn[aria-pressed="true"] {
+            outline: 2px solid var(--text-primary);
+            outline-offset: 3px;
+            box-shadow: var(--shadow-md);
+        }
+        .prediction-buttons .btn[aria-pressed="true"]::after {
+            content: '\2713';
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            font-size: 0.8rem;
         }
         .prediction-buttons:has(button:nth-child(3)) { grid-template-columns: 1fr; }
         .prediction-buttons:has(button:nth-child(3)) .btn { font-size: 1rem; text-align: left; }

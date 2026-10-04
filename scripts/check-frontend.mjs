@@ -75,6 +75,41 @@ assert.equal(marketStatus({resolution_status:'Voided',start_time:'2026-10-04T12:
 const card=marketCard({id:3,title:'<img src=x onerror=alert(1)>',description:'Real context',category:'Sports',resolution_status:'Paused',news_url:'javascript:alert(1)',entry_coins:10,payout:25,volume:0});
 assert.ok(card.includes('&lt;img'));assert.ok(!card.includes('javascript:'));assert.ok(card.includes('Be the first to predict'));assert.ok(card.includes('10 Coins'));assert.ok(!card.includes('>LIVE<'));
 const marketPage = fs.readFileSync(path.join(root,'market.html'),'utf8');
+// API-rendered choices must retain their tones and expose an exclusive selection.
+const predictionButtons = [];
+let predictionFormHidden = true;
+const marketContext = vm.createContext({
+    document:{
+        querySelector:()=>({innerHTML:''}),
+        addEventListener:()=>{},
+        createElement:()=>({dataset:{},attributes:{},listeners:{},setAttribute(name,value){this.attributes[name]=value;},addEventListener(name,fn){this.listeners[name]=fn;}}),
+        querySelectorAll:()=>predictionButtons,
+        getElementById:id=>id==='tradeForm' ? {classList:{remove:()=>{predictionFormHidden=false;}}} : null
+    },
+    window:{addEventListener:()=>{}}
+});
+vm.runInContext(fs.readFileSync(path.join(root,'js/pages/market.js'),'utf8').replace(/^import .*;\r?\n/gm,''),marketContext);
+vm.runInContext("currentMarket = {prediction_type:'binary'}",marketContext);
+const yesButton = marketContext.createPredictionButton('Yes');
+const noButton = marketContext.createPredictionButton('No');
+predictionButtons.push(yesButton,noButton);
+assert.equal(yesButton.className,'btn btn-yes','API-rendered Yes must keep its green tone');
+assert.equal(noButton.className,'btn btn-no','API-rendered No must keep its red tone');
+assert.equal(yesButton.attributes['aria-pressed'],'false');
+yesButton.listeners.click();
+assert.equal(predictionFormHidden,false,'selecting an outcome must show the confirmation');
+assert.equal(yesButton.attributes['aria-pressed'],'true');
+assert.equal(noButton.attributes['aria-pressed'],'false');
+assert.equal(marketContext.readTypedAnswer(),'Yes','confirmation must use the selected Yes outcome');
+noButton.listeners.click();
+assert.equal(yesButton.attributes['aria-pressed'],'false');
+assert.equal(noButton.attributes['aria-pressed'],'true');
+assert.equal(marketContext.readTypedAnswer(),'No','switching choices must update the submitted outcome');
+assert.equal(marketContext.createPredictionButton('Buffalo Bills').className,'btn btn-outline','named outcomes must retain their labels');
+assert.equal(marketContext.createPredictionButton('constructor').className,'btn btn-outline');
+const previewButton = marketContext.createPredictionButton('Yes',true);
+assert.equal(previewButton.disabled,true);
+assert.equal(previewButton.listeners.click,undefined,'draft choices must not allow selection');
 // A settlement received while the page is open must refresh the sidebar wallet.
 const walletListeners = new Map();
 const balanceNode = {textContent:'--'};
