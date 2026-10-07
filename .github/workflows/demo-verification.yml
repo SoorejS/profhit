@@ -22,6 +22,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify no tracked Python code remains
+        shell: bash
+        run: test -z "$(git ls-files '*.py' '*.pyi' '*.ipynb')"
       - name: Start disposable PostgreSQL
         shell: bash
         run: |

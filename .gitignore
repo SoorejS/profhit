@@ -16,5 +16,7 @@ node_modules/
 audit-artifacts/
 .tmp/
 **/.tmp-go-cache/
+.frontend-migrate-backups/
+.frontend-migrate.lock
 
 backend/api_output.json

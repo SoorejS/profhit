@@ -1,0 +1,13 @@
+{
+  "admin.js": "function switchTab() {}\nfunction fetchProposedMarkets() {}\nfunction approveMarket() {}\nfunction resolveMarket() {}\nfunction fetchKycRequests() {}\nfunction reviewKyc() {}\nfunction fetchWithdrawals() {}\nfunction approveWithdrawal() {}\nfunction rejectWithdrawal() {}\n",
+  "dashboard.html": "<!DOCTYPE html>\n<html><head>\n<link rel=\"stylesheet\" href=\"css/tokens.css\">\n<link rel=\"stylesheet\" href=\"css/base.css\">\n<link rel=\"stylesheet\" href=\"css/components.css\">\n<link rel=\"stylesheet\" href=\"css/dashboard.css\">\n</head><body>\n<script type=\"module\" src=\"js/pages/dashboard.js\"></script>\n<script src=\"js/other.js\"></script>\n</body></html>\n",
+  "js/api.js": "class ApiClient {}\nwindow.ApiClient = ApiClient;\n",
+  "js/auth.js": "function login() { return window.ApiClient; }\n",
+  "js/components.js": "// Legacy combined components.\n",
+  "js/dashboard.js": "window.claimDailyReward = async () => window.showToast(\"Reward\");\n",
+  "js/market.js": "function submitPrediction() { return window.ApiClient; }\nfunction postComment() {}\n",
+  "js/pages/dashboard.js": "import '../components/sidebar.js';\nimport '../components/topbar.js';\n// Previously separated page without layout imports.\n",
+  "js/profile.js": "function updateProfile() { return window.showToast(\"Saved\"); }\n",
+  "js/wallet.js": "function openWithdraw() {}\nfunction startKYC() {}\n",
+  "login.html": "<html><head><link rel=\"stylesheet\" href=\"css/auth.css\"></head><body><script type=\"module\" src=\"js/pages/auth.js\"></script></body></html>\n"
+}

@@ -1,0 +1,2 @@
+function openWithdraw() {}
+function startKYC() {}

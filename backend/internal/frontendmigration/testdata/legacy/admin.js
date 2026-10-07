@@ -1,0 +1,9 @@
+function switchTab() {}
+function fetchProposedMarkets() {}
+function approveMarket() {}
+function resolveMarket() {}
+function fetchKycRequests() {}
+function reviewKyc() {}
+function fetchWithdrawals() {}
+function approveWithdrawal() {}
+function rejectWithdrawal() {}
